@@ -1,0 +1,40 @@
+<!-- @dsCard height=288 -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;600&display=swap">
+<style>
+  html, body { margin: 0; background: var(--ground); }
+  .cv { position: relative; width: 960px; height: 288px; background: var(--ground); overflow: hidden; }
+  .cv svg { position: absolute; inset: 0; }
+  .prim { fill: var(--primary); }
+  .raised { fill: var(--surface-raised); }
+  .deep { fill: var(--ground-deep); }
+  .acc { fill: var(--accent); }
+  .cut { fill: var(--ground); }
+  .wire { fill: none; stroke: var(--line-strong); stroke-width: 1; }
+  .t-md { rx: var(--radius-md); }
+  .t-lg { rx: var(--radius-lg); }
+  .cv-text { position: absolute; left: 48px; bottom: 40px; max-width: 420px; }
+  .cv-name { margin: 0; font: 600 120px/0.92 var(--font-sans); letter-spacing: -0.03em; color: var(--ink); }
+  .cv-tag { margin: 16px 0 0; font: 400 14px/20px var(--font-sans); color: var(--ink-muted); }
+</style>
+<div class="cv">
+  <svg viewBox="0 0 960 288" width="960" height="288" aria-hidden="true">
+    <!--
+      blocks: primary 256x224 (radius-lg, bleeds off the top), surface-raised 128x304 slab, ground-deep 128x128, one small accent 48x48 (the rare call to action)
+      arrangement: one tall primary slab with grey satellites, all right of x=480
+      pattern: literal motif, the folded ribbon of the Menab M cut from the primary block, plus four hairline isometric edges in the Expo wireframe style
+      scales: gaps space-4 (16px), radii radius-md and radius-lg
+    -->
+    <rect class="raised t-md" x="496" y="40" width="64" height="264"/>
+    <rect class="prim t-lg" x="576" y="-24" width="256" height="248"/>
+    <polygon class="cut" points="600,224 648,224 768,-24 720,-24"/>
+    <polygon class="cut" points="680,224 696,224 816,-24 800,-24"/>
+    <rect class="deep t-md" x="848" y="-16" width="128" height="144"/>
+    <rect class="raised t-md" x="848" y="144" width="128" height="160"/>
+    <rect class="acc t-md" x="864" y="160" width="48" height="48"/>
+    <path class="wire" d="M576 240 L704 272 L832 240 M704 272 L704 304"/>
+  </svg>
+  <div class="cv-text">
+    <p class="cv-name">Menab</p>
+    <p class="cv-tag">From brief to final cut, step by step.</p>
+  </div>
+</div>

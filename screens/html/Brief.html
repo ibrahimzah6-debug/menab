@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Menab brief stage</title>
+
+<link rel="stylesheet" href="../../design-system/tokens.css">
+<link rel="stylesheet" href="../../design-system/components/bundle.css">
+</head>
+<body>
+
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{opacity:.8}
+</style>
+
+<div data-theme="light" style="background: var(--ground); color: var(--ink); font-family: var(--font-sans); width: 100%; min-height: 900px; display: flex; flex-direction: column;">
+
+  <header style="padding: 14px 24px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: center; gap: 16px; background: var(--surface);">
+    <a href="Main.html"><img src="../../design-system/assets/Logos/menab-logo-ink.png" alt="Menab" style="height: 22px; width: auto;"></a>
+    <span style="color: var(--line-strong);">/</span>
+    <span style="font-size: 15px; font-weight: 500;">Ninja Ramadan ad</span>
+    <span class="mn-chip mn-chip--ready">Path not chosen yet</span>
+    <span style="flex-grow: 1;"></span>
+    <span class="mn-label">Balance $18.40</span>
+    <button class="mn-btn mn-btn--ghost mn-btn--sm" aria-label="Switch to Arabic">العربية</button>
+  </header>
+
+  <div style="padding: 16px 24px; display: flex; justify-content: center; overflow-x: auto;">
+    <nav class="mn-stagebar" aria-label="Project stages">
+      <span class="mn-stage mn-stage--current" aria-current="step"><span class="mn-stage__num">01</span>Brief</span>
+      <span class="mn-stage"><span class="mn-stage__num">02</span>Creative</span>
+      <span class="mn-stage"><span class="mn-stage__num">03</span>Look and characters</span>
+      <span class="mn-stage"><span class="mn-stage__num">04</span>Generate or shoot</span>
+      <span class="mn-stage"><span class="mn-stage__num">05</span>Edit</span>
+      <span class="mn-stage"><span class="mn-stage__num">06</span>Deliver</span>
+    </nav>
+  </div>
+
+  <main style="flex-grow: 1; max-width: 1240px; width: 100%; box-sizing: border-box; margin: 0 auto; padding: 8px 24px 24px; display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
+
+    <section aria-label="Conversation" style="flex: 999 1 560px; min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; display: flex; flex-direction: column; min-height: 620px;">
+      <div style="padding: 24px; display: flex; flex-direction: column; gap: 20px; flex-grow: 1;">
+        <div style="align-self: flex-end; max-width: 520px; background: var(--surface-raised); border-radius: 16px; padding: 12px 16px; font-size: 15px; line-height: 24px;">
+          A 30 second Ramadan ad for Ninja kitchen appliances. Warm, family, the moment before iftar. For Instagram and TV.
+        </div>
+        <div style="max-width: 560px; display: flex; flex-direction: column; gap: 8px;">
+          <span class="mn-label">Menab AI</span>
+          <p style="margin: 0; font-size: 15px; line-height: 24px;">Got it. I filled in what I could on the right. Three things are missing before I can write the creative:</p>
+          <ol style="margin: 0; padding-inline-start: 20px; font-size: 15px; line-height: 26px; color: var(--ink-muted);">
+            <li>When do you need the final video?</li>
+            <li>Should real Ninja products appear, or can the AI generate them?</li>
+            <li>Arabic only, or Arabic and English versions?</li>
+          </ol>
+        </div>
+        <div style="align-self: flex-end; max-width: 520px; background: var(--surface-raised); border-radius: 16px; padding: 12px 16px; font-size: 15px; line-height: 24px;">
+          Real products, we have them. Arabic first, English cut later.
+          <span style="display: block; margin-top: 6px;" class="mn-label">Voice note · 0:14</span>
+        </div>
+        <div style="max-width: 560px; display: flex; flex-direction: column; gap: 8px;">
+          <span class="mn-label">Menab AI</span>
+          <p style="margin: 0; font-size: 15px; line-height: 24px;">Because the real products must be on camera, I suggest a hybrid: shoot the products and the family, generate the street and the sunset outside. You can change this.</p>
+        </div>
+      </div>
+      <form style="margin: 0 16px 16px; border: 1px solid var(--line-control); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+        <label for="reply" class="mn-label">Reply</label>
+        <textarea id="reply" rows="2" placeholder="Type, or press the mic and speak" style="width: 100%; box-sizing: border-box; resize: none; border: 0; outline: none; background: transparent; color: var(--ink); font: 400 15px/24px var(--font-sans);"></textarea>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+          <button type="button" class="mn-btn mn-btn--secondary mn-btn--sm" aria-label="Record a voice note">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>
+            Voice
+          </button>
+          <button type="button" class="mn-btn mn-btn--secondary mn-btn--sm">Attach logo, products, references</button>
+          <span style="flex-grow: 1;"></span>
+          <button type="submit" class="mn-btn mn-btn--primary mn-btn--sm">Send</button>
+        </div>
+      </form>
+    </section>
+
+    <aside aria-label="Brief summary" style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+      <div style="background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;"><h2 style="margin: 0; font-size: 18px; font-weight: 500;">Brief</h2><span class="mn-label">Updates as you talk</span></div>
+        <dl style="margin: 0; display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px 12px; font-size: 14px; line-height: 20px;">
+          <dt style="color: var(--ink-muted);">Client</dt><dd style="margin: 0;">Ninja</dd>
+          <dt style="color: var(--ink-muted);">Goal</dt><dd style="margin: 0;">Ramadan brand ad, warm and family focused</dd>
+          <dt style="color: var(--ink-muted);">Length</dt><dd style="margin: 0;">30 sec, plus 15 and 6 sec cutdowns</dd>
+          <dt style="color: var(--ink-muted);">Formats</dt><dd style="margin: 0;">9:16 for Instagram, 16:9 for TV</dd>
+          <dt style="color: var(--ink-muted);">Language</dt><dd style="margin: 0;">Arabic (Saudi), English later</dd>
+          <dt style="color: var(--ink-muted);">Products</dt><dd style="margin: 0;">Real, supplied by client</dd>
+          <dt style="color: var(--ink-muted);">Deadline</dt><dd style="margin: 0;"><span class="mn-chip mn-chip--failed">Missing</span></dd>
+          <dt style="color: var(--ink-muted);">Budget</dt><dd style="margin: 0;"><span class="mn-chip mn-chip--waiting">Optional</span></dd>
+        </dl>
+      </div>
+      <div style="background: var(--surface); border: 1px solid var(--line-strong); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 12px;">
+        <span class="mn-label">Suggested path</span>
+        <h3 style="margin: 0; font-size: 18px; font-weight: 500;">Hybrid</h3>
+        <p style="margin: 0; font-size: 14px; line-height: 22px; color: var(--ink-muted);">Shoot the family and the products. Generate the street at sunset and the opening wide shot.</p>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button class="mn-btn mn-btn--secondary mn-btn--sm">Make it all AI</button>
+          <button class="mn-btn mn-btn--secondary mn-btn--sm">Shoot it all</button>
+        </div>
+        <span class="mn-label">AI cost estimate: [SHOWN AFTER CREATIVE]</span>
+      </div>
+    </aside>
+  </main>
+
+  <footer style="position: sticky; bottom: 0; background: var(--surface); border-top: 1px solid var(--line); padding: 14px 24px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+    <span style="font-size: 14px; color: var(--ink-muted);">Answer the missing deadline to approve the brief.</span>
+    <span style="flex-grow: 1;"></span>
+    <a class="mn-btn mn-btn--primary" href="StagePage.html">Approve brief</a>
+  </footer>
+</div>
+
+
+</body>
+</html>

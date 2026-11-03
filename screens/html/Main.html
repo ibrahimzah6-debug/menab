@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Menab website</title>
+
+<link rel="stylesheet" href="../../design-system/tokens.css">
+<link rel="stylesheet" href="../../design-system/components/bundle.css">
+</head>
+<body>
+
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{opacity:.8}
+</style>
+
+<div data-theme="dark" style="background: var(--ground); color: var(--ink); font-family: var(--font-sans); width: 100%;">
+
+  <header style="max-width: 1240px; margin: 0 auto; padding: 20px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 24px;">
+    <img src="../../design-system/assets/Logos/menab-logo-light.png" alt="Menab" style="height: 26px; width: auto;">
+    <nav aria-label="Main" style="display: flex; flex-wrap: wrap; gap: 24px; font-size: 14px; color: var(--ink-muted); flex-grow: 1;">
+      <a href="#how">How it works</a>
+      <a href="#templates">Templates</a>
+      <a href="#models">Models</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#houses">For production houses</a>
+    </nav>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <button class="mn-btn mn-btn--ghost mn-btn--sm" aria-label="Switch to Arabic">العربية</button>
+      <a class="mn-btn mn-btn--ghost mn-btn--sm" href="#login">Log in</a>
+      <a class="mn-btn mn-btn--primary mn-btn--sm" href="Brief.html">Start your project</a>
+    </div>
+  </header>
+
+  <section style="max-width: 1040px; margin: 0 auto; padding: 96px 24px 72px; display: flex; flex-direction: column; align-items: center; gap: 24px; text-align: center;">
+    <span class="mn-label">AI and production, one place</span>
+    <h1 style="margin: 0; font-size: clamp(40px, 6vw, 72px); line-height: 1.02; font-weight: 600; letter-spacing: -0.03em; text-wrap: balance;">From brief to final cut, step by step.</h1>
+    <p style="margin: 0; max-width: 600px; font-size: 18px; line-height: 28px; color: var(--ink-muted);">Tell Menab what you need. It writes the creative, builds the storyboard and either generates the video with AI or prepares every document a production house needs.</p>
+    <form style="width: 100%; max-width: 720px; margin-top: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 16px; display: flex; flex-direction: column; gap: 12px; text-align: start;">
+      <label for="brief" class="mn-label">Your brief</label>
+      <textarea id="brief" rows="3" placeholder="A 30 second Ramadan ad for a kitchen appliance brand, warm and family focused, for Instagram and TV" style="width: 100%; box-sizing: border-box; resize: none; background: transparent; border: 0; color: var(--ink); font: 400 16px/24px var(--font-sans); outline: none;"></textarea>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+        <button type="button" class="mn-btn mn-btn--secondary mn-btn--sm" aria-label="Record a voice note">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>
+          Voice note
+        </button>
+        <button type="button" class="mn-btn mn-btn--secondary mn-btn--sm">Attach files</button>
+        <span style="flex-grow: 1;"></span>
+        <a class="mn-btn mn-btn--accent" href="Brief.html">Start your project</a>
+      </div>
+    </form>
+    <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;">
+      <span class="mn-chip mn-chip--ready">Ramadan ad</span>
+      <span class="mn-chip mn-chip--ready">Product launch</span>
+      <span class="mn-chip mn-chip--ready">Event recap</span>
+      <span class="mn-chip mn-chip--ready">Interview</span>
+      <span class="mn-chip mn-chip--ready">Social series</span>
+    </div>
+  </section>
+
+  <section id="how" style="max-width: 1240px; margin: 0 auto; padding: 64px 24px;">
+    <div style="background: var(--ground-deep); border: 1px solid var(--line); border-radius: 24px; padding: 48px; display: flex; flex-wrap: wrap; gap: 48px; align-items: center;">
+      <div style="flex: 1 1 420px; min-width: 0; display: flex; justify-content: center;">
+        <svg viewBox="0 0 600 480" style="width: 100%; max-width: 520px; height: auto;" role="img" aria-label="Line drawing of the Menab M as a 3D box, showing the brief stage">
+          <g fill="none" stroke="var(--line-strong)" stroke-width="1.2">
+            <polygon points="196,200 300,260 300,400 196,340" fill="var(--tint-2)"></polygon>
+            <path d="M300 140 L404 200 L300 260 L196 200 Z"></path>
+            <path d="M196 200 V340 L300 400 L404 340 V200 M300 260 V400"></path>
+            <path d="M300 140 V280 M300 280 L196 340 M300 280 L404 340" stroke-dasharray="5 5"></path>
+            <path d="M300 180 L370 220 L300 260 L230 220 Z" stroke="var(--line-control)"></path>
+            <path d="M230 220 V300 L300 340 L370 300 V220 M300 260 V340" stroke="var(--line-control)"></path>
+            <path d="M120 156 L300 52 L480 156 M120 156 V356 M480 156 V356" stroke-dasharray="3 6"></path>
+          </g>
+          <g>
+            <polygon points="300,300 338,322 300,344 262,322" fill="var(--ink)"></polygon>
+            <polygon points="262,322 300,344 300,388 262,366" fill="var(--ink-muted)"></polygon>
+            <polygon points="300,344 338,322 338,366 300,388" fill="var(--ink-faint)"></polygon>
+          </g>
+          <circle cx="300" cy="260" r="4" fill="var(--ink)"></circle>
+        </svg>
+      </div>
+      <div style="flex: 1 1 420px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+        <span class="mn-label">01 / 07</span>
+        <h2 style="margin: 0 0 16px; font-size: 36px; line-height: 42px; font-weight: 600; letter-spacing: -0.01em;">See every stage before you start</h2>
+        <ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column;">
+          <li style="padding: 16px 0; border-top: 1px solid var(--line);">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span class="mn-label" style="color: var(--ink);">01</span>
+              <span style="font-size: 22px; font-weight: 500;">Brief</span>
+              <button class="mn-btn mn-btn--secondary mn-btn--sm" aria-label="Play the brief stage" style="padding: 0 10px;"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 2l7 4-7 4z" fill="currentColor"></path></svg></button>
+            </div>
+            <p style="margin: 8px 0 0 36px; font-size: 15px; line-height: 24px; color: var(--ink-muted); max-width: 440px;">Write or speak your idea. Menab asks only what is missing, then suggests AI, a shoot, or both, with a cost range.</p>
+          </li>
+          <li style="padding: 16px 0; border-top: 1px solid var(--line); display: flex; gap: 12px; align-items: center; color: var(--ink-faint);"><span class="mn-label">02</span><span style="font-size: 22px; font-weight: 500;">Creative</span></li>
+          <li style="padding: 16px 0; border-top: 1px solid var(--line); display: flex; gap: 12px; align-items: center; color: var(--ink-faint);"><span class="mn-label">03</span><span style="font-size: 22px; font-weight: 500;">Look and characters</span></li>
+          <li style="padding: 16px 0; border-top: 1px solid var(--line); display: flex; gap: 12px; align-items: center; color: var(--ink-faint);"><span class="mn-label">04</span><span style="font-size: 22px; font-weight: 500;">Pre-production</span></li>
+          <li style="padding: 16px 0; border-top: 1px solid var(--line); display: flex; gap: 12px; align-items: center; color: var(--ink-faint);"><span class="mn-label">05</span><span style="font-size: 22px; font-weight: 500;">Generate or shoot</span></li>
+          <li style="padding: 16px 0; border-top: 1px solid var(--line); display: flex; gap: 12px; align-items: center; color: var(--ink-faint);"><span class="mn-label">06</span><span style="font-size: 22px; font-weight: 500;">Edit</span></li>
+          <li style="padding: 16px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: center; color: var(--ink-faint);"><span class="mn-label">07</span><span style="font-size: 22px; font-weight: 500;">Deliver</span></li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <section id="houses" style="max-width: 1240px; margin: 0 auto; padding: 64px 24px; display: flex; flex-direction: column; gap: 32px;">
+    <h2 style="margin: 0; font-size: 36px; line-height: 42px; font-weight: 600; max-width: 640px; text-wrap: balance;">Make it with AI, shoot it for real, or mix both</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+      <article style="background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 12px;">
+        <span class="mn-label">AI path</span>
+        <h3 style="margin: 0; font-size: 20px; font-weight: 500;">Generate the whole video</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 24px; color: var(--ink-muted);">Characters and locations stay locked, so every shot looks like the same film.</p>
+      </article>
+      <article style="background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 12px;">
+        <span class="mn-label">Production path</span>
+        <h3 style="margin: 0; font-size: 20px; font-weight: 500;">Get every document for the shoot</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 24px; color: var(--ink-muted);">Treatment, storyboard, CPS, PPM booklet, call sheets and GAMR permit data, ready to share.</p>
+      </article>
+      <article style="background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 12px;">
+        <span class="mn-label">Hybrid</span>
+        <h3 style="margin: 0; font-size: 20px; font-weight: 500;">Choose scene by scene</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 24px; color: var(--ink-muted);">Shoot your product for real and generate the worlds around it.</p>
+      </article>
+    </div>
+  </section>
+
+  <section id="templates" style="max-width: 1240px; margin: 0 auto; padding: 64px 24px; display: flex; flex-direction: column; gap: 24px;">
+    <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 16px;">
+      <h2 style="margin: 0; font-size: 36px; line-height: 42px; font-weight: 600;">Start from a template</h2>
+      <a class="mn-btn mn-btn--secondary mn-btn--sm" href="#templates">See all templates</a>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+      <a href="Brief.html" style="display: flex; flex-direction: column; gap: 10px;"><div style="aspect-ratio: 4/5; background: var(--surface-raised); border: 1px solid var(--line); border-radius: 12px;"></div><span style="font-size: 15px; font-weight: 500;">Ramadan ad</span><span class="mn-label">30 sec · 9:16 and 16:9</span></a>
+      <a href="Brief.html" style="display: flex; flex-direction: column; gap: 10px;"><div style="aspect-ratio: 4/5; background: var(--surface-raised); border: 1px solid var(--line); border-radius: 12px;"></div><span style="font-size: 15px; font-weight: 500;">Product launch</span><span class="mn-label">15 sec · 9:16</span></a>
+      <a href="Brief.html" style="display: flex; flex-direction: column; gap: 10px;"><div style="aspect-ratio: 4/5; background: var(--surface-raised); border: 1px solid var(--line); border-radius: 12px;"></div><span style="font-size: 15px; font-weight: 500;">Event recap</span><span class="mn-label">60 sec · 16:9</span></a>
+      <a href="Brief.html" style="display: flex; flex-direction: column; gap: 10px;"><div style="aspect-ratio: 4/5; background: var(--surface-raised); border: 1px solid var(--line); border-radius: 12px;"></div><span style="font-size: 15px; font-weight: 500;">National Day</span><span class="mn-label">30 sec · 16:9</span></a>
+      <a href="Brief.html" style="display: flex; flex-direction: column; gap: 10px;"><div style="aspect-ratio: 4/5; background: var(--surface-raised); border: 1px solid var(--line); border-radius: 12px;"></div><span style="font-size: 15px; font-weight: 500;">Interview</span><span class="mn-label">3 min · 16:9</span></a>
+    </div>
+  </section>
+
+  <section id="models" style="max-width: 1240px; margin: 0 auto; padding: 64px 24px; display: flex; flex-direction: column; gap: 24px;">
+    <h2 style="margin: 0; font-size: 36px; line-height: 42px; font-weight: 600;">The best models, one place</h2>
+    <p style="margin: 0; max-width: 560px; font-size: 16px; line-height: 26px; color: var(--ink-muted);">Every step has a default model. Switch any time, edit the prompt and compare.</p>
+    <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+      <span class="mn-btn mn-btn--secondary">Nano Banana 2 <span class="mn-btn__cost">Images</span></span>
+      <span class="mn-btn mn-btn--secondary">Kling 3.0 <span class="mn-btn__cost">Video</span></span>
+      <span class="mn-btn mn-btn--secondary">Seedance 2.5 <span class="mn-btn__cost">Video</span></span>
+      <span class="mn-btn mn-btn--secondary">Veo 3.1 <span class="mn-btn__cost">Video</span></span>
+      <span class="mn-btn mn-btn--secondary">ElevenLabs <span class="mn-btn__cost">Voice</span></span>
+      <span class="mn-btn mn-btn--secondary">Suno <span class="mn-btn__cost">Music</span></span>
+      <span class="mn-btn mn-btn--secondary">Claude <span class="mn-btn__cost">Script</span></span>
+    </div>
+  </section>
+
+  <section id="pricing" style="max-width: 1240px; margin: 0 auto; padding: 64px 24px;">
+    <div style="border: 1px solid var(--line); border-radius: 24px; padding: 48px; display: flex; flex-wrap: wrap; gap: 32px; align-items: center; justify-content: space-between;">
+      <div style="max-width: 560px; display: flex; flex-direction: column; gap: 12px;">
+        <h2 style="margin: 0; font-size: 36px; line-height: 42px; font-weight: 600;">Free to use. Pay only for what the AI makes.</h2>
+        <p style="margin: 0; font-size: 16px; line-height: 26px; color: var(--ink-muted);">No plans and no expiring credits. You see the cost of every generation before it runs, at the provider's price.</p>
+      </div>
+      <a class="mn-btn mn-btn--primary" href="Brief.html">Start your project</a>
+    </div>
+  </section>
+
+  <footer style="max-width: 1240px; margin: 0 auto; padding: 48px 24px 64px; display: flex; flex-wrap: wrap; gap: 24px; justify-content: space-between; align-items: center; border-top: 1px solid var(--line); color: var(--ink-faint); font-size: 13px;">
+    <img src="../../design-system/assets/Logos/menab-logo-light.png" alt="Menab" style="height: 20px; width: auto; opacity: .7;">
+    <span>menab.si</span>
+  </footer>
+</div>
+
+
+</body>
+</html>

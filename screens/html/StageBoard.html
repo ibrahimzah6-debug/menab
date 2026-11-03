@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Menab creative stage, board view</title>
+
+<link rel="stylesheet" href="../../design-system/tokens.css">
+<link rel="stylesheet" href="../../design-system/components/bundle.css">
+</head>
+<body>
+
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{opacity:.8}
+</style>
+
+<div data-theme="light" style="background: var(--ground); color: var(--ink); font-family: var(--font-sans); width: 100%; min-height: 900px; display: flex; flex-direction: column;">
+
+  <header style="padding: 14px 24px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: center; gap: 16px; background: var(--surface);">
+    <a href="Main.html"><img src="../../design-system/assets/Logos/menab-logo-ink.png" alt="Menab" style="height: 22px; width: auto;"></a>
+    <span style="color: var(--line-strong);">/</span>
+    <span style="font-size: 15px; font-weight: 500;">Ninja Ramadan ad</span>
+    <span class="mn-chip mn-chip--ready">Hybrid</span>
+    <span style="flex-grow: 1;"></span>
+    <span class="mn-label">Spent $0.62 · Balance $17.78</span>
+    <button class="mn-btn mn-btn--ghost mn-btn--sm" aria-label="Switch to Arabic">العربية</button>
+  </header>
+
+  <div style="padding: 16px 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between;">
+    <div style="overflow-x: auto; max-width: 100%;">
+      <nav class="mn-stagebar" aria-label="Project stages">
+        <span class="mn-stage mn-stage--done"><svg class="mn-chip__icon" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2.5 6.2l2.3 2.3 4.7-5"></path></svg>Brief</span>
+        <span class="mn-stage mn-stage--current" aria-current="step"><span class="mn-stage__num">02</span>Creative</span>
+        <span class="mn-stage"><span class="mn-stage__num">03</span>Look and characters</span>
+        <span class="mn-stage"><span class="mn-stage__num">04</span>Pre-production</span>
+        <span class="mn-stage"><span class="mn-stage__num">05</span>Generate and shoot</span>
+        <span class="mn-stage"><span class="mn-stage__num">06</span>Edit</span>
+        <span class="mn-stage"><span class="mn-stage__num">07</span>Deliver</span>
+      </nav>
+    </div>
+    <div style="display: flex; gap: 12px; align-items: center;">
+      <span class="mn-chip mn-chip--generating"><span class="mn-chip__icon" aria-hidden="true"></span>Menab AI is writing the treatment</span>
+      <div class="mn-stagebar" role="group" aria-label="View">
+        <a class="mn-stage" href="StagePage.html">Page</a>
+        <a class="mn-stage mn-stage--current" href="StageBoard.html">Board</a>
+      </div>
+    </div>
+  </div>
+
+  <main style="flex-grow: 1; padding: 0 24px 24px; display: flex; flex-direction: column;">
+    <div style="overflow: auto; border-radius: 16px; border: 1px solid var(--line); flex-grow: 1;">
+      <div class="mn-board" style="position: relative; min-width: 1240px; height: 640px; box-sizing: border-box; border-radius: 0;">
+
+        <svg width="1240" height="640" style="position: absolute; inset: 0;" aria-hidden="true">
+          <g fill="none" stroke="var(--line-strong)" stroke-width="1.2">
+            <path d="M272 140 H328"></path>
+            <path d="M568 140 H624"></path>
+            <path d="M744 248 V312"></path>
+            <path d="M864 380 H920"></path>
+          </g>
+        </svg>
+
+        <article class="mn-card" style="position: absolute; left: 32px; top: 40px;">
+          <div class="mn-card__head"><span class="mn-label">07 Directions</span><span class="mn-chip mn-chip--approved"><svg class="mn-chip__icon" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2.5 6.2l2.3 2.3 4.7-5"></path></svg>Approved</span></div>
+          <h3 class="mn-card__title">The last minute before iftar</h3>
+          <p class="mn-card__text">A family races the clock while one appliance brings everyone to the table.</p>
+          <div class="mn-card__meta"><span>Picked of 3</span><span>v1</span></div>
+        </article>
+
+        <article class="mn-card" style="position: absolute; left: 328px; top: 40px;">
+          <div class="mn-card__head"><span class="mn-label">08 Meeting notes</span><span class="mn-chip mn-chip--approved"><svg class="mn-chip__icon" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2.5 6.2l2.3 2.3 4.7-5"></path></svg>Approved</span></div>
+          <h3 class="mn-card__title">Client picked direction A</h3>
+          <p class="mn-card__text">Keep the timer in frame. Daughter takes over. Saudi dialect only.</p>
+          <div class="mn-card__meta"><span>From voice note</span><span>v1</span></div>
+        </article>
+
+        <article class="mn-card" style="position: absolute; left: 624px; top: 40px;">
+          <div class="mn-card__head"><span class="mn-label">09 Script</span><span class="mn-chip mn-chip--ready">Ready</span></div>
+          <h3 class="mn-card__title">30 sec AV script</h3>
+          <p class="mn-card__text">5 beats. 1 AI shot, 4 shoot. Arabic VO in Saudi dialect.</p>
+          <div class="mn-card__meta"><span>Claude</span><span>v2</span></div>
+        </article>
+
+        <article class="mn-card mn-card--ai" style="position: absolute; left: 624px; top: 312px;">
+          <div class="mn-card__head"><span class="mn-label">10 Treatment</span><span class="mn-chip mn-chip--generating"><span class="mn-chip__icon" aria-hidden="true"></span>Generating</span></div>
+          <div class="mn-card__media" aria-hidden="true"></div>
+          <h3 class="mn-card__title">Director's treatment</h3>
+          <p class="mn-card__text mn-typing">Warm tungsten light, handheld close-ups in the kitchen, the timer always in frame</p>
+        </article>
+
+        <div class="mn-cursor" style="left: 840px; top: 430px;" aria-hidden="true">
+          <svg class="mn-cursor__arrow" viewBox="0 0 16 16"><path d="M1 1l13 6-6 1.5L6.5 15z"></path></svg>
+          <span class="mn-cursor__tag">Menab AI</span>
+        </div>
+
+        <article style="position: absolute; left: 920px; top: 312px; width: 240px; box-sizing: border-box; border: 1px dashed var(--line-control); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 8px; background: var(--tint-1);">
+          <div style="display: flex; justify-content: space-between; align-items: center;"><span class="mn-label">11 Visual mood</span><span class="mn-chip mn-chip--waiting">Waiting</span></div>
+          <p style="margin: 0; font-size: 13px; line-height: 20px; color: var(--ink-faint);">Starts when the treatment is ready.</p>
+        </article>
+
+        <div style="position: absolute; right: 24px; bottom: 24px; display: flex; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px; box-shadow: var(--shadow-float);">
+          <button class="mn-btn mn-btn--ghost mn-btn--sm" aria-label="Zoom out">−</button>
+          <span class="mn-label" style="align-self: center;">100%</span>
+          <button class="mn-btn mn-btn--ghost mn-btn--sm" aria-label="Zoom in">+</button>
+          <button class="mn-btn mn-btn--ghost mn-btn--sm">Fit</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer style="position: sticky; bottom: 0; background: var(--surface); border-top: 1px solid var(--line); padding: 14px 24px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+    <span style="font-size: 14px; color: var(--ink-muted);">Click any card to open it. Drag to rearrange.</span>
+    <span style="flex-grow: 1;"></span>
+    <button class="mn-btn mn-btn--secondary">Pause AI</button>
+    <button class="mn-btn mn-btn--primary">Approve stage 2</button>
+  </footer>
+</div>
+
+
+</body>
+</html>

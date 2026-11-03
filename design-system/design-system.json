@@ -1,0 +1,70 @@
+{
+  "v": 3,
+  "assetGroups": {
+    "Logos": {
+      "files": {
+        "menab-logo-ink.png": {
+          "blob": "9e63df10f5e7ac0debe072d0ef60c090",
+          "name": "menab-logo-ink.png",
+          "size": 104930,
+          "type": "image/png"
+        },
+        "menab-logo-light.png": {
+          "blob": "b3696a6678243e9d7b6c284b128a1bcb",
+          "name": "menab-logo-light.png",
+          "size": 104926,
+          "type": "image/png"
+        },
+        "menab-mark-ember.png": {
+          "blob": "d39f31822f72dc63b89b89950249e019",
+          "name": "menab-mark-ember.png",
+          "size": 32031,
+          "type": "image/png"
+        },
+        "menab-mark-ink.png": {
+          "blob": "433ad5f8c274c6ed1b1e2c803ce88bd9",
+          "name": "menab-mark-ink.png",
+          "size": 31896,
+          "type": "image/png"
+        },
+        "menab-mark-light.png": {
+          "blob": "0ddfb5e7cf585568829afc04fed2fdb5",
+          "name": "menab-mark-light.png",
+          "size": 31879,
+          "type": "image/png"
+        }
+      },
+      "name": "Logos",
+      "order": [
+        "menab-logo-light.png",
+        "menab-logo-ink.png",
+        "menab-mark-light.png",
+        "menab-mark-ink.png",
+        "menab-mark-ember.png"
+      ],
+      "tile": "l"
+    }
+  },
+  "blobs": {},
+  "createdOnFiles": {
+    "at": "2026-11-03T16:55:00Z",
+    "v": 1
+  },
+  "docs": {
+    "sections": []
+  },
+  "groups": [
+    "Logos"
+  ],
+  "lastChange": {
+    "by": "Ibrahim",
+    "at": "2026-11-03T17:30:00Z",
+    "via": "Claude",
+    "note": "Black, white and gray from Storyflow, rare orange accent, Rubik, Expo-style teaching"
+  },
+  "layout": "files",
+  "libraries": [],
+  "namespace": "Menab",
+  "sections": {},
+  "title": "Menab"
+}

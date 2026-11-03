@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Menab creative stage, page view</title>
+
+<link rel="stylesheet" href="../../design-system/tokens.css">
+<link rel="stylesheet" href="../../design-system/components/bundle.css">
+</head>
+<body>
+
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{opacity:.8}
+</style>
+
+<div data-theme="light" style="background: var(--ground); color: var(--ink); font-family: var(--font-sans); width: 100%; min-height: 900px; display: flex; flex-direction: column;">
+
+  <header style="padding: 14px 24px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: center; gap: 16px; background: var(--surface);">
+    <a href="Main.html"><img src="../../design-system/assets/Logos/menab-logo-ink.png" alt="Menab" style="height: 22px; width: auto;"></a>
+    <span style="color: var(--line-strong);">/</span>
+    <span style="font-size: 15px; font-weight: 500;">Ninja Ramadan ad</span>
+    <span class="mn-chip mn-chip--ready">Hybrid</span>
+    <span style="flex-grow: 1;"></span>
+    <span class="mn-label">Spent $0.62 · Balance $17.78</span>
+    <button class="mn-btn mn-btn--ghost mn-btn--sm" aria-label="Switch to Arabic">العربية</button>
+  </header>
+
+  <div style="padding: 16px 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between;">
+    <div style="overflow-x: auto; max-width: 100%;">
+      <nav class="mn-stagebar" aria-label="Project stages">
+        <span class="mn-stage mn-stage--done"><svg class="mn-chip__icon" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2.5 6.2l2.3 2.3 4.7-5"></path></svg>Brief</span>
+        <span class="mn-stage mn-stage--current" aria-current="step"><span class="mn-stage__num">02</span>Creative</span>
+        <span class="mn-stage"><span class="mn-stage__num">03</span>Look and characters</span>
+        <span class="mn-stage"><span class="mn-stage__num">04</span>Pre-production</span>
+        <span class="mn-stage"><span class="mn-stage__num">05</span>Generate and shoot</span>
+        <span class="mn-stage"><span class="mn-stage__num">06</span>Edit</span>
+        <span class="mn-stage"><span class="mn-stage__num">07</span>Deliver</span>
+      </nav>
+    </div>
+    <div class="mn-stagebar" role="group" aria-label="View">
+      <a class="mn-stage mn-stage--current" href="StagePage.html">Page</a>
+      <a class="mn-stage" href="StageBoard.html">Board</a>
+    </div>
+  </div>
+
+  <main style="flex-grow: 1; width: 100%; box-sizing: border-box; padding: 0 24px 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+
+    <nav aria-label="Outputs in this stage" style="flex: 1 1 220px; max-width: 260px; min-width: 0; background: var(--ground-deep); border: 1px solid var(--line); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 4px;">
+      <span class="mn-label" style="padding: 8px;">Stage 2 · 6 outputs</span>
+      <a href="#o7" style="display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px; border-radius: 10px; font-size: 14px;">Directions <span class="mn-chip mn-chip--approved"><svg class="mn-chip__icon" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2.5 6.2l2.3 2.3 4.7-5"></path></svg>Approved</span></a>
+      <a href="#o8" style="display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px; border-radius: 10px; font-size: 14px;">Meeting notes <span class="mn-chip mn-chip--approved"><svg class="mn-chip__icon" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2.5 6.2l2.3 2.3 4.7-5"></path></svg>Approved</span></a>
+      <a href="#o9" aria-current="page" style="display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px; border-radius: 10px; font-size: 14px; font-weight: 500; background: var(--surface); border: 1px solid var(--line);">Script <span class="mn-chip mn-chip--ready">Ready</span></a>
+      <a href="#o10" style="display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px; border-radius: 10px; font-size: 14px;">Treatment <span class="mn-chip mn-chip--generating"><span class="mn-chip__icon" aria-hidden="true"></span>Generating</span></a>
+      <a href="#o11" style="display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px; border-radius: 10px; font-size: 14px; color: var(--ink-muted);">Visual mood <span class="mn-chip mn-chip--waiting">Waiting</span></a>
+      <a href="#o12" style="display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px; border-radius: 10px; font-size: 14px; color: var(--ink-muted);">Client approval <span class="mn-chip mn-chip--waiting">Waiting</span></a>
+    </nav>
+
+    <section aria-label="Script" style="flex: 999 1 560px; min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; display: flex; flex-direction: column;">
+      <div style="padding: 20px 24px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
+        <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 4px;">
+          <span class="mn-label">09 Script · 30 sec · v2</span>
+          <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600;">The last minute before iftar</h1>
+        </div>
+        <button class="mn-btn mn-btn--ghost mn-btn--sm">Versions</button>
+        <button class="mn-btn mn-btn--secondary mn-btn--sm">Edit</button>
+        <button class="mn-btn mn-btn--secondary mn-btn--sm">Regenerate <span class="mn-btn__cost">$0.02</span></button>
+      </div>
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px; line-height: 22px;">
+          <thead>
+            <tr style="text-align: start;">
+              <th scope="col" class="mn-label" style="text-align: start; padding: 12px 24px; width: 72px;">Time</th>
+              <th scope="col" class="mn-label" style="text-align: start; padding: 12px 16px;">Picture</th>
+              <th scope="col" class="mn-label" style="text-align: start; padding: 12px 24px 12px 16px;">Sound</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-top: 1px solid var(--line); vertical-align: top;">
+              <td class="data" style="padding: 14px 24px; color: var(--ink-muted);">00:00</td>
+              <td style="padding: 14px 16px;">Wide, sunset over a Riyadh street. Cars rush home. <span class="mn-label">AI</span></td>
+              <td style="padding: 14px 24px 14px 16px;" dir="rtl" lang="ar">VO: كل يوم في رمضان، نفس السباق قبل الأذان.</td>
+            </tr>
+            <tr style="border-top: 1px solid var(--line); vertical-align: top;">
+              <td class="data" style="padding: 14px 24px; color: var(--ink-muted);">00:05</td>
+              <td style="padding: 14px 16px;">Kitchen, close-up. A timer on the wall reads 4 minutes. The mother checks three pots at once. <span class="mn-label">Shoot</span></td>
+              <td style="padding: 14px 24px 14px 16px;">SFX: sizzling, a ticking clock.</td>
+            </tr>
+            <tr style="border-top: 1px solid var(--line); vertical-align: top;">
+              <td class="data" style="padding: 14px 24px; color: var(--ink-muted);">00:12</td>
+              <td style="padding: 14px 16px;">Her daughter slides the Ninja air fryer forward. One button. <span class="mn-label">Shoot</span></td>
+              <td style="padding: 14px 24px 14px 16px;" dir="rtl" lang="ar">البنت: يمه، خليها علي.</td>
+            </tr>
+            <tr style="border-top: 1px solid var(--line); vertical-align: top;">
+              <td class="data" style="padding: 14px 24px; color: var(--ink-muted);">00:20</td>
+              <td style="padding: 14px 16px;">The family sits as the adhan begins. Steam rises from the dish. <span class="mn-label">Shoot</span></td>
+              <td style="padding: 14px 24px 14px 16px;">Adhan, soft music rises.</td>
+            </tr>
+            <tr style="border-top: 1px solid var(--line); vertical-align: top;">
+              <td class="data" style="padding: 14px 24px; color: var(--ink-muted);">00:26</td>
+              <td style="padding: 14px 16px;">Product and logo on the table. <span class="mn-label">Shoot</span></td>
+              <td style="padding: 14px 24px 14px 16px;" dir="rtl" lang="ar">VO: نينجا. وقتك لأهلك.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <aside aria-label="Assistant" style="flex: 1 1 280px; max-width: 340px; min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;"><h2 style="margin: 0; font-size: 16px; font-weight: 500;">Assistant</h2><span class="mn-label">Sees: Script v2</span></div>
+      <p style="margin: 0; font-size: 14px; line-height: 22px; color: var(--ink-muted);">I tagged each line AI or Shoot from your hybrid path. Want the daughter's line in English for the second cut?</p>
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <span class="mn-label">Model</span>
+        <button class="mn-btn mn-btn--secondary mn-btn--sm" style="justify-content: space-between;">Claude <span class="mn-btn__cost">Default</span></button>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <label for="prompt" class="mn-label">Prompt</label>
+        <textarea id="prompt" rows="4" style="width: 100%; box-sizing: border-box; resize: vertical; border: 1px solid var(--line-control); border-radius: 10px; padding: 10px; background: var(--surface); color: var(--ink); font: 400 13px/20px var(--font-sans);">30 second Ramadan script for Ninja, Saudi family, kitchen before iftar, warm and calm, Arabic VO in Saudi dialect, product hero at the end.</textarea>
+      </div>
+      <form style="display: flex; gap: 8px; align-items: center; border-top: 1px solid var(--line); padding-top: 14px;">
+        <label for="ask" class="mn-label" style="position: absolute; left: -9999px;">Ask the assistant</label>
+        <input id="ask" placeholder="Ask or tell Menab what to change" style="flex-grow: 1; min-width: 0; height: 36px; border: 1px solid var(--line-control); border-radius: 999px; padding: 0 14px; background: var(--surface); color: var(--ink); font: 400 13px/20px var(--font-sans);">
+        <button type="button" class="mn-btn mn-btn--secondary mn-btn--sm" aria-label="Record a voice note" style="padding: 0 10px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg></button>
+      </form>
+    </aside>
+  </main>
+
+  <footer style="position: sticky; bottom: 0; background: var(--surface); border-top: 1px solid var(--line); padding: 14px 24px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+    <span style="font-size: 14px; color: var(--ink-muted);">Stage 2 of 7 · about $0.30 left to finish this stage</span>
+    <span style="flex-grow: 1;"></span>
+    <button class="mn-btn mn-btn--primary">Approve stage 2</button>
+  </footer>
+</div>
+
+
+</body>
+</html>
