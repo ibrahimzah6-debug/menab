@@ -36,8 +36,10 @@ The diagrams in the docs were dropped in the Markdown export and show as "embedd
 - Every AI call goes through the AI layer: show the cost first, hold credits, retry once, fall back to the backup provider, save the file to our own storage, then charge the real cost. A full failure costs nothing.
 - National ID and iqama numbers are encrypted, masked in the interface and never sent to an AI model.
 - Secrets live in `.env.local` and in Vercel settings, never in the code, the repo, or the chat.
+- Desktop first. Build for a computer screen. On a phone, only these need to work: review and approve, comments, voice brief or voice note, today's call sheet, credit balance, and notices. See Devices in docs/information-architecture.md. No native mobile app.
+- Before showing Ibrahim any screen, open it with Playwright, take a screenshot, and compare it with the matching PNG in screens/. Fix what does not match first.
 - Never add a feature the docs do not list. Ask when something is unclear.
 
 ## Start
 
-Milestone M0: accounts and keys, repository, Supabase project, login, workspace and roles, and the Arabic and English shell with the stage screen layout.
+Milestone M0: install the official Supabase agent skill (`npx skills add supabase/agent-skills`), then accounts and keys, repository, Supabase project, login, workspace and roles, and the Arabic and English shell with the stage screen layout.

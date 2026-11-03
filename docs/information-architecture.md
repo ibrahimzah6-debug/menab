@@ -38,7 +38,7 @@ A project is where the work happens. Libraries hold what a company reuses, such 
 - **Open output:** the work itself, with Edit, Regenerate, and Versions.
 - **Assistant:** chat or voice that knows the open output; model picker and editable prompt; cost shown before any generation; comments.
 - **Footer:** stage cost and time, and one Approve button that unlocks the next stage.
-- **On a phone:** the three panels stack, and the assistant opens as a sheet from the bottom.
+- **On a phone:** quick jobs only (see Global rules, Devices).
 
 **\[Confirmed\] Board view, the live canvas.** Each stage can switch between Page view (the layout above) and Board view. Board view shows the stage's outputs as cards on a canvas. While the AI works, the user watches a labelled AI cursor create each card and fill it live: treatment, visual ideas, keyframes, look and feel, music, equipment, boards. The user can drag cards, zoom, and click any card to edit or regenerate it. Both views show the same outputs and versions, so nothing in the approval chain changes. Inspired by Storyflow's AI-controlled canvas.
 
@@ -64,6 +64,7 @@ The approval chain is what users click through: stages, their outputs, and versi
 
 ## Global rules
 
+- **Devices:** Menab is a web app built for a computer screen, on Windows or Mac. Chrome and Edge can install it as a desktop app with its own icon. There is no App Store app in v1. On a phone the site handles quick jobs only: review and approve a stage or a shot, leave comments, record a voice brief or voice note, open today's call sheet on set, check the credit balance, and get a notice when a generation finishes or an approval is waiting. Building, the Board view and paperwork stay on the computer.
 - **Language:** Arabic and English, switchable at any time. Arabic is right to left across the whole interface. Each output can be generated in Arabic, English, or both.
 - **Assistant everywhere:** the chat and voice panel is available on every screen, and knows which project and output is open.
 - **Cost before action:** every generate button shows its cost and the remaining balance before it runs.
@@ -80,3 +81,4 @@ The approval chain is what users click through: stages, their outputs, and versi
 - Coordinators can approve stages.
 - Working product name: **Menab (مِناب)**.
 - Main navigation approved as drafted.
+- Desktop first; on a phone, quick jobs only. No App Store app in v1.
