@@ -11,12 +11,12 @@ type Props = {
   memberId: string;
   name: string;
   role: Role;
-  invited: boolean;
+  canRelink: boolean;
   t: Dictionary["team"];
   roles: Dictionary["roles"];
 };
 
-export function RoleSelect({ memberId, name, role, t, roles, onError }: Omit<Props, "invited"> & { onError: (e?: TeamError) => void }) {
+export function RoleSelect({ memberId, name, role, t, roles, onError }: Omit<Props, "canRelink"> & { onError: (e?: TeamError) => void }) {
   const [pending, start] = useTransition();
   return (
     <select
@@ -42,7 +42,7 @@ export function RoleSelect({ memberId, name, role, t, roles, onError }: Omit<Pro
 }
 
 export function MemberAdminCells(props: Props) {
-  const { memberId, name, invited, t } = props;
+  const { memberId, name, canRelink, t } = props;
   const [error, setError] = useState<TeamError | undefined>();
   const [link, setLink] = useState<InviteState>();
   const [pending, start] = useTransition();
@@ -53,7 +53,7 @@ export function MemberAdminCells(props: Props) {
       </td>
       <td className="px-4 py-3 align-top">
         <div className="flex gap-1 justify-end flex-wrap">
-          {invited && (
+          {canRelink && (
             <button
               type="button"
               className="mn-btn mn-btn--ghost mn-btn--sm"

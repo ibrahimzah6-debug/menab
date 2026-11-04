@@ -58,7 +58,7 @@ export default async function TeamPage() {
                       memberId={m.id}
                       name={name}
                       role={m.role as Role}
-                      invited={m.status === "invited"}
+                      canRelink={!self}
                       t={t.team}
                       roles={t.roles}
                     />
