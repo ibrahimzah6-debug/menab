@@ -2,10 +2,10 @@
 @import "../../design-system/tokens.css";
 @import "../../design-system/components/bundle.css";
 
-/* Fonts are loaded by next/font; point the design tokens at them. */
+/* Fonts are bundled from @fontsource (imported in layout.tsx); point the design tokens at them. */
 :root {
-  --font-sans: var(--font-rubik), Rubik, system-ui, sans-serif;
-  --font-mono: var(--font-jetbrains), "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --font-sans: "Rubik Variable", Rubik, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
 }
 
 @theme inline {
