@@ -24,3 +24,22 @@ Supabase in Frankfurt (eu-central-1), approved by Ibrahim on 3 Nov 2026 for inte
 ## Noted for later (from Ibrahim's M0 test, 4 Nov 2026)
 
 - **Menu layout:** move the logo, workspace name, language switch and log out into the side menu, like Claude or ChatGPT, on the computer and on the phone, instead of the top bar. Do it when the remaining screens (login, home and projects) are designed. Not urgent; building comes first.
+
+## B4. Dark only, compact (Ibrahim, 4 Nov 2026)
+
+The app uses the Dark theme from `design-system/tokens.css` everywhere; the Light theme is not used for now. Text, cards and buttons are one step smaller than in the first screens (overrides at the end of `src/app/globals.css`). The side menu holds the logo, workspace, New project, the areas, and at the bottom the account, language and log out, like Claude. The orange accent rule is unchanged.
+
+## B5. Provider test stopped, build first (Ibrahim, 4 Nov 2026)
+
+Round 1 showed Kie.ai works end to end: jobs start, finish, files are saved to our storage and real costs are read back. Kling 3.0 made all clips. To save money, testing stops here and models are judged inside the real app as projects run. The test page stays under Settings for later rounds.
+
+## B6. Ranked model lists (Ibrahim, 4 Nov 2026)
+
+Each media task offers a short ranked list: 10 image models, 10 video models, 3 voice models, each with what it is good for and its starting price on Kie.ai. Number 1 is the top-rated. Lists live in `src/lib/ai/catalog.ts`; the Admin picks each task's default in Settings (`model_settings` table). Ranks start from public reputation and move with our own results.
+
+## B7. The brain and voice briefs (M2)
+
+- Claude (`claude-opus-5-5`, Anthropic API, structured outputs) reads the brief chat, fills the brief fields, asks at most 3 questions for required fields, suggests the path with a reason, and writes the stage 1 documents. Refusal fallback is on (`server-side-fallback-2026-07-01`, `fallbacks: "default"`).
+- Voice notes are recorded in the browser, saved to our storage, and turned into text by Gemini 3.8 Flash through Kie.ai (Ibrahim's choice), then read by Claude.
+- Every AI call is logged in `ai_jobs` with tokens and real cost; a failed call is logged at $0.
+- Required brief fields before documents: client, goal, length, formats, language, deadline. Budget is optional.

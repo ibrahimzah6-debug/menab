@@ -55,3 +55,16 @@ html[lang="ar"] .mn-label:not([lang="en"]) { font-family: var(--font-sans); lett
   background: var(--surface); color: var(--ink); font: 400 13px/20px var(--font-sans);
 }
 .mn-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Compact sizes (Ibrahim, 4 Nov 2026: dark only, smaller text and cards). */
+.h1 { font-size: 26px; line-height: 32px; }
+.h2 { font-size: 20px; line-height: 26px; }
+.h3 { font-size: 15px; line-height: 22px; }
+.body { font-size: 14px; line-height: 22px; }
+.small { font-size: 12.5px; line-height: 19px; }
+html[lang="ar"] .body, html[lang="ar"] .mn-prose { font-size: 15px; line-height: 26px; }
+.mn-btn { height: 36px; padding: 0 18px; font-size: 13.5px; }
+.mn-btn--sm { height: 30px; padding: 0 12px; font-size: 12.5px; }
+.mn-input { height: 36px; font-size: 13.5px; }
+.mn-stage { height: 30px; font-size: 12.5px; padding: 0 12px; }
+::selection { background: var(--tint-3); }

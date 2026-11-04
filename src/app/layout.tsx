@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const { locale, dir } = await getI18n();
   return (
-    <html lang={locale} dir={dir} data-theme="light">
+    <html lang={locale} dir={dir} data-theme="dark">
       <body>{children}</body>
     </html>
   );

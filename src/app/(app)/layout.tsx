@@ -6,67 +6,69 @@ import { LangSwitch } from "@/components/lang-switch";
 import { SideNav } from "@/components/side-nav";
 import { getI18n } from "@/lib/i18n/server";
 import { getCurrentMember, getUserEmail } from "@/lib/workspace";
+import { createProject } from "@/app/p/[id]/actions";
 
+// Side menu like Claude: logo and workspace on top, the main action, the areas,
+// and the account, language and log out at the bottom.
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { locale, t } = await getI18n();
   const member = await getCurrentMember();
   const email = await getUserEmail();
   if (!email) redirect("/login");
 
-  const header = (
-    <header className="flex items-center gap-4 px-6 py-3.5 bg-surface border-b border-line">
-      <Link href="/" aria-label="Menab">
-        <Image src="/brand/menab-logo-ink.png" alt="Menab" width={133} height={24} priority style={{ height: 24, width: "auto" }} />
-      </Link>
-      {member && (
-        <>
-          <span className="text-line-strong" aria-hidden="true">/</span>
-          <span className="text-[15px] font-medium">{member.workspace.name}</span>
-        </>
-      )}
-      <span className="grow" />
-      <span className="small text-ink-muted hidden sm:inline" dir="ltr">{email}</span>
-      <LangSwitch to={locale === "ar" ? "en" : "ar"} label={t.langSwitch} ariaLabel={t.langSwitchLabel} />
-      <form action="/auth/signout" method="post">
-        <button className="mn-btn mn-btn--ghost mn-btn--sm">{t.account.signOut}</button>
-      </form>
-    </header>
-  );
+  const canCreate = member && ["admin", "producer"].includes(member.role);
 
-  if (!member) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        {header}
-        <main className="flex-1 flex items-center justify-center p-6">
-          <div className="max-w-[440px] text-center">
+  return (
+    <div className="min-h-screen flex flex-col md:flex-row">
+      <aside className="md:w-[232px] shrink-0 md:h-screen md:sticky md:top-0 bg-ground-deep border-b md:border-b-0 md:border-e border-line flex flex-col gap-4 p-3">
+        <div className="flex items-center gap-2 px-2 pt-1">
+          <Link href="/" aria-label="Menab">
+            <Image src="/brand/menab-logo-light.png" alt="Menab" width={111} height={20} priority style={{ height: 20, width: "auto" }} />
+          </Link>
+        </div>
+        {member && (
+          <div className="px-2">
+            <span className="mn-label block truncate">{member.workspace.name}</span>
+          </div>
+        )}
+        {member && (
+          canCreate ? (
+            <form action={createProject}>
+              <button className="mn-btn mn-btn--primary justify-center w-full">
+                <IconPlus size={16} />
+                {t.nav.newProject}
+              </button>
+            </form>
+          ) : (
+            <p className="small text-ink-faint m-0 px-2">{t.projects.viewerNote}</p>
+          )
+        )}
+        {member && <SideNav labels={t.nav} menuLabel={t.nav.mainMenu} />}
+        <span className="grow hidden md:block" />
+        <div className="flex flex-col gap-1 border-t border-line pt-3">
+          <div className="px-2 flex flex-col">
+            <span className="small truncate" dir="ltr" style={{ textAlign: "start" }}>{member?.fullName || email}</span>
+            {member && <span className="small text-ink-faint">{t.roles[member.role]}</span>}
+          </div>
+          <div className="flex items-center gap-1">
+            <LangSwitch to={locale === "ar" ? "en" : "ar"} label={t.langSwitch} ariaLabel={t.langSwitchLabel} />
+            <form action="/auth/signout" method="post">
+              <button className="mn-btn mn-btn--ghost mn-btn--sm">{t.account.signOut}</button>
+            </form>
+          </div>
+        </div>
+      </aside>
+
+      <main className="flex-1 min-w-0 p-5 md:p-8">
+        {member ? (
+          children
+        ) : (
+          <div className="max-w-[440px] mx-auto mt-24 text-center">
             <h1 className="h2 m-0 mb-2">{t.noWorkspace.title}</h1>
             <p className="body text-ink-muted m-0">{t.noWorkspace.body}</p>
           </div>
-        </main>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen flex flex-col">
-      {header}
-      <div className="flex-1 flex flex-col md:flex-row">
-        <aside className="md:w-[248px] shrink-0 p-4 md:border-e border-b md:border-b-0 border-line bg-ground-deep flex flex-col gap-4">
-          <button
-            type="button"
-            className="mn-btn mn-btn--primary justify-center w-full"
-            disabled
-            title={t.nav.newProjectLater}
-            aria-describedby="new-project-later"
-          >
-            <IconPlus size={16} />
-            {t.nav.newProject}
-          </button>
-          <span id="new-project-later" className="sr-only">{t.nav.newProjectLater}</span>
-          <SideNav labels={t.nav} menuLabel={t.nav.mainMenu} />
-        </aside>
-        <main className="flex-1 min-w-0 p-6 md:p-12">{children}</main>
-      </div>
+        )}
+      </main>
     </div>
   );
 }
