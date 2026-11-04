@@ -1,19 +1,10 @@
 import type { Metadata } from "next";
-import { JetBrains_Mono, Rubik } from "next/font/google";
 import { getI18n } from "@/lib/i18n/server";
+// Fonts ship with the app, so builds never depend on downloading them.
+import "@fontsource-variable/rubik";
+import "@fontsource/jetbrains-mono/latin-400.css";
+import "@fontsource/jetbrains-mono/latin-500.css";
 import "./globals.css";
-
-const rubik = Rubik({
-  variable: "--font-rubik",
-  subsets: ["latin", "arabic"],
-  weight: ["400", "500", "600"],
-});
-
-const jetbrains = JetBrains_Mono({
-  variable: "--font-jetbrains",
-  subsets: ["latin"],
-  weight: ["400", "500"],
-});
 
 export const metadata: Metadata = {
   title: "Menab",
@@ -24,7 +15,7 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const { locale, dir } = await getI18n();
   return (
-    <html lang={locale} dir={dir} data-theme="light" className={`${rubik.variable} ${jetbrains.variable}`}>
+    <html lang={locale} dir={dir} data-theme="light">
       <body>{children}</body>
     </html>
   );
