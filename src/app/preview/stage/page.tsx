@@ -40,7 +40,7 @@ export default async function StagePreview() {
     <div className="min-h-screen flex flex-col bg-ground">
       <header className="flex flex-wrap items-center gap-4 px-6 py-3.5 bg-surface border-b border-line">
         <Link href="/" aria-label="Menab">
-          <Image src="/brand/menab-logo-ink.png" alt="Menab" width={81} height={28} priority style={{ height: 28, width: "auto" }} />
+          <Image src="/brand/menab-logo-ink.png" alt="Menab" width={133} height={24} priority style={{ height: 24, width: "auto" }} />
         </Link>
         <span className="text-line-strong" aria-hidden="true">/</span>
         <span className="text-[15px] font-medium">Ninja Ramadan ad</span>
