@@ -20,3 +20,7 @@ Supabase's built-in email only sends to members of the Supabase organization, an
 ## B3. Hosting regions (M0)
 
 Supabase in Frankfurt (eu-central-1), approved by Ibrahim on 3 Nov 2026 for internal testing. Vercel functions run in Frankfurt too (`vercel.json`), so the app sits next to its database.
+
+## Noted for later (from Ibrahim's M0 test, 4 Nov 2026)
+
+- **Menu layout:** move the logo, workspace name, language switch and log out into the side menu, like Claude or ChatGPT, on the computer and on the phone, instead of the top bar. Do it when the remaining screens (login, home and projects) are designed. Not urgent; building comes first.

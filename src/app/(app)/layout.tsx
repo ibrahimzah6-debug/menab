@@ -16,7 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const header = (
     <header className="flex items-center gap-4 px-6 py-3.5 bg-surface border-b border-line">
       <Link href="/" aria-label="Menab">
-        <Image src="/brand/menab-logo-ink.png" alt="Menab" width={81} height={28} priority style={{ height: 28, width: "auto" }} />
+        <Image src="/brand/menab-logo-ink.png" alt="Menab" width={133} height={24} priority style={{ height: 24, width: "auto" }} />
       </Link>
       {member && (
         <>
