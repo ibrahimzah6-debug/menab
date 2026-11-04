@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { LangChoice } from "./lang-choice";
 import { getI18n } from "@/lib/i18n/server";
 import { getCurrentMember } from "@/lib/workspace";
@@ -13,6 +14,15 @@ export default async function SettingsPage() {
         <p className="body text-ink-muted m-0">{t.settings.languageBody}</p>
         <LangChoice current={locale} english={t.settings.english} arabic={t.settings.arabic} label={t.settings.language} />
       </section>
+      {member?.role === "admin" && (
+        <section className="bg-surface border border-line rounded-lg p-6 flex flex-col gap-3">
+          <h2 className="h3 m-0">{t.settings.providerTest}</h2>
+          <p className="body text-ink-muted m-0">{t.settings.providerTestBody}</p>
+          <div>
+            <Link href="/provider-test" className="mn-btn mn-btn--secondary mn-btn--sm">{t.settings.open}</Link>
+          </div>
+        </section>
+      )}
       {member && (
         <section className="bg-surface border border-line rounded-lg p-6 flex flex-col gap-2">
           <h2 className="h3 m-0">{t.settings.account}</h2>
