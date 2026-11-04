@@ -1,7 +1,7 @@
 import { IconCheck } from "@/components/icons";
 import { fill } from "@/lib/i18n/dictionaries";
 import { getI18n } from "@/lib/i18n/server";
-import { PLAN, phaseEstimateUsd, STEP_ORDER, type Step } from "@/lib/ai/provider-test-plan";
+import { PLAN, phaseEstimateUsd, STEP_ORDER, VIDEO_MODELS, type Step } from "@/lib/ai/provider-test-plan";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/workspace";
@@ -162,21 +162,37 @@ export default async function ProviderTestPage() {
         const started = (step: Step) => mine.some((r) => r.step === step);
         const refsDone = done(PLAN.filter((x) => x.step === "character" || x.step === "location").map((x) => x.key));
         const keysDone = done(PLAN.filter((x) => x.step === "keyframe").map((x) => x.key));
+        const busy = (steps: Step[]) => mine.some((r) => steps.includes(r.step) && r.status === "generating");
+        // A step can be finished when its earlier step is done and nothing in it is still running.
+        // Already finished items are skipped, so only the missing ones run.
+        const videosDone = PLAN.filter((x) => x.step === "video").every((x) =>
+          VIDEO_MODELS.map((m) => m.label).every((m) =>
+            mine.some((r) => r.item_key === x.key && r.model === m && r.status === "success"),
+          ),
+        );
         return (
           <section key={run} className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-3">
               <h2 className="h2 m-0 grow">{fill(p.run, { n: run })}</h2>
+              {!refsDone && (
+                <PhaseButton
+                  run={run}
+                  phase="references"
+                  disabled={busy(["character", "location"])}
+                  label={p.finishRefs}
+                />
+              )}
               <PhaseButton
                 run={run}
                 phase="keyframes"
-                disabled={!refsDone || started("keyframe")}
-                label={`${p.keyframes} · ${fill(p.about, { cost: usd(phaseEstimateUsd("keyframes")) })}`}
+                disabled={!refsDone || keysDone || busy(["keyframe"])}
+                label={`${started("keyframe") ? p.finishKeyframes : p.keyframes} · ${fill(p.about, { cost: usd(phaseEstimateUsd("keyframes")) })}`}
               />
               <PhaseButton
                 run={run}
                 phase="videos"
-                disabled={!keysDone || started("video")}
-                label={`${p.videos} · ${fill(p.about, { cost: usd(phaseEstimateUsd("videos")) })}`}
+                disabled={!keysDone || videosDone || busy(["video"])}
+                label={`${started("video") ? p.finishVideos : p.videos} · ${fill(p.about, { cost: usd(phaseEstimateUsd("videos")) })}`}
               />
             </div>
             {STEP_ORDER.filter((step) => mine.some((r) => r.step === step)).map((step) => (

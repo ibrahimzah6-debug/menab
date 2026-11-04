@@ -14,6 +14,17 @@ async function requireAdmin() {
   return me && me.role === "admin" ? me : null;
 }
 
+// Problems with our own Kie.ai account, not with the model. These are not recorded as model failures.
+const ACCOUNT_ERRORS: Record<number, string> = {
+  401: "Kie.ai did not accept the key. Check KIE_API_KEY in Vercel, then redeploy.",
+  402: "The Kie.ai balance is too low. Add credit at kie.ai, then try again.",
+  433: "This key's Safe-Spend Limit is used up. Raise it on the Kie.ai API Keys page, then try again.",
+};
+
+function accountError(e: unknown) {
+  return e instanceof KieError ? ACCOUNT_ERRORS[e.code] ?? null : null;
+}
+
 function errText(e: unknown) {
   if (e instanceof KieError) return `${e.code}: ${e.message}`;
   if (e instanceof Error) return e.message;
@@ -80,7 +91,9 @@ async function launch(
     await admin.from("provider_test_items").insert({ ...row, task_id: taskId, status: "generating" });
     return null;
   } catch (e) {
-    // A job Kie refuses still counts against its success rate.
+    const account = accountError(e);
+    if (account) return { account };
+    // A job Kie refuses for any other reason counts against its success rate.
     await admin.from("provider_test_items").insert({
       ...row,
       status: "failed",
@@ -112,6 +125,10 @@ export async function startPhase(run: number, phase: Phase): Promise<ActionResul
       );
       if (already) continue;
       const err = await launch(me.workspace.id, me.userId, run, item.key, model.providerModel);
+      if (err && typeof err === "object") {
+        revalidatePath("/provider-test");
+        return { error: err.account, started };
+      }
       if (err) lastError = err;
       else started++;
     }
@@ -147,7 +164,10 @@ export async function retryItem(id: string): Promise<ActionResult> {
   if (!row) return { error: "Unknown test item" };
   const err = await launch(me.workspace.id, me.userId, row.run_number, row.item_key, row.provider_model);
   revalidatePath("/provider-test");
-  return err ? { error: err } : { started: 1 };
+  if (err && typeof err === "object") return { error: err.account };
+  if (err) return { error: err };
+  // The new attempt replaces this failed one on the page; keep the failed row for the success rate.
+  return { started: 1 };
 }
 
 function extension(url: string, contentType: string | null) {
