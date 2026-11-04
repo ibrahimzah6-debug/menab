@@ -5,37 +5,68 @@ export type Step = "character" | "location" | "keyframe" | "video";
 
 export type ModelDef = {
   label: string;
+  // Stable id stored with each result.
   providerModel: string;
+  // The Kie.ai model to call; some models have a separate endpoint when there are no references.
+  kieModel?: (refs: string[]) => string;
   // Rough price before running, from kie.ai/pricing. The real cost is read back from Kie after each job.
   estimateUsd: number;
   build: (prompt: string, refs: string[]) => Record<string, unknown>;
 };
 
-export const IMAGE_MODEL: ModelDef = {
-  label: "Nano Banana 2",
-  providerModel: "nano-banana-2",
-  estimateUsd: 0.04,
-  build: (prompt, refs) => ({
-    prompt,
-    image_input: refs,
-    aspect_ratio: "16:9",
-    resolution: "1K",
-    output_format: "png",
-  }),
-};
+// Three image models side by side, to see which one looks least like AI.
+export const IMAGE_MODELS: ModelDef[] = [
+  {
+    label: "Nano Banana 2",
+    providerModel: "nano-banana-2",
+    estimateUsd: 0.06,
+    build: (prompt, refs) => ({
+      prompt,
+      image_input: refs,
+      aspect_ratio: "16:9",
+      resolution: "2K",
+      output_format: "jpg",
+    }),
+  },
+  {
+    label: "Nano Banana Pro",
+    providerModel: "nano-banana-pro",
+    estimateUsd: 0.09,
+    build: (prompt, refs) => ({
+      prompt,
+      image_input: refs,
+      aspect_ratio: "16:9",
+      resolution: "2K",
+      output_format: "jpg",
+    }),
+  },
+  {
+    label: "Seedream 5 Pro",
+    providerModel: "seedream-5-pro",
+    kieModel: (refs) => (refs.length ? "seedream/5-pro-image-to-image" : "seedream/5-pro-text-to-image"),
+    estimateUsd: 0.06,
+    build: (prompt, refs) => ({
+      prompt,
+      ...(refs.length ? { image_urls: refs } : {}),
+      aspect_ratio: "16:9",
+      quality: "high",
+      output_format: "jpg",
+    }),
+  },
+];
 
 export const VIDEO_MODELS: ModelDef[] = [
   {
     label: "Kling 3.0",
     providerModel: "kling-3.0/video",
-    estimateUsd: 0.4,
+    estimateUsd: 0.55,
     build: (prompt, refs) => ({
       prompt,
       image_urls: refs.slice(0, 1),
       sound: false,
       duration: "5",
       aspect_ratio: "16:9",
-      mode: "std",
+      mode: "pro",
       multi_shots: false,
     }),
   },
@@ -48,7 +79,8 @@ export const VIDEO_MODELS: ModelDef[] = [
       first_frame_url: refs[0],
       generate_audio: false,
       resolution: "720p",
-      aspect_ratio: "16:9",
+      // Kie.ai: tasks that start from a first frame only accept "adaptive".
+      aspect_ratio: "adaptive",
       duration: 5,
     }),
   },
@@ -68,8 +100,9 @@ export const VIDEO_MODELS: ModelDef[] = [
   },
 ];
 
+// Written to look like a real photograph from a Saudi TV shoot, not a polished render.
 const STYLE =
-  "Photorealistic commercial still, shot on a cinema camera, warm tungsten and golden hour light, soft contrast, natural skin tones, Saudi setting. No text unless asked.";
+  "A real photograph from a Saudi TV commercial shoot, not a render or illustration. Shot on an ARRI Alexa 35 with a 35mm lens at f/2.8, natural light from the window mixed with warm practical lamps, gentle film grain, true-to-life color. Real details and small imperfections: real skin texture with pores and fine lines, slightly creased fabric, everyday objects in the background. Avoid a glossy CGI look, plastic skin, perfect symmetry, heavy blur and oversaturated colors. No text unless asked.";
 
 export type PlanItem = { key: string; step: Step; title: string; prompt: string; uses: string[] };
 
@@ -79,28 +112,28 @@ export const PLAN: PlanItem[] = [
     step: "character",
     title: "Umm Faisal, the mother",
     uses: [],
-    prompt: `Character reference sheet of one Saudi woman in her mid 40s, warm kind face, light laugh lines, wearing a loose deep green house dress and a soft beige headscarf loosely framing her face. Front view and three quarter view side by side, full body and close-up, plain light gray background, even studio light. ${STYLE}`,
+    prompt: `Casting photo of one Saudi woman in her mid 40s, warm kind face, light laugh lines, a few gray strands at the hairline, wearing a loose deep green house dress and a soft beige headscarf loosely framing her face. Front view and three quarter view side by side, full body and close-up, plain light gray backdrop, soft daylight from a large window. ${STYLE}`,
   },
   {
     key: "C2",
     step: "character",
     title: "Noura, the daughter",
     uses: [],
-    prompt: `Character reference sheet of one Saudi woman in her early 20s, confident calm expression, wearing a cream colored modest long dress and a light gray headscarf. Front view and three quarter view side by side, full body and close-up, plain light gray background, even studio light. ${STYLE}`,
+    prompt: `Casting photo of one Saudi woman in her early 20s, confident calm expression, light freckles, wearing a cream colored modest long dress and a light gray headscarf. Front view and three quarter view side by side, full body and close-up, plain light gray backdrop, soft daylight from a large window. ${STYLE}`,
   },
   {
     key: "L1",
     step: "location",
     title: "Family kitchen in Riyadh",
     uses: [],
-    prompt: `Empty modern Saudi family kitchen in a Riyadh villa, late afternoon. Warm wood cabinets, cream stone counter, three pots on the stove, a round wall clock, a window with sunlight coming in, dates and a dallah coffee pot on the counter. Wide shot, no people. ${STYLE}`,
+    prompt: `A lived-in family kitchen in a Riyadh villa, half an hour before iftar. Beige stone counter with small scratches, wood cabinets with worn handles, three steel pots on a gas stove, a plain round wall clock, a dish rack, a plastic bag of bread, dates in a bowl and a brass dallah. Low sun through a window with a thin white curtain. Wide shot at eye level, no people. ${STYLE}`,
   },
   {
     key: "L2",
     step: "location",
     title: "Riyadh street at sunset",
     uses: [],
-    prompt: `A wide Riyadh street at sunset during Ramadan, cars with headlights heading home, palm trees along the road, Ramadan crescent lights on lamp posts, the Kingdom Centre tower far in the distance against an orange sky. No people in focus. ${STYLE}`,
+    prompt: `King Fahd Road in Riyadh at sunset during Ramadan, seen from the sidewalk. Busy traffic heading home with headlights on, dust in the air, date palms in the median, simple crescent lights on lamp posts, the Kingdom Centre tower small in the hazy distance. Pale orange sky, not dramatic. No people in focus. ${STYLE}`,
   },
   {
     key: "K1",
@@ -158,7 +191,7 @@ export function itemsForPhase(phase: Phase) {
 }
 
 export function modelsForStep(step: Step) {
-  return step === "video" ? VIDEO_MODELS : [IMAGE_MODEL];
+  return step === "video" ? VIDEO_MODELS : IMAGE_MODELS;
 }
 
 export function phaseEstimateUsd(phase: Phase) {
@@ -169,5 +202,5 @@ export function phaseEstimateUsd(phase: Phase) {
 }
 
 export function findModel(providerModel: string) {
-  return [IMAGE_MODEL, ...VIDEO_MODELS].find((m) => m.providerModel === providerModel);
+  return [...IMAGE_MODELS, ...VIDEO_MODELS].find((m) => m.providerModel === providerModel);
 }

@@ -32,32 +32,63 @@ function errText(e: unknown) {
 }
 
 // Expiring links to our own copies of earlier results, used as references for the next step.
-async function referenceUrls(workspaceId: string, run: number, keys: string[]) {
+// Image steps use references made by the same image model, so each model is judged on its own work.
+// Video steps use the keyframe Ibrahim scored highest for quality, sent as a light JPEG.
+async function referenceUrls(
+  workspaceId: string,
+  run: number,
+  keys: string[],
+  opts: { sameModel?: string; forVideo?: boolean },
+) {
   const admin = createAdminClient();
   const urls: string[] = [];
   for (const key of keys) {
-    const { data } = await admin
+    const { data: rows } = await admin
       .from("provider_test_items")
-      .select("file_path, source_url")
+      .select("file_path, source_url, provider_model, quality, finished_at")
       .eq("workspace_id", workspaceId)
       .eq("run_number", run)
       .eq("item_key", key)
       .eq("status", "success")
-      .order("finished_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (!data) return { missing: key };
-    if (data.file_path) {
-      const { data: signed } = await admin.storage.from("media").createSignedUrl(data.file_path, 60 * 60);
+      .order("finished_at", { ascending: false });
+    if (!rows?.length) return { missing: key };
+    let pick = rows[0];
+    if (opts.sameModel) {
+      pick = rows.find((r) => r.provider_model === opts.sameModel) ?? rows[0];
+    } else if (opts.forVideo) {
+      pick = [...rows].sort((a, b) => (b.quality ?? 0) - (a.quality ?? 0))[0];
+    }
+    if (pick.file_path) {
+      const path = opts.forVideo ? await lightJpeg(pick.file_path) : pick.file_path;
+      const { data: signed } = await admin.storage.from("media").createSignedUrl(path, 60 * 60);
       if (signed?.signedUrl) {
         urls.push(signed.signedUrl);
         continue;
       }
     }
-    if (data.source_url) urls.push(data.source_url);
+    if (pick.source_url) urls.push(pick.source_url);
     else return { missing: key };
   }
   return { urls };
+}
+
+// Some video models refuse heavy images (Veo 3.1 rejected 2 MB PNGs). Make a JPEG copy, at most 1920 px wide.
+async function lightJpeg(path: string) {
+  const target = path.replace(/\.[a-z0-9]+$/i, "") + "-video.jpg";
+  const admin = createAdminClient();
+  const folder = target.slice(0, target.lastIndexOf("/"));
+  const name = target.slice(target.lastIndexOf("/") + 1);
+  const { data: existing } = await admin.storage.from("media").list(folder, { search: name });
+  if (existing?.some((f) => f.name === name)) return target;
+  const { data: file } = await admin.storage.from("media").download(path);
+  if (!file) return path;
+  const sharp = (await import("sharp")).default;
+  const jpg = await sharp(Buffer.from(await file.arrayBuffer()))
+    .resize({ width: 1920, withoutEnlargement: true })
+    .jpeg({ quality: 85 })
+    .toBuffer();
+  const up = await admin.storage.from("media").upload(target, jpg, { contentType: "image/jpeg", upsert: true });
+  return up.error ? path : target;
 }
 
 async function launch(
@@ -70,7 +101,10 @@ async function launch(
   const item = PLAN.find((p) => p.key === itemKey);
   const model = findModel(providerModel);
   if (!item || !model) return "Unknown test item";
-  const refs = await referenceUrls(workspaceId, run, item.uses);
+  const refs = await referenceUrls(workspaceId, run, item.uses, {
+    sameModel: item.step === "video" ? undefined : model.providerModel,
+    forVideo: item.step === "video",
+  });
   if ("missing" in refs) return `Generate ${refs.missing} first`;
 
   const input = model.build(item.prompt, refs.urls ?? []);
@@ -87,7 +121,7 @@ async function launch(
   };
   const admin = createAdminClient();
   try {
-    const taskId = await createTask(model.providerModel, input);
+    const taskId = await createTask(model.kieModel ? model.kieModel(refs.urls ?? []) : model.providerModel, input);
     await admin.from("provider_test_items").insert({ ...row, task_id: taskId, status: "generating" });
     return null;
   } catch (e) {

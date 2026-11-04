@@ -124,7 +124,7 @@ const en = {
   },
   providerTest: {
     title: "Provider test",
-    intro: "Runs the M1 test brief on Kie.ai: 2 characters, 2 locations, 3 keyframes, then each keyframe as a clip on 3 video models. Score each result so we can choose the default models.",
+    intro: "Runs the M1 test brief on Kie.ai. Characters, locations and keyframes are made on 3 image models side by side. Each video model then animates the keyframe you scored highest. Score each result so we can choose the default models.",
     briefTitle: "Test brief",
     brief: "A 30 second Ramadan ad for Dalla Home, a made-up kitchen brand. The mother races the clock before iftar, her daughter takes over with one button on the air fryer.",
     adminOnly: "Only an Admin can open the provider test.",
@@ -334,7 +334,7 @@ const ar: Dictionary = {
   },
   providerTest: {
     title: "اختبار المزوّد",
-    intro: "يشغّل بريف اختبار M1 على Kie.ai: شخصيتين، موقعين، ٣ كي فريم، وبعدها كل كي فريم كمقطع على ٣ نماذج فيديو. قيّم كل نتيجة عشان نختار النماذج الافتراضية.",
+    intro: "يشغّل بريف اختبار M1 على Kie.ai. الشخصيات والمواقع والكي فريم تتسوّى على ٣ نماذج صور جنب بعض. بعدها كل نموذج فيديو يحرّك الكي فريم اللي أعطيته أعلى تقييم. قيّم كل نتيجة عشان نختار النماذج الافتراضية.",
     briefTitle: "بريف الاختبار",
     brief: "إعلان رمضاني ٣٠ ثانية لدلة هوم، علامة مطابخ تجريبية. الأم تسابق الوقت قبل الفطور، وبنتها تتولى الموضوع بزر واحد على القلاية الهوائية.",
     adminOnly: "المدير فقط يقدر يفتح اختبار المزوّد.",

@@ -30,7 +30,15 @@ Each step uses the results of the step before, the way the real Generate stage w
 | V2 | Video | K2 handheld, steam rises, the mother turns | K2 |
 | V3 | Video | K3 slow dolly in, she presses the button | K3 |
 
-Images run on Nano Banana 2. Each video shot runs on Kling 3.0, Seedance 2.5 and Veo 3.1 Fast, so the three can be compared on the same frames.
+Images run on three models side by side: Nano Banana 2, Nano Banana Pro and Seedream 5 Pro, at 2K. Keyframes use the characters and locations made by the same model. Each video shot runs on Kling 3.0 (pro mode), Seedance 2.5 and Veo 3.1 Fast, starting from the keyframe Ibrahim scored highest, so the three video models are compared on the same frame.
+
+## Changes after run 1 (4 Nov 2026)
+
+- Ibrahim: the character sheets were good; locations, keyframes and videos looked like AI.
+- Prompts rewritten to describe a real photograph from a Saudi TV shoot (camera, lens, natural light, film grain, small imperfections, a lived-in kitchen) instead of a polished commercial still.
+- Two more image models added to compare realism, and resolution raised from 1K to 2K.
+- Kling 3.0 moved from standard to pro mode.
+- Fixed two settings errors on Menab's side: Seedance 2.5 needs the "adaptive" aspect ratio when it starts from an image, and Veo 3.1 needs a lighter JPEG keyframe.
 
 ## How to score
 
