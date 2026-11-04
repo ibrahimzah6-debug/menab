@@ -51,6 +51,10 @@ const en = {
   },
   auth: {
     linkExpired: "That invite link has expired or was already used. Ask your Admin for a new one.",
+    acceptTitle: "Accept your invite",
+    acceptBody: "You've been invited to Menab. Accept the invite, then choose your password.",
+    acceptSubmit: "Accept invite",
+    otherAccount: "This browser is logged in as {email}. Accepting logs that account out first.",
   },
   account: {
     signOut: "Log out",
@@ -86,7 +90,7 @@ const en = {
     status: "Status",
     you: "You",
     inviteTitle: "Invite someone",
-    inviteBody: "We make a private link. Send it to them on WhatsApp or email. It works once and expires in 24 hours.",
+    inviteBody: "We make a private link. Send it to them on WhatsApp or email. It works once and expires in 24 hours. If they lose it or forget their password, make a new link.",
     inviteSubmit: "Create invite link",
     linkReady: "Invite link for {email}",
     copy: "Copy link",
@@ -218,6 +222,10 @@ const ar: Dictionary = {
   },
   auth: {
     linkExpired: "رابط الدعوة انتهى أو استُخدم من قبل. اطلب رابط جديد من المدير.",
+    acceptTitle: "اقبل الدعوة",
+    acceptBody: "وصلتك دعوة لمِناب. اقبل الدعوة، وبعدها اختر كلمة المرور.",
+    acceptSubmit: "قبول الدعوة",
+    otherAccount: "هذا المتصفح داخل بحساب {email}. قبول الدعوة يسجّل خروج هذا الحساب أول.",
   },
   account: {
     signOut: "تسجيل الخروج",
@@ -253,7 +261,7 @@ const ar: Dictionary = {
     status: "الحالة",
     you: "أنت",
     inviteTitle: "ادعُ شخص",
-    inviteBody: "نسوي لك رابط خاص. أرسله له بالواتساب أو الإيميل. يشتغل مرة وحدة وينتهي بعد ٢٤ ساعة.",
+    inviteBody: "نسوي لك رابط خاص. أرسله له بالواتساب أو الإيميل. يشتغل مرة وحدة وينتهي بعد ٢٤ ساعة. إذا ضاع الرابط أو نسي كلمة المرور، سوّ له رابط جديد.",
     inviteSubmit: "إنشاء رابط دعوة",
     linkReady: "رابط الدعوة لـ {email}",
     copy: "نسخ الرابط",

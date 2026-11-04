@@ -9,7 +9,6 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Menab",
   description: "From brief to delivery, made with AI, shot for real, or both.",
-  icons: { icon: "/brand/menab-mark-ink.png" },
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
