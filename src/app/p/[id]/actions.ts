@@ -305,11 +305,13 @@ export async function approveStage(projectId: string, stage: number): Promise<Re
 // ---------- Edits by people ----------
 
 // Saves a person's edit as a new version. The earlier version is kept and can be restored.
+// Which outputs a person can edit by hand, per stage (approved stages are read only).
+const EDITABLE: Record<number, number[]> = { 1: [3, 4, 5, 6], 2: [7, 9, 10, 11] };
+
 export async function saveOutputEdit(projectId: string, number: number, content: unknown): Promise<Result> {
-  if (![3, 4, 5, 6].includes(number)) return { error: "This step can't be edited here." };
   try {
     const { me, supabase, project } = await loadProject(projectId);
-    if (project.current_stage !== 1) return { error: "This stage is approved. Changes come with a new version in a later milestone." };
+    if (!(EDITABLE[project.current_stage] ?? []).includes(number)) return { error: "This step can't be edited now. Approved work changes only with a new version." };
     const { data: o } = await supabase
       .from("outputs")
       .select("id, workspace_id, current_version")
@@ -318,6 +320,38 @@ export async function saveOutputEdit(projectId: string, number: number, content:
       .maybeSingle();
     if (!o) return { error: "Step not found." };
     await saveVersion(supabase, o, content, "edit", me.userId, null);
+  } catch (e) {
+    return { error: errText(e) };
+  }
+  revalidatePath(`/p/${projectId}`);
+  return {};
+}
+
+// The creative meeting (output 8): the chosen direction and the notes.
+export async function chooseDirection(projectId: string, chosen: number, notes: string): Promise<Result> {
+  try {
+    const { me, supabase, project } = await loadProject(projectId);
+    if (project.current_stage !== 2) return { error: "This stage is not open." };
+    const { data: o } = await supabase.from("outputs").select("id, workspace_id, current_version").eq("project_id", projectId).eq("number", 8).maybeSingle();
+    if (!o) return { error: "Step not found." };
+    await saveVersion(supabase, o, { chosen: Math.max(0, Math.min(2, Math.round(chosen))), notes: notes.trim().slice(0, 4000) }, "edit", me.userId, null, "ready");
+  } catch (e) {
+    return { error: errText(e) };
+  }
+  revalidatePath(`/p/${projectId}`);
+  return {};
+}
+
+// Any earlier version comes back as a new version, so nothing is ever lost (M3, Versions).
+export async function restoreVersion(projectId: string, number: number, version: number): Promise<Result> {
+  try {
+    const { me, supabase, project } = await loadProject(projectId);
+    if (!(EDITABLE[project.current_stage] ?? []).includes(number) && number !== 8) return { error: "Approved work changes only with a new version." };
+    const { data: o } = await supabase.from("outputs").select("id, workspace_id, current_version").eq("project_id", projectId).eq("number", number).maybeSingle();
+    if (!o) return { error: "Step not found." };
+    const { data: v } = await supabase.from("versions").select("content").eq("output_id", o.id).eq("version", version).maybeSingle();
+    if (!v) return { error: "Version not found." };
+    await saveVersion(supabase, o, v.content, "restore", me.userId, null, "edited");
   } catch (e) {
     return { error: errText(e) };
   }

@@ -8,7 +8,7 @@ export type { Attachment, Msg, Step, Usage } from "./brain-core";
 // guessing and nothing is generated before the idea is clear. The calls themselves, with
 // retry and backup, live in brain-core.ts.
 
-const MENAB = `You are Menab AI, the production brain inside Menab (مِناب), a Saudi platform that takes a video from a client brief to delivery: made with AI, shot by a production house, or a hybrid of both. You think like a senior Saudi creative producer at a production house in Riyadh: you care first about the idea and how the video will make people feel, then about how to make it well within the time and money.
+export const MENAB = `You are Menab AI, the production brain inside Menab (مِناب), a Saudi platform that takes a video from a client brief to delivery: made with AI, shot by a production house, or a hybrid of both. You think like a senior Saudi creative producer at a production house in Riyadh: you care first about the idea and how the video will make people feel, then about how to make it well within the time and money.
 
 How you write:
 - Plain, warm and direct, like a producer talking to a colleague. Short sentences.
@@ -26,13 +26,13 @@ The user can always change the path.`;
 
 // What Menab remembers about this company and its people (Settings, Memory). Lasting
 // preferences only; each project's own details stay in its brief.
-function remembered(memory?: string[]) {
+export function remembered(memory?: string[]) {
   if (!memory?.length) return "";
   return `\nWhat you remember about this company and its people (use it, do not repeat it back unless it matters):\n${memory.map((m) => `- ${m}`).join("\n")}\n`;
 }
 
 // Lessons the owner approved in the development loop (owner dashboard, AI rules).
-function lessons(rules?: string[]) {
+export function lessons(rules?: string[]) {
   if (!rules?.length) return "";
   return `\nLessons from how Menab is used (always follow them):\n${rules.map((r) => `- ${r}`).join("\n")}\n`;
 }
@@ -70,12 +70,12 @@ const BriefFields = z.object({
 export type BriefFields = z.infer<typeof BriefFields>;
 
 const BriefTurn = z.object({
-  reply: z.string().describe("Your chat reply. Short. Reflect back the idea in one line when it changes. Ask your questions here as a numbered list."),
+  reply: z.string().describe("Your chat reply. Short: 2 to 4 sentences. Reflect back the idea in one line when it changes. Put your questions (at most 2) at the end as a numbered list, or none."),
   brief: BriefFields,
   remember: z
     .array(z.string())
     .describe("Lasting facts about the company or the person that will matter on future projects too, e.g. 'Prefers vertical 9:16 first', 'Their main client is Dalla', 'Wants Saudi dialect voiceover'. Not this project's details. Usually empty; at most 2. Never IDs, phone numbers or private personal data."),
-  questions: z.array(z.string()).describe("At most 3. First any required field still empty; then the questions that would most improve the video itself (story, feeling, key message)."),
+  questions: z.array(z.string()).describe("At most 2, and only for required fields that are still empty. Empty when every required field is filled. Never a question already asked in this chat."),
   path: z.object({
     suggested: z.enum(["ai", "production", "hybrid"]).nullable(),
     reason: z.string().describe("One line explaining the suggestion, in the user's language. Empty if not suggested yet."),
@@ -105,7 +105,14 @@ export async function briefTurn(
 ${remembered(extra?.memory)}${lessons(extra?.rules)}
 Your job now: run the brief conversation. Turn what the user says into a structured brief that starts from the video itself: the idea in one line, the story beats, the feeling and the key message. Then delivery, production needs, client and timing. Keep values the user gave earlier unless they change them, and when they change the idea (for example a different character or place), update the logline and story beats to match. You may draft the logline and story beats from what you heard, as a first draft for the user to confirm.
 
-Required before documents can be written: ${REQUIRED_BRIEF_FIELDS.join(", ")}. Ask for those first. When they are filled, ask what would most improve the video. Never more than 3 questions at a time. Budget is optional: never insist on it. Suggest a path as soon as you know whether real products or people must be on camera.`,
+Required before documents can be written: ${REQUIRED_BRIEF_FIELDS.join(", ")}.
+How to ask (people leave when a chat keeps questioning them):
+- Ask only for required fields that are still empty, at most 2 at a time, in one short line each.
+- Never ask the same thing twice. If the user skipped a question, pick a sensible default, say it in one line ("I set 30 sec, change it any time"), and move on.
+- Fill what you can infer yourself: a 30 sec main film with 15 and 6 sec cutdowns, 16:9 and 9:16, Saudi Arabic, unless the user says otherwise. Mark these as defaults in your reply.
+- When every required field is filled, ask nothing. Tell the user the brief is ready and they can write the documents.
+- Do not ask about story, feeling, references or style here: the Creative stage proposes directions for those, and the user picks one there.
+Budget is optional: never ask for it. Suggest a path as soon as you know whether real products or people must be on camera.`,
     [
       ...history,
       {
@@ -116,7 +123,7 @@ Required before documents can be written: ${REQUIRED_BRIEF_FIELDS.join(", ")}. A
     BriefTurn,
     { effort: "low", maxTokens: 8000, onStep, timeoutMs: 70_000, signal: extra?.signal },
   );
-  r.data.questions = r.data.questions.slice(0, 3);
+  r.data.questions = r.data.questions.slice(0, 2);
   r.data.remember = (r.data.remember ?? []).map((x) => x.trim()).filter(Boolean).slice(0, 2);
   return { turn: r.data, usage: r.usage, model: r.model, fallbackFrom: r.fallbackFrom, firstError: r.firstError };
 }

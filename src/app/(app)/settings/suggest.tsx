@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { MicButton } from "@/components/mic-button";
 import { sendFeedback } from "@/lib/feedback";
 
 type C = { title: string; body: string; placeholder: string; idea: string; bug: string; send: string; thanks: string };
 
 // Ideas and problems go straight into Menab's development list (owner dashboard).
-export function SuggestForm({ c }: { c: C }) {
+export function SuggestForm({ c, mic }: { c: C; mic: { start: string; stop: string; working: string; blocked: string } }) {
+  const [text, setText] = useState("");
   const [pending, start] = useTransition();
   const [kind, setKind] = useState<"idea" | "bug">("idea");
   const [sent, setSent] = useState(false);
@@ -30,7 +32,10 @@ export function SuggestForm({ c }: { c: C }) {
           </button>
         ))}
       </div>
-      <textarea name="text" required rows={3} maxLength={2000} dir="auto" placeholder={c.placeholder} aria-label={c.title} className="mn-input" style={{ height: "auto", paddingTop: 8, paddingBottom: 8 }} />
+      <div className="flex justify-end">
+        <MicButton labels={mic} onText={(t) => setText((x) => (x.trim() ? `${x.trim()} ${t}` : t))} />
+      </div>
+      <textarea name="text" value={text} onChange={(e) => setText(e.target.value)} required rows={3} maxLength={2000} dir="auto" placeholder={c.placeholder} aria-label={c.title} className="mn-input" style={{ height: "auto", paddingTop: 8, paddingBottom: 8 }} />
       <div className="flex items-center gap-3">
         <button className="mn-btn mn-btn--primary" disabled={pending}>{c.send}</button>
         {note && <span className="small" role="alert">{note}</span>}

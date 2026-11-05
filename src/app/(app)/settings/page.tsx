@@ -187,7 +187,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           {section === "memory" && member && memory && (
             <section className={card}>
               <p className="small text-ink-muted m-0">{s.memoryBody}</p>
-              <MemoryPanel on={memory.on} items={memory.items} canEdit={member.role !== "viewer"} isAdmin={member.role === "admin"} c={s.memory} />
+              <MemoryPanel on={memory.on} items={memory.items} canEdit={member.role !== "viewer"} isAdmin={member.role === "admin"} c={s.memory} mic={t.mic} />
             </section>
           )}
 
@@ -248,7 +248,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <section className={card}>
               <h3 className="h3 m-0">{s.suggest.title}</h3>
               <p className="small text-ink-muted m-0">{s.suggest.body}</p>
-              <SuggestForm c={s.suggest} />
+              <SuggestForm c={s.suggest} mic={t.mic} />
             </section>
           )}
 
