@@ -170,7 +170,13 @@ export default async function ProjectPage({
 
       {/* Stages, and Page or Board */}
       <div className="shrink-0 px-4 md:px-6 py-3 flex flex-wrap gap-3 items-center justify-between min-w-0">
-        <StageBar stages={names} current={currentIndex} label={t.stage.stagesLabel} />
+        <StageBar
+          stages={names}
+          current={currentIndex}
+          label={t.stage.stagesLabel}
+          viewing={order.indexOf(showing)}
+          links={order.map((n, i) => (i > currentIndex ? null : i === currentIndex ? href({}) : n === 1 ? href({ o: 1 }) : n === 2 ? href({ o: 7 }) : null))}
+        />
         <div className="mn-stagebar" role="group" aria-label={t.stage.viewLabel}>
           <Link href={href({ o: open || undefined })} aria-current={!board ? "true" : undefined} className={`mn-stage ${!board ? "mn-stage--current" : ""}`}>
             <IconLayoutPage size={14} />
@@ -417,10 +423,16 @@ export default async function ProjectPage({
       )}
 
       <AutoRefresh active={generating} />
+      {showing < stage && (
+        <footer className="shrink-0 sticky bottom-0 bg-surface border-t border-line px-5 py-3 flex flex-wrap gap-3 items-center z-10">
+          <span className="small text-ink-muted grow">{fill(t.stage.viewingApproved, { name: names[order.indexOf(showing)] ?? "" })}</span>
+          <Link href={href({})} className="mn-btn mn-btn--primary">{fill(t.stage.goTo, { name: names[currentIndex] ?? "" })}</Link>
+        </footer>
+      )}
       {canEdit && showing === 2 && stage === 2 && !stageTwoApproved && !content[7] && statusOf(7) !== "generating" && (
         <CreativeStart projectId={id} label={t.creative.writeDirections} cost={approx(estimateUsd(model, "directions"))} message={t.creative.footer.start} run={runCopy} />
       )}
-      {canEdit && showing === 2 && (stageTwoApproved || content[7] || statusOf(7) === "generating") && (
+      {canEdit && showing === 2 && stage === 2 && (stageTwoApproved || content[7] || statusOf(7) === "generating") && (
         <StageFooter
           projectId={id}
           stage={2}

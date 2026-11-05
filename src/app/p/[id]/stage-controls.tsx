@@ -9,12 +9,14 @@ function useRun() {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | undefined>();
-  const run = (fn: () => Promise<Result>, showProgress = false) => {
+  const run = (fn: () => Promise<Result>, showProgress = false, thenGo?: string) => {
     // While Menab AI writes, redraw once so the steps show "Generating".
     if (showProgress) setTimeout(() => router.refresh(), 1500);
     start(async () => {
       const res = await fn();
       setError(res.error);
+      // After an approval, open the next stage instead of staying on the approved page.
+      if (!res.error && thenGo) router.push(thenGo);
       router.refresh();
     });
   };
@@ -110,7 +112,7 @@ export function StageFooter({
           type="button"
           className="mn-btn mn-btn--primary"
           disabled={disabled || pending}
-          onClick={() => run(() => (action === "write" ? writeBriefDocuments(projectId) : approveStage(projectId, stage)), action === "write")}
+          onClick={() => run(() => (action === "write" ? writeBriefDocuments(projectId) : approveStage(projectId, stage)), action === "write", action === "approve" ? `/p/${projectId}` : undefined)}
         >
           {pending && <span className="mn-chip__icon" style={{ border: "1.5px solid currentColor", borderTopColor: "transparent", borderRadius: "50%", width: 12, height: 12, animation: "mn-spin .9s linear infinite" }} aria-hidden="true" />}
           {label}
