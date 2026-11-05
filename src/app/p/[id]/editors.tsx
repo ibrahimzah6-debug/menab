@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { MicButton } from "@/components/mic-button";
 import { saveBriefIdea, saveOutputEdit, writeBriefDocuments } from "./actions";
 
 type Json = string | number | boolean | null | Json[] | { [k: string]: Json };
@@ -228,11 +229,16 @@ export function ChangeBox({
   copy,
   cost,
   disabled,
+  mic,
+  onApply,
 }: {
   projectId: string;
   copy: { label: string; placeholder: string; apply: string; working: string };
   cost: string;
   disabled?: boolean;
+  mic?: { start: string; stop: string; working: string; blocked: string };
+  // Another way to apply the change (the Creative stage streams its steps); default: stage 1 documents.
+  onApply?: (text: string) => Promise<{ error?: string }>;
 }) {
   const router = useRouter();
   const [text, setText] = useState("");
@@ -240,7 +246,10 @@ export function ChangeBox({
   const [error, setError] = useState<string | undefined>();
   return (
     <div className="flex flex-col gap-2 border-t border-line pt-3">
-      <label htmlFor="change-box" className="mn-label">{copy.label}</label>
+      <div className="flex items-center justify-between gap-2">
+        <label htmlFor="change-box" className="mn-label">{copy.label}</label>
+        {mic && <MicButton projectId={projectId} labels={mic} size={28} onText={(t) => setText((x) => (x.trim() ? `${x.trim()} ${t}` : t))} />}
+      </div>
       <textarea
         id="change-box"
         dir="auto"
@@ -259,7 +268,7 @@ export function ChangeBox({
         onClick={() => {
           setTimeout(() => router.refresh(), 1500);
           start(async () => {
-            const res = await writeBriefDocuments(projectId, text);
+            const res = onApply ? await onApply(text) : await writeBriefDocuments(projectId, text);
             setError(res.error);
             if (!res.error) setText("");
             router.refresh();

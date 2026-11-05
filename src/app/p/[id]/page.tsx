@@ -19,6 +19,8 @@ import { LanguageMenu } from "@/components/menus";
 import { MenabLoader } from "@/components/menab-loader";
 import { StepModelPicker } from "./side-panels";
 import { PathButtons, RewriteButton, StageFooter } from "./stage-controls";
+import { DirectionsView, MeetingView, MoodView, ScriptView, TreatmentView, Versions } from "./creative-docs";
+import { AutoRefresh, CreativeAssistant, CreativeStart } from "./creative-panels";
 
 // AI calls run inside the actions on this page and can take up to a minute.
 export const maxDuration = 300;
@@ -82,19 +84,29 @@ export default async function ProjectPage({
     price: iso(`~$${estimateUsd(m.id, "briefTurn").toFixed(3)}`) + (locale === "ar" ? " للرد" : " a reply"),
   }));
 
-  // Which stage the screen shows: the current one, or stage 1 when one of its outputs is opened.
+  // Which stage the screen shows: the current one, or an earlier one when one of its outputs is opened.
   const stageOne = outs.filter((x) => x.stage === 1);
+  const stageTwo = outs.filter((x) => x.stage === 2);
   const asked = Number(o);
-  const showing = asked >= 1 && asked <= 6 ? 1 : stage;
+  const showing = asked >= 1 && asked <= 6 ? 1 : asked >= 7 && asked <= 12 && stageTwo.length ? 2 : stage;
   const list = showing === 1 ? stageOne.filter((x) => x.number !== 2) : outs.filter((x) => x.stage === showing);
-  const docsReady = [3, 4, 5, 6].every((n) => ["ready", "edited", "approved"].includes(stageOne.find((x) => x.number === n)?.status ?? ""));
+  const isReady = (n: number) => ["ready", "edited", "approved"].includes(outs.find((x) => x.number === n)?.status ?? "");
+  const docsReady = [3, 4, 5, 6].every(isReady);
   const stageOneApproved = stageOne.length > 0 && stageOne.every((x) => x.status === "approved");
-  const open = showing === 1 ? (asked >= 1 && asked <= 6 ? (asked === 2 ? 1 : asked) : docsReady ? 3 : 1) : 0;
+  const stageTwoApproved = stageTwo.length > 0 && stageTwo.every((x) => x.status === "approved");
+  // The open output: the one asked for, else where the work is.
+  const open =
+    showing === 1
+      ? asked >= 1 && asked <= 6 ? (asked === 2 ? 1 : asked) : docsReady ? 3 : 1
+      : showing === 2
+        ? asked >= 7 && asked <= 12 ? asked : isReady(12) ? 12 : isReady(8) ? 9 : isReady(7) ? 8 : 7
+        : 0;
   const board = view === "board";
-  const editableHere = canEdit && showing === stage && !(showing === 1 && stageOneApproved);
+  const editableHere = canEdit && showing === stage && !(showing === 1 && stageOneApproved) && !(showing === 2 && stageTwoApproved);
+  const generating = outs.some((x) => x.status === "generating");
 
-  // Latest content of every stage 1 output, for the page and the board.
-  const withVersions = stageOne.filter((x) => x.current_version > 0);
+  // Latest content of every stage 1 and stage 2 output, for the page and the board.
+  const withVersions = [...stageOne, ...stageTwo].filter((x) => x.current_version > 0);
   const content: Record<number, unknown> = {};
   if (withVersions.length) {
     const { data: versions } = await supabase
@@ -103,6 +115,20 @@ export default async function ProjectPage({
       .in("output_id", withVersions.map((x) => x.id));
     for (const x of withVersions) content[x.number] = versions?.find((v) => v.output_id === x.id && v.version === x.current_version)?.content;
   }
+
+  // Every version of the open output, to restore an earlier one.
+  const openOut = outs.find((x) => x.number === open);
+  const { data: versionList } = openOut && openOut.current_version > 1
+    ? await supabase.from("versions").select("version, source, created_at").eq("output_id", openOut.id).order("version")
+    : { data: [] };
+
+  const runCopy = {
+    thinking: p.thinking,
+    outputs: t.outputs as unknown as Record<number, string>,
+    steps: { call: p.steps.call, retry: p.steps.retry, switch: p.steps.switch, skip: p.steps.skip, writing: t.creative.steps.writing, saved: t.creative.steps.saved, stopped: p.steps.stopped, lost: p.steps.lost, stop: p.steps.stop },
+  };
+  const seconds = Number(brief.length_seconds) || 30;
+  const meeting = (content[8] ?? {}) as { chosen?: number; notes?: string };
 
   const statusOf = (n: number) => (outs.find((x) => x.number === n)?.status ?? "waiting") as OutputStatus | "failed";
   const href = (q: Record<string, string | number | undefined>) => {
@@ -150,7 +176,7 @@ export default async function ProjectPage({
             <IconLayoutPage size={14} />
             {t.stage.page}
           </Link>
-          <Link href={href({ o: showing === 1 ? 1 : undefined, view: "board" })} aria-current={board ? "true" : undefined} className={`mn-stage ${board ? "mn-stage--current" : ""}`}>
+          <Link href={href({ o: showing === 1 ? 1 : showing === 2 ? 7 : undefined, view: "board" })} aria-current={board ? "true" : undefined} className={`mn-stage ${board ? "mn-stage--current" : ""}`}>
             <IconLayoutBoard size={14} />
             {t.stage.board}
           </Link>
@@ -181,13 +207,15 @@ export default async function ProjectPage({
                         editable={editableHere && st !== "generating"}
                         label={t.outputs[x.number]}
                       />
+                    ) : showing === 2 ? (
+                      <span dir="auto">{creativeExcerpt(x.number, content, meeting, t)}</span>
                     ) : (
                       fill(p.later, { m: MILESTONE[showing] ?? "" })
                     )}
                   </div>
                   <div className="mn-card__meta">
                     <span>{x.current_version > 0 ? `${textModel(model).name} · v${x.current_version}` : ""}</span>
-                    {showing === 1 && (
+                    {(showing === 1 || showing === 2) && (
                       <Link href={href({ o: x.number })} className="underline hover:text-ink">{p.openPage}</Link>
                     )}
                   </div>
@@ -213,7 +241,7 @@ export default async function ProjectPage({
             <span className="mn-label p-2">{fill(t.stage.outputsCount, { n: order.indexOf(showing) + 1, count: list.length })}</span>
             {list.map((x) => {
               const st = statusOf(x.number);
-              const isOpen = showing === 1 && open === x.number;
+              const isOpen = (showing === 1 || showing === 2) && open === x.number;
               const inner = (
                 <>
                   <span className={st === "waiting" ? "text-ink-muted" : ""}>{x.number === 1 ? p.chat : t.outputs[x.number]}</span>
@@ -221,7 +249,7 @@ export default async function ProjectPage({
                 </>
               );
               const cls = `flex justify-between items-center gap-2 p-2.5 rounded-md text-[14px] ${isOpen ? "font-medium bg-surface border border-line" : "border border-transparent hover:bg-tint-2"}`;
-              return showing === 1 ? (
+              return showing === 1 || showing === 2 ? (
                 <Link key={x.id} href={href({ o: x.number })} aria-current={isOpen ? "page" : undefined} className={cls}>{inner}</Link>
               ) : (
                 <div key={x.id} className={cls}>{inner}</div>
@@ -229,12 +257,56 @@ export default async function ProjectPage({
             })}
           </nav>
 
-          {showing !== 1 ? (
+          {showing === 2 ? (
+            <section className="relative flex-1 min-w-0 md:min-h-0 md:overflow-y-auto bg-surface border border-line rounded-lg">
+              <div className="px-6 py-5 border-b border-line flex flex-wrap items-center gap-3">
+                <div className="grow flex flex-col gap-1">
+                  <span className="mn-label" lang="en">{String(open).padStart(2, "0")} · v{openOut?.current_version ?? 0}</span>
+                  <h1 className="h2 m-0">{t.outputs[open]}</h1>
+                </div>
+                <Versions projectId={id} n={open} list={versionList ?? []} current={openOut?.current_version ?? 0} editable={editableHere} c={t.creative} />
+                <StatusChip status={statusOf(open) as OutputStatus} label={statusLabel(t, statusOf(open))} />
+              </div>
+              <div className="p-6">
+                {open === 8 ? (
+                  <MeetingView
+                    projectId={id}
+                    directions={content[7] as never}
+                    meeting={meeting}
+                    editable={editableHere}
+                    c={t.creative}
+                    mic={t.mic}
+                    run={runCopy}
+                    cost={approx(estimateUsd(model, "creativeBuild"))}
+                  />
+                ) : open === 12 ? (
+                  <CreativeApproval t={t} content={content} meeting={meeting} isReady={isReady} seconds={seconds} href={(n) => href({ o: n })} />
+                ) : statusOf(open) === "generating" && !content[open] ? (
+                  <MenabLoader size={20} label={p.writing} />
+                ) : content[open] ? (
+                  open === 7 ? (
+                    <DirectionsView projectId={id} content={content[7] as never} chosen={meeting.chosen} editable={editableHere && statusOf(7) !== "generating"} c={t.creative} />
+                  ) : open === 9 ? (
+                    <ScriptView projectId={id} content={content[9] as never} seconds={seconds} editable={editableHere && statusOf(9) !== "generating"} c={t.creative} />
+                  ) : open === 10 ? (
+                    <TreatmentView projectId={id} content={content[10] as never} editable={editableHere && statusOf(10) !== "generating"} c={t.creative} />
+                  ) : (
+                    <MoodView projectId={id} content={content[11] as never} editable={editableHere && statusOf(11) !== "generating"} c={t.creative} />
+                  )
+                ) : (
+                  <p className="body text-ink-muted m-0">{open === 7 ? t.creative.footer.start : isReady(8) ? p.docs.notWritten : t.creative.footer.pick}</p>
+                )}
+              </div>
+            </section>
+          ) : showing !== 1 ? (
             <section className="flex-1 min-w-0 self-start bg-surface border border-line rounded-lg p-6">
               <span className="mn-label">{fill(t.projects.stageOf, { n: currentIndex + 1, total: order.length })}</span>
               <h1 className="h2 m-0 mt-1 mb-2">{names[currentIndex]}</h1>
               <p className="body text-ink-muted m-0">{fill(p.later, { m: MILESTONE[showing] ?? "" })}</p>
-              <p className="small m-0 mt-4"><Link href={href({ o: 3 })} className="underline">{t.outputs[3]}</Link></p>
+              <p className="small m-0 mt-4 flex gap-4">
+                <Link href={href({ o: 3 })} className="underline">{t.outputs[3]}</Link>
+                {stageTwo.length > 0 && <Link href={href({ o: 9 })} className="underline">{t.outputs[9]}</Link>}
+              </p>
             </section>
           ) : open === 1 ? (
             <div className="flex-1 min-w-0 h-[75vh] md:h-auto md:min-h-0 flex">
@@ -256,6 +328,7 @@ export default async function ProjectPage({
                   <span className="mn-label" lang="en">{String(open).padStart(2, "0")} · v{outs.find((x) => x.number === open)?.current_version ?? 0}</span>
                   <h1 className="h2 m-0">{t.outputs[open]}</h1>
                 </div>
+                <Versions projectId={id} n={open} list={versionList ?? []} current={openOut?.current_version ?? 0} editable={editableHere} c={t.creative} />
                 <StatusChip status={statusOf(open) as OutputStatus} label={statusLabel(t, statusOf(open))} />
               </div>
               <div className="p-6">
@@ -321,9 +394,20 @@ export default async function ProjectPage({
                   disabled={!canEdit}
                 />
               </div>
+              {showing === 2 && editableHere && [7, 9, 10, 11].includes(open) && Boolean(content[open]) && (
+                <CreativeAssistant
+                  key={open}
+                  projectId={id}
+                  n={open}
+                  copy={p.change}
+                  cost={approx(estimateUsd(model, open === 7 ? "directions" : "revise"))}
+                  mic={t.mic}
+                  run={runCopy}
+                />
+              )}
               {showing === 1 && open !== 1 && docsReady && editableHere && (
                 <>
-                  <ChangeBox projectId={id} copy={p.change} cost={approx(estimateUsd(model, "stageOne"))} />
+                  <ChangeBox projectId={id} copy={p.change} cost={approx(estimateUsd(model, "stageOne"))} mic={t.mic} />
                   <RewriteButton projectId={id} label={p.rewrite} cost={approx(estimateUsd(model, "stageOne"))} />
                 </>
               )}
@@ -332,6 +416,27 @@ export default async function ProjectPage({
         </main>
       )}
 
+      <AutoRefresh active={generating} />
+      {canEdit && showing === 2 && stage === 2 && !stageTwoApproved && !content[7] && statusOf(7) !== "generating" && (
+        <CreativeStart projectId={id} label={t.creative.writeDirections} cost={approx(estimateUsd(model, "directions"))} message={t.creative.footer.start} run={runCopy} />
+      )}
+      {canEdit && showing === 2 && (stageTwoApproved || content[7] || statusOf(7) === "generating") && (
+        <StageFooter
+          projectId={id}
+          stage={2}
+          message={
+            stageTwoApproved
+              ? t.creative.footer.approved
+              : [7, 9, 10, 11].some((n) => statusOf(n) === "generating")
+                ? t.creative.footer.writing
+                : !isReady(8)
+                  ? t.creative.footer.pick
+                  : t.creative.footer.review
+          }
+          action={!stageTwoApproved && isReady(12) && stage === 2 ? "approve" : null}
+          label={fill(t.stage.approve, { n: 2 })}
+        />
+      )}
       {canEdit && showing === 1 && stage === 1 && (
         <StageFooter
           projectId={id}
@@ -364,6 +469,60 @@ function excerpt(n: number, c: unknown, brief: Partial<BriefFields>, p: Dictiona
     return m.length ? `${m[0].name} ${m[0].start} · ${m[m.length - 1].name} ${m[m.length - 1].end}` : p.docs.notWritten;
   }
   return "";
+}
+
+// A one-line summary of a Creative output for its board card.
+function creativeExcerpt(n: number, content: Record<number, unknown>, meeting: { chosen?: number; notes?: string }, t: Dictionary): string {
+  const dirs = (content[7] as { directions?: { title: string; idea: string }[] } | undefined)?.directions ?? [];
+  if (n === 7) return dirs.map((d, i) => `${String.fromCharCode(65 + i)}. ${d.title}`).join(" · ");
+  if (n === 8) return meeting.chosen !== undefined && dirs[meeting.chosen] ? `${t.creative.chosen}: ${dirs[meeting.chosen].title}` : t.creative.footer.pick;
+  if (n === 9) return (content[9] as { rows?: { vo_ar?: string; picture?: string }[] } | undefined)?.rows?.find((r) => r.vo_ar)?.vo_ar ?? "";
+  if (n === 10) return (content[10] as { idea?: string } | undefined)?.idea ?? "";
+  if (n === 11) return (content[11] as { look?: string } | undefined)?.look ?? "";
+  if (n === 12) return content[12] ? t.creative.approval.ready : "";
+  return "";
+}
+
+// Output 12: everything the client signs off in the Creative stage, in one place.
+function CreativeApproval({ t, content, meeting, isReady, seconds, href }: { t: Dictionary; content: Record<number, unknown>; meeting: { chosen?: number; notes?: string }; isReady: (n: number) => boolean; seconds: number; href: (n: number) => string }) {
+  const c = t.creative;
+  const dirs = (content[7] as { directions?: { title: string; idea: string }[] } | undefined)?.directions ?? [];
+  const chosen = meeting.chosen !== undefined ? dirs[meeting.chosen] : undefined;
+  const items = [7, 8, 9, 10, 11];
+  const waiting = items.filter((n) => !isReady(n));
+  const script = content[9] as { rows?: { seconds: number }[] } | undefined;
+  const total = (script?.rows ?? []).reduce((n, r) => n + (Number(r.seconds) || 0), 0);
+  return (
+    <div className="flex flex-col gap-5 max-w-[760px]">
+      <p className="small text-ink-muted m-0">{c.approval.intro}</p>
+      <p className={`small m-0 px-3 py-2 rounded-md ${waiting.length ? "bg-tint-2" : "border border-line"}`}>
+        {waiting.length ? fill(c.approval.waiting, { items: waiting.map((n) => t.outputs[n]).join(", ") }) : c.approval.ready}
+      </p>
+      {chosen && (
+        <div>
+          <span className="mn-label">{c.approval.direction}</span>
+          <h2 className="h3 m-0 mt-1" dir="auto">{chosen.title}</h2>
+          <p className="body m-0 mt-1" dir="auto">{chosen.idea}</p>
+        </div>
+      )}
+      {script?.rows && (
+        <p className="small m-0">
+          <span className="mn-label me-2">{c.approval.length}</span>
+          <span className="data">{fill(c.script.total, { n: total, target: seconds })}</span>
+        </p>
+      )}
+      <ul className="m-0 p-0 list-none flex flex-col border border-line rounded-lg">
+        {items.map((n, i) => (
+          <li key={n} className={`flex items-center gap-3 px-4 py-3 ${i ? "border-t border-line" : ""}`}>
+            <span className="mn-label" lang="en">{String(n).padStart(2, "0")}</span>
+            <span className="body grow">{t.outputs[n]}</span>
+            <span className={`mn-chip ${isReady(n) ? "mn-chip--ready" : "mn-chip--waiting"}`}>{isReady(n) ? t.status.ready : t.status.waiting}</span>
+            <Link href={href(n)} className="small underline">{c.approval.open}</Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {

@@ -23,3 +23,4 @@ Ideas that come up while testing. None of these are in scope until Ibrahim decid
 | I17 | Connectors and plugins under "+" in the reply box | Ibrahim, 5 Nov | Later | Shown as Soon |
 | I18 | Billing, plans and upgrades in Settings | Ibrahim, 6 Nov | Later | With credits and top-up (M5 and after) |
 | I19 | Apps and extensions, API keys, guest passes in the person menu | Ibrahim, 6 Nov | Later | Not in the docs yet |
+| I20 | Video editor: export shots with a timeline file (XML) for Premiere and DaVinci Resolve first; a simple built-in editor in v2; maybe a Menab panel inside Premiere | Ibrahim, 6 Nov | Proposed | Edit stage; docs say built-in editor in v2 |

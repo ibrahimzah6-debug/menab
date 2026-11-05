@@ -90,6 +90,10 @@ export function textModel(id: string | null | undefined) {
 export const TYPICAL_TOKENS = {
   briefTurn: { in: 4000, out: 1500 },
   stageOne: { in: 3000, out: 6000 },
+  directions: { in: 4000, out: 3000 },
+  // Script, treatment and visual mood together, written after a direction is chosen.
+  creativeBuild: { in: 15000, out: 9000 },
+  revise: { in: 6000, out: 3000 },
 } as const;
 export function estimateUsd(modelId: string, action: keyof typeof TYPICAL_TOKENS) {
   const m = textModel(modelId);

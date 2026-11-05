@@ -2,12 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { MicButton } from "@/components/mic-button";
 import { addMemory, removeMemory, setMemoryOn } from "./actions";
 
 type C = { on: string; off: string; turnOn: string; turnOff: string; add: string; addPlaceholder: string; empty: string; remove: string; fromAi: string; fromPerson: string; adminOnly: string };
 
 // What Menab remembers about this workspace: read it, add to it, remove anything, or turn it off.
-export function MemoryPanel({ on, items, canEdit, isAdmin, c }: { on: boolean; items: { id: string; content: string; source: string }[]; canEdit: boolean; isAdmin: boolean; c: C }) {
+export function MemoryPanel({ on, items, canEdit, isAdmin, c, mic }: { on: boolean; items: { id: string; content: string; source: string }[]; canEdit: boolean; isAdmin: boolean; c: C; mic: { start: string; stop: string; working: string; blocked: string } }) {
+  const [draft, setDraft] = useState("");
   const router = useRouter();
   const [pending, start] = useTransition();
   const [note, setNote] = useState<string | undefined>();
@@ -35,10 +37,12 @@ export function MemoryPanel({ on, items, canEdit, isAdmin, c }: { on: boolean; i
           className="flex gap-2"
           action={(f) => {
             const v = String(f.get("content") ?? "");
+            setDraft("");
             run(() => addMemory(v));
           }}
         >
-          <input name="content" maxLength={300} dir="auto" placeholder={c.addPlaceholder} aria-label={c.add} className="mn-input grow" />
+          <input name="content" value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={300} dir="auto" placeholder={c.addPlaceholder} aria-label={c.add} className="mn-input grow" />
+          <MicButton labels={mic} size={40} onText={(t) => setDraft((x) => (x.trim() ? `${x.trim()} ${t}` : t))} />
           <button className="mn-btn mn-btn--primary" disabled={pending}>{c.add}</button>
         </form>
       )}
