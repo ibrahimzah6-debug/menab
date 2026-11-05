@@ -121,7 +121,7 @@ export async function writeTreatment(c: Ctx & { direction: unknown; notes: strin
     system(c),
     [{ role: "user", content: `${ask}\n\nChosen direction: ${JSON.stringify(c.direction)}\nMeeting notes: ${c.notes || "none"}\nScript: ${JSON.stringify(c.script)}\n\n${base(c)}` }],
     Treatment,
-    { effort: "medium", maxTokens: 8000, onStep: c.onStep, signal: c.signal, timeoutMs: 120_000 },
+    { effort: "medium", maxTokens: 8000, onStep: c.onStep, signal: c.signal, timeoutMs: 150_000 },
   );
 }
 

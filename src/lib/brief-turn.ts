@@ -91,6 +91,8 @@ export async function runBriefMessage(projectId: string, payload: BriefPayload, 
   if (!clean && !list.length) return;
   const loaded = await loadProject(projectId);
   const { me, supabase, project } = loaded;
+  // The brief chat is closed once stage 1 is approved.
+  if (project.current_stage !== 1) throw new Error("The brief is approved. The chat is read only now.");
   let model = loaded.model;
   const { t } = await getI18n();
   const voice = payload.voice && ownPath(payload.voice.path, me.workspace.id, projectId) ? payload.voice : undefined;

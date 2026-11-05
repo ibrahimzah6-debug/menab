@@ -9,7 +9,7 @@ import { isFailing } from "@/lib/ai/health";
 import { activeRules } from "@/lib/dev";
 import { transcribe } from "@/lib/ai/transcribe";
 import { getI18n } from "@/lib/i18n/server";
-import { logAiJob, notify, saveVersion, STAGE_OUTPUTS, type Path } from "@/lib/projects";
+import { claimForWriting, logAiJob, notify, saveVersion, STAGE_OUTPUTS, type Path } from "@/lib/projects";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/workspace";
@@ -167,7 +167,9 @@ export async function sendBriefMessage(projectId: string, payload: BriefPayload)
 export async function choosePath(projectId: string, path: Path): Promise<Result> {
   if (!["ai", "production", "hybrid"].includes(path)) return { error: "Unknown path" };
   try {
-    const { supabase } = await loadProject(projectId);
+    const { supabase, project } = await loadProject(projectId);
+    // The path decides which stages follow, so it is fixed once stage 1 is approved.
+    if (project.current_stage !== 1) return { error: "The path is fixed once the brief is approved." };
     await supabase.from("projects").update({ path, updated_at: new Date().toISOString() }).eq("id", projectId);
   } catch (e) {
     return { error: errText(e) };
@@ -196,6 +198,7 @@ export async function writeBriefDocuments(projectId: string, instruction?: strin
   try {
     const loaded = await loadProject(projectId);
     const { me, supabase, project } = loaded;
+    if (project.current_stage !== 1) return { error: t.project.notCurrentStage };
     // A model that keeps failing right now is skipped for its backup.
     const model = (await isFailing(loaded.model)) ? textModel(backupFor(textModel(loaded.model))).id : loaded.model;
     const brief = project.brief as BriefFields;
@@ -206,7 +209,7 @@ export async function writeBriefDocuments(projectId: string, instruction?: strin
       .select("id, workspace_id, number, current_version")
       .eq("project_id", projectId)
       .in("number", [3, 4, 5, 6]);
-    await supabase.from("outputs").update({ status: "generating" }).eq("project_id", projectId).in("number", [3, 4, 5, 6]);
+    if (!(await claimForWriting(supabase, projectId, [3, 4, 5, 6]))) return { error: t.project.alreadyWriting };
 
     let result;
     try {
@@ -363,6 +366,8 @@ export async function restoreVersion(projectId: string, number: number, version:
 export async function saveBriefIdea(projectId: string, logline: string, story: string[]): Promise<Result> {
   try {
     const { me, supabase, project } = await loadProject(projectId);
+    // The brief is approved with stage 1; after that it changes only with a new version.
+    if (project.current_stage !== 1) return { error: "The brief is approved. It can't be changed here." };
     const brief = {
       ...((project.brief ?? {}) as Record<string, unknown>),
       logline: logline.trim().slice(0, 600) || null,

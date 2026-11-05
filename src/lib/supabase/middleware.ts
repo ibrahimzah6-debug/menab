@@ -28,6 +28,9 @@ export async function updateSession(request: NextRequest) {
   const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + "/"));
 
   if (!signedIn && !isPublic) {
+    // The AI endpoints answer a plain "log in" instead of sending back the login page.
+    const isEndpoint = path.startsWith("/api/") || /^\/p\/[^/]+\/(brief|voice|creative)$/.test(path);
+    if (isEndpoint) return NextResponse.json({ error: "Log in again." }, { status: 401 });
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.search = "";
