@@ -101,7 +101,7 @@ export function estimateUsd(modelId: string, action: keyof typeof TYPICAL_TOKENS
 export const TRANSCRIBER = {
   provider: "kie.ai",
   model: "gemini-3-8-flash",
-  label: "Gemini 3.8 Flash through Kie.ai (Google's free tier as backup)",
+  label: "Gemini 3.5 Transcribe (Google, free tier)",
   // kie.ai/pricing lists "from $0.225 per million tokens"; used for both directions as an estimate.
   usdPerMillion: 0.225,
 } as const;

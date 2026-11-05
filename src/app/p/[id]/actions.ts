@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { missingRequired, writeStageOne, type BriefFields } from "@/lib/ai/brain";
 import { TEXT_MODELS, textModel } from "@/lib/ai/catalog";
+import { backupFor } from "@/lib/ai/brain-core";
+import { isFailing } from "@/lib/ai/health";
+import { activeRules } from "@/lib/dev";
 import { transcribe } from "@/lib/ai/transcribe";
 import { getI18n } from "@/lib/i18n/server";
 import { logAiJob, notify, saveVersion, STAGE_OUTPUTS, type Path } from "@/lib/projects";
@@ -140,7 +143,7 @@ export async function transcribeVoice(projectId: string, path: string): Promise<
       await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "transcribe", provider: r.provider, model: r.model, ok: true, usage: r.usage });
       return { text: r.text };
     } catch (e) {
-      await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "transcribe", provider: "kie.ai", model: "gemini-3-8-flash", ok: false, error: errText(e) });
+      await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "transcribe", provider: "google", model: "gemini-3.5-transcribe", ok: false, error: errText(e) });
       await notify({ workspaceId: me.workspace.id, projectId, kind: "ai_failed", title: "A voice note could not be turned into text", body: errText(e) });
       return { error: t.project.voiceFailed };
     }
@@ -191,7 +194,10 @@ export async function renameProject(projectId: string, name: string): Promise<Re
 export async function writeBriefDocuments(projectId: string, instruction?: string): Promise<Result> {
   const { t, locale } = await getI18n();
   try {
-    const { me, supabase, project, model } = await loadProject(projectId);
+    const loaded = await loadProject(projectId);
+    const { me, supabase, project } = loaded;
+    // A model that keeps failing right now is skipped for its backup.
+    const model = (await isFailing(loaded.model)) ? textModel(backupFor(textModel(loaded.model))).id : loaded.model;
     const brief = project.brief as BriefFields;
     if (missingRequired(brief).length) return { error: t.project.answerFirst };
 
@@ -223,7 +229,7 @@ export async function writeBriefDocuments(projectId: string, instruction?: strin
       const memory = ws?.memory_on === false
         ? []
         : ((await supabase.from("memories").select("content").eq("workspace_id", project.workspace_id).order("created_at", { ascending: false }).limit(40)).data ?? []).map((r) => r.content as string);
-      result = await writeStageOne(brief, project.path ?? project.path_suggested, today, language, model, revise, undefined, memory);
+      result = await writeStageOne(brief, project.path ?? project.path_suggested, today, language, model, revise, undefined, memory, await activeRules());
     } catch (e) {
       await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "stage1-docs", provider: textModel(model).provider, model, ok: false, error: errText(e) });
       // Keep earlier versions; only steps that never had one are marked failed.

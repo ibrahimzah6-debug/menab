@@ -44,7 +44,7 @@ function estimateCost(m: TextModel, input: number, output: number) {
 }
 
 // The backup when a model fails: Claude falls back to GPT, GPT falls back to Claude.
-function backupFor(m: TextModel): string {
+export function backupFor(m: TextModel): string {
   return m.provider === "kie-claude" ? "gpt-6-1-sol" : "claude-sonnet-5-5";
 }
 
