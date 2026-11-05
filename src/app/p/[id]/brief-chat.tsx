@@ -7,6 +7,7 @@ import { MenabLoader } from "@/components/menab-loader";
 import { browserClient } from "@/lib/supabase/client";
 import { startWavRecorder, type WavRecorder } from "@/lib/wav-recorder";
 import { chooseTextModel, prepareUpload } from "./actions";
+import { ReplyFeedback } from "./reply-feedback";
 
 type Msg = {
   id: string;
@@ -39,6 +40,7 @@ type Copy = {
   soon: string;
   recording: string;
   fields: Record<string, string>;
+  rate: { good: string; bad: string; why: string; send: string; thanks: string };
   steps: {
     read: string;
     readFiles: string;
@@ -52,6 +54,7 @@ type Copy = {
     slow: string;
     lost: string;
     memory: string;
+    skip: string;
     stopped: string;
     summary: string;
     count: string;
@@ -91,6 +94,8 @@ function stepText(e: StepEvent, copy: Copy, paths: Record<string, string>) {
       return fillIn(copy.steps.retry, { model: String(e.model) });
     case "switch":
       return fillIn(copy.steps.switch, { from: String(e.from), to: String(e.to) });
+    case "skip":
+      return fillIn(copy.steps.skip, { from: String(e.from), to: String(e.to) });
     case "fields":
       return fillIn(copy.steps.fields, { fields: (e.keys as string[]).map((k) => copy.fields[k] ?? k).join(sep) });
     case "path":
@@ -297,11 +302,15 @@ export function BriefChat({
     let heard = "";
     try {
       const { blob, seconds } = await r.stop();
-      const path = await upload(projectId, "voice", blob, "voice-note.wav");
+      // Save a copy and turn it into text at the same time; short notes go straight to the
+      // speech model without waiting for the copy.
+      const saving = upload(projectId, "voice", blob, "voice-note.wav");
+      saving.catch(() => {});
+      const direct = blob.size < 4 * 1024 * 1024;
       const res = await fetch(`/p/${projectId}/voice`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path }),
+        headers: { "Content-Type": direct ? "audio/wav" : "application/json" },
+        body: direct ? blob : JSON.stringify({ path: await saving }),
         signal: controller.signal,
       });
       if (!res.ok) throw new Error(copy.micBlocked);
@@ -312,7 +321,7 @@ export function BriefChat({
         } else if (e.t === "error") throw new Error(String(e.message));
       }
       if (!heard.trim()) throw new Error(copy.micBlocked);
-      setVoice({ path, seconds });
+      setVoice({ path: await saving, seconds });
     } catch (e) {
       if (controller.signal.aborted) setText(before);
       else setError(e instanceof Error ? e.message : String(e));
@@ -356,6 +365,7 @@ export function BriefChat({
                 <StepsLine events={m.steps.events} live={false} summary={fillIn(copy.steps.summary, { s: m.steps.seconds, model: m.steps.model })} copy={copy} paths={paths} />
               ) : null}
               <p className="body m-0 whitespace-pre-wrap" dir="auto">{m.content}</p>
+              {canEdit && <ReplyFeedback projectId={projectId} messageId={m.id} c={copy.rate} />}
             </div>
           ),
         )}

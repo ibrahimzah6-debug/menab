@@ -1,6 +1,8 @@
 import "server-only";
 import { briefTurn, missingRequired, type Attachment, type BriefFields, type Step } from "@/lib/ai/brain";
-import { StoppedError } from "@/lib/ai/brain-core";
+import { backupFor, StoppedError } from "@/lib/ai/brain-core";
+import { isFailing } from "@/lib/ai/health";
+import { activeRules } from "@/lib/dev";
 import { DEFAULT_TEXT_MODEL, textModel } from "@/lib/ai/catalog";
 import { getI18n } from "@/lib/i18n/server";
 import { logAiJob, notify, saveVersion } from "@/lib/projects";
@@ -64,6 +66,7 @@ export type BriefEvent =
   | { t: "call"; model: string }
   | { t: "retry"; model: string }
   | { t: "switch"; from: string; to: string }
+  | { t: "skip"; from: string; to: string }
   | { t: "fields"; keys: string[] }
   | { t: "path"; path: string }
   | { t: "memory"; items: string[] }
@@ -86,10 +89,18 @@ export async function runBriefMessage(projectId: string, payload: BriefPayload, 
   const clean = payload.text.trim().slice(0, 8000);
   const list = (payload.files ?? []).slice(0, 5);
   if (!clean && !list.length) return;
-  const { me, supabase, project, model } = await loadProject(projectId);
+  const loaded = await loadProject(projectId);
+  const { me, supabase, project } = loaded;
+  let model = loaded.model;
   const { t } = await getI18n();
   const voice = payload.voice && ownPath(payload.voice.path, me.workspace.id, projectId) ? payload.voice : undefined;
   emit({ t: "read", files: list.length, voice: Boolean(voice) });
+  // A model that keeps failing right now is skipped, so nobody waits for it to fail again.
+  if (await isFailing(model)) {
+    const backup = textModel(backupFor(textModel(model))).id;
+    emit({ t: "skip", from: textModel(model).name, to: textModel(backup).name });
+    model = backup;
+  }
 
   const admin = createAdminClient();
   const files: Attachment[] = [];
@@ -133,7 +144,7 @@ export async function runBriefMessage(projectId: string, payload: BriefPayload, 
       before,
       model,
       onStep,
-      { signal, memory },
+      { signal, memory, rules: await activeRules() },
     );
   } catch (e) {
     if (signal?.aborted || e instanceof StoppedError) throw new StoppedError();

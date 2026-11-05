@@ -9,6 +9,7 @@ import { workspaceUsage } from "@/lib/usage";
 import { getCurrentMember } from "@/lib/workspace";
 import { LanguageList, PasswordForm, ProfileForm, WorkspaceForm } from "./account-forms";
 import { MemoryPanel } from "./memory";
+import { SuggestForm } from "./suggest";
 import { DefaultModel } from "./models";
 import { ThemeChoice } from "./theme-choice";
 
@@ -240,6 +241,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               <div>
                 <Link href="/credits" className="mn-btn mn-btn--secondary mn-btn--sm">{s.openCredits}</Link>
               </div>
+            </section>
+          )}
+
+          {section === "help" && (
+            <section className={card}>
+              <h3 className="h3 m-0">{s.suggest.title}</h3>
+              <p className="small text-ink-muted m-0">{s.suggest.body}</p>
+              <SuggestForm c={s.suggest} />
             </section>
           )}
 

@@ -31,6 +31,12 @@ function remembered(memory?: string[]) {
   return `\nWhat you remember about this company and its people (use it, do not repeat it back unless it matters):\n${memory.map((m) => `- ${m}`).join("\n")}\n`;
 }
 
+// Lessons the owner approved in the development loop (owner dashboard, AI rules).
+function lessons(rules?: string[]) {
+  if (!rules?.length) return "";
+  return `\nLessons from how Menab is used (always follow them):\n${rules.map((r) => `- ${r}`).join("\n")}\n`;
+}
+
 // ---------- Brief turn ----------
 
 // The brief starts from the video itself (the idea, story and feeling), then delivery,
@@ -91,12 +97,12 @@ export async function briefTurn(
   current: Partial<BriefFields>,
   modelId: string,
   onStep?: (s: Step) => void,
-  extra?: { signal?: AbortSignal; memory?: string[] },
+  extra?: { signal?: AbortSignal; memory?: string[]; rules?: string[] },
 ) {
   const r = await structured(
     modelId,
     `${MENAB}
-${remembered(extra?.memory)}
+${remembered(extra?.memory)}${lessons(extra?.rules)}
 Your job now: run the brief conversation. Turn what the user says into a structured brief that starts from the video itself: the idea in one line, the story beats, the feeling and the key message. Then delivery, production needs, client and timing. Keep values the user gave earlier unless they change them, and when they change the idea (for example a different character or place), update the logline and story beats to match. You may draft the logline and story beats from what you heard, as a first draft for the user to confirm.
 
 Required before documents can be written: ${REQUIRED_BRIEF_FIELDS.join(", ")}. Ask for those first. When they are filled, ask what would most improve the video. Never more than 3 questions at a time. Budget is optional: never insist on it. Suggest a path as soon as you know whether real products or people must be on camera.`,
@@ -170,6 +176,7 @@ export async function writeStageOne(
   revise?: { instruction: string; current: unknown },
   onStep?: (s: Step) => void,
   memory?: string[],
+  rules?: string[],
 ) {
   const ask = revise
     ? `Today is ${today}. Revise these stage 1 documents with this change from the producer: "${revise.instruction}". Apply the change everywhere it matters (summary, strategy, pathway, CPS) and keep everything else. Write in: ${language}.
@@ -178,7 +185,7 @@ Current documents: ${JSON.stringify(revise.current)}`
     : `Today is ${today}. Write the stage 1 documents for this brief: the brief summary for sign-off (start from the idea), strategy and deliverables (with every cutdown and ratio), the pathway with a rough cost and time range, and a first CPS. The CPS weeks run Sunday to Saturday, as in Saudi. Work back from the deadline; if the deadline is tight, say so in the note. Write in: ${language}.`;
   const r = await structured(
     modelId,
-    `${MENAB}\n${remembered(memory)}`,
+    `${MENAB}\n${remembered(memory)}${lessons(rules)}`,
     [
       {
         role: "user",
