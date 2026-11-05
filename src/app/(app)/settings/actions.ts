@@ -1,14 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { CATALOG, type ModelTask } from "@/lib/ai/catalog";
+import { CATALOG, TEXT_MODELS, type ModelTask } from "@/lib/ai/catalog";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/workspace";
 
-export async function saveDefaultModel(task: ModelTask, modelId: string): Promise<{ error?: string }> {
+export async function saveDefaultModel(task: ModelTask | "text", modelId: string): Promise<{ error?: string }> {
   const me = await getCurrentMember();
   if (!me || me.role !== "admin") return { error: "Only an Admin can change the default model." };
-  if (!(task in CATALOG) || !CATALOG[task].some((m) => m.id === modelId)) return { error: "Unknown model" };
+  const list = task === "text" ? TEXT_MODELS : CATALOG[task as ModelTask];
+  if (!list || !list.some((m) => m.id === modelId)) return { error: "Unknown model" };
   const supabase = await createClient();
   const { error } = await supabase.from("model_settings").upsert({
     workspace_id: me.workspace.id,

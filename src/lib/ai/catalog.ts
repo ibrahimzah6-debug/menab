@@ -56,19 +56,41 @@ export const DEFAULT_MODEL: Record<ModelTask, string> = {
   voice: "elevenlabs-multilingual-v2",
 };
 
-// Text and voice-brief models are not user choices in v1.
-export const BRAIN = {
-  provider: "anthropic",
-  model: "claude-opus-5-5",
-  label: "Claude Opus 5.5",
-  usdPerMillionIn: 4,
-  usdPerMillionOut: 20,
+// Writing models (briefs, scripts, documents), ranked. Prices per million tokens from Anthropic.
+export type TextModel = {
+  id: string;
+  name: string;
+  usdPerMillionIn: number;
+  usdPerMillionOut: number;
+  fallback: boolean; // server-side refusal fallback is available
+  goodFor: { en: string; ar: string };
+};
+export const TEXT_MODELS: TextModel[] = [
+  { id: "claude-opus-5-5", name: "Claude Opus 5.5", usdPerMillionIn: 4, usdPerMillionOut: 20, fallback: true, goodFor: { en: "Best thinking for briefs, scripts and treatments", ar: "أفضل تفكير للبريف والسكربت ورؤية المخرج" } },
+  { id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5", usdPerMillionIn: 2, usdPerMillionOut: 10, fallback: true, goodFor: { en: "Fast and strong, half the price", ar: "سريع وقوي بنص السعر" } },
+  { id: "claude-haiku-5-5", name: "Claude Haiku 5.5", usdPerMillionIn: 0.1, usdPerMillionOut: 0.5, fallback: false, goodFor: { en: "Cheapest, for quick drafts", ar: "الأرخص، للمسودات السريعة" } },
+];
+export const DEFAULT_TEXT_MODEL = "claude-opus-5-5";
+export function textModel(id: string | null | undefined) {
+  return TEXT_MODELS.find((m) => m.id === id) ?? TEXT_MODELS[0];
+}
+// Typical token use per action, to show the price before it runs.
+export const TYPICAL_TOKENS = {
+  briefTurn: { in: 4000, out: 1500 },
+  stageOne: { in: 3000, out: 6000 },
 } as const;
+export function estimateUsd(modelId: string, action: keyof typeof TYPICAL_TOKENS) {
+  const m = textModel(modelId);
+  const t = TYPICAL_TOKENS[action];
+  return (t.in * m.usdPerMillionIn + t.out * m.usdPerMillionOut) / 1_000_000;
+}
+
+export const BRAIN = { provider: "anthropic" } as const;
 
 export const TRANSCRIBER = {
   provider: "kie.ai",
   model: "gemini-3-8-flash",
-  label: "Gemini 3.8 Flash",
+  label: "Gemini (Google, free tier; Kie.ai as backup)",
   // kie.ai/pricing lists "from $0.225 per million tokens"; used for both directions as an estimate.
   usdPerMillion: 0.225,
 } as const;

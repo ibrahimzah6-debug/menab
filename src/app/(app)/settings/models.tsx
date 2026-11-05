@@ -14,7 +14,7 @@ export function DefaultModel({
   testedLabel,
   savedLabel,
 }: {
-  task: "image" | "video" | "voice";
+  task: "text" | "image" | "video" | "voice";
   label: string;
   options: PickerOption[];
   value: string;

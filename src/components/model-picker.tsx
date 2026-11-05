@@ -31,30 +31,37 @@ export function ModelPicker({
     <div
       ref={ref}
       className="relative"
+      onKeyDown={(e) => {
+        if (e.key === "Escape") setOpen(false);
+      }}
       onBlur={(e) => {
         if (!ref.current?.contains(e.relatedTarget as Node)) setOpen(false);
       }}
     >
       <button
         type="button"
-        className="w-full flex items-center gap-3 px-3 h-10 rounded-md bg-surface-raised border border-line text-start disabled:opacity-60"
+        className="w-full grid grid-cols-[22px_1fr_auto] items-center gap-x-2 px-3 py-2 rounded-md bg-surface-raised border border-line text-start hover:border-line-strong disabled:opacity-60"
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={label}
         disabled={disabled}
         onClick={() => setOpen((v) => !v)}
       >
-        <span className="data text-ink-faint w-5">{String(current.rank).padStart(2, "0")}</span>
-        <span className="small font-medium grow truncate" lang="en">{current.name}</span>
-        <span className="mn-label">{defaultLabel}</span>
-        <span className="small text-ink-muted whitespace-nowrap">{current.price}</span>
+        <span className="data text-ink-faint">{String(current.rank).padStart(2, "0")}</span>
+        <span className="flex flex-col min-w-0">
+          <span className="small font-medium truncate" lang="en">
+            {current.name}
+            {defaultLabel && <span className="mn-label ms-2">{defaultLabel}</span>}
+          </span>
+          <span className="text-[12px] text-ink-muted truncate">{current.price}</span>
+        </span>
         <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 4.5l3 3 3-3" /></svg>
       </button>
       {open && (
         <ul
           role="listbox"
           aria-label={label}
-          className="absolute z-20 mt-1 w-full max-h-[360px] overflow-y-auto bg-surface border border-line-strong rounded-md p-1 m-0 list-none"
+          className="absolute z-20 mt-1 end-0 w-full min-w-[320px] max-h-[380px] overflow-y-auto bg-surface border border-line-strong rounded-md p-1 m-0 list-none"
           style={{ boxShadow: "var(--shadow-float)" }}
         >
           {options.map((o) => (

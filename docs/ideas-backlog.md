@@ -16,3 +16,5 @@ Ideas that come up while testing. None of these are in scope until Ibrahim decid
 | I10 | One brain that decides everything from the brief (script, treatment, image and camera choices) so the person rarely regenerates | Ibrahim, 4 Nov | In progress | Started in M2 (`src/lib/ai/brain.ts`). Each stage passes its approved outputs to the next. "Training" means better instructions and examples from approved ZAH work plus the edit and regenerate counts (I6), not training a model |
 | I11 | Test one video per model in sequence (Kling 0 to 5 sec, Seedance 6 to 10, Veo 11 to 15) | Ibrahim, 4 Nov | Later | Testing paused to save money (decisions-build.md B5) |
 | I12 | Voice brief model | Ibrahim, 4 Nov | Built (M2) | Gemini 3.8 Flash through Kie.ai turns the voice note into text, Claude reads it |
+| I13 | Switch between workspaces | Ibrahim, 5 Nov | Built (M2) | Switcher at the top of the side menu. Creating a new workspace is not built; one per company is set up by Menab for now |
+| I14 | Check the brief fields against a real ZAH brief | Claude, 5 Nov | Open | Needs one past ZAH brief from Ibrahim |

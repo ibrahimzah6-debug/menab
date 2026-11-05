@@ -43,3 +43,14 @@ Each media task offers a short ranked list: 10 image models, 10 video models, 3 
 - Voice notes are recorded in the browser, saved to our storage, and turned into text by Gemini 3.8 Flash through Kie.ai (Ibrahim's choice), then read by Claude.
 - Every AI call is logged in `ai_jobs` with tokens and real cost; a failed call is logged at $0.
 - Required brief fields before documents: client, goal, length, formats, language, deadline. Budget is optional.
+
+## B8. Design revision after the M2 review (Ibrahim, 5 Nov 2026)
+
+Replaces B4.
+- **Colors:** each person picks Light, Dark or System in Settings → Appearance. Light is the default. Original sizes are back.
+- **Frame:** one side menu on every screen, including inside projects. It opens and closes like Claude's (remembered per browser). Top: logo, workspace switcher (the up and down arrows icon), New project (the one orange button), the areas. Bottom: person, language, log out.
+- **Stage screen:** back to the first design: stages on top, Page and Board on the top right, steps on the left with their status and a spinner while generating, the open step in the middle, the brief or the assistant on the right, approve bar at the bottom.
+- **Board view:** the stage's steps as cards on the dotted canvas; clicking a card opens it in Page view. The live AI cursor comes with M4.
+- **Model on the step:** the assistant panel has the ranked model picker with the price; the choice is remembered for the project (`projects.models`). Settings keeps each workspace's default, including a ranked writing model list (Claude Opus 5.5, Sonnet 5.5, Haiku 5.5).
+- **Brief panel:** starts from the video (the idea in one line, the story beats, feeling, key message, must show), then delivery, production, and client and timing. Fields came from the Brief screen design and the Workflow Map, not from a real ZAH brief; to be checked against one when available.
+- **Voice briefs:** Google's Gemini API on the free tier with Menab's own key (`GEMINI_API_KEY`, optional `GEMINI_MODEL`), Kie.ai as backup. Ibrahim accepted that Google may use free-tier content to improve its models.

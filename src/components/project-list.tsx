@@ -4,13 +4,17 @@ import { getI18n } from "@/lib/i18n/server";
 import { stageNumbersFor, type Path } from "@/lib/projects";
 import { stagesFor } from "@/lib/stages";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentMember } from "@/lib/workspace";
 
 export async function ProjectList({ limit }: { limit?: number }) {
   const { locale, t } = await getI18n();
   const supabase = await createClient();
+  const me = await getCurrentMember();
+  if (!me) return null;
   let q = supabase
     .from("projects")
     .select("id, name, client, path, current_stage, updated_at")
+    .eq("workspace_id", me.workspace.id)
     .order("updated_at", { ascending: false });
   if (limit) q = q.limit(limit);
   const { data } = await q;

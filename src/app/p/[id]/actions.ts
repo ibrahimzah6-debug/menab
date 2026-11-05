@@ -3,13 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { briefTurn, missingRequired, writeStageOne, type BriefFields } from "@/lib/ai/brain";
-import { BRAIN, TRANSCRIBER } from "@/lib/ai/catalog";
+import { BRAIN, DEFAULT_TEXT_MODEL, TEXT_MODELS, textModel } from "@/lib/ai/catalog";
 import { transcribe } from "@/lib/ai/transcribe";
 import { getI18n } from "@/lib/i18n/server";
 import { logAiJob, saveVersion, STAGE_OUTPUTS, type Path } from "@/lib/projects";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentMember } from "@/lib/workspace";
+import { getCurrentMember, getMemberships } from "@/lib/workspace";
 
 export type Result = { error?: string };
 
@@ -46,17 +46,40 @@ export async function createProject() {
 // ---------- Brief chat ----------
 
 async function loadProject(projectId: string) {
-  const me = await getCurrentMember();
-  if (!me) throw new Error("Log in again.");
-  if (!["admin", "producer", "coordinator"].includes(me.role)) throw new Error("Viewers can read and comment only.");
   const supabase = await createClient();
   const { data: project } = await supabase
     .from("projects")
-    .select("id, workspace_id, name, client, brief, path, path_suggested, current_stage")
+    .select("id, workspace_id, name, client, brief, path, path_suggested, current_stage, models")
     .eq("id", projectId)
     .maybeSingle();
   if (!project) throw new Error("Project not found.");
-  return { me, supabase, project };
+  // The person's role in the project's own workspace.
+  const me = (await getMemberships()).find((m) => m.workspace.id === project.workspace_id);
+  if (!me) throw new Error("Log in again.");
+  if (!["admin", "producer", "coordinator"].includes(me.role)) throw new Error("Viewers can read and comment only.");
+  const { data: setting } = await supabase
+    .from("model_settings")
+    .select("model_id")
+    .eq("workspace_id", project.workspace_id)
+    .eq("task", "text")
+    .maybeSingle();
+  // The model picked on this project's steps, else the workspace default, else Menab's default.
+  const models = (project.models ?? {}) as { text?: string };
+  const model = textModel(models.text ?? setting?.model_id ?? DEFAULT_TEXT_MODEL).id;
+  return { me, supabase, project, model };
+}
+
+export async function chooseTextModel(projectId: string, modelId: string): Promise<Result> {
+  if (!TEXT_MODELS.some((m) => m.id === modelId)) return { error: "Unknown model" };
+  try {
+    const { supabase, project } = await loadProject(projectId);
+    const models = { ...((project.models ?? {}) as Record<string, string>), text: modelId };
+    await supabase.from("projects").update({ models }).eq("id", projectId);
+  } catch (e) {
+    return { error: errText(e) };
+  }
+  revalidatePath(`/p/${projectId}`);
+  return {};
 }
 
 // The user's new message is only saved once Menab AI answers, so a failed call leaves no trace
@@ -65,7 +88,7 @@ async function runBriefTurn(
   projectId: string,
   newMessage: { content: string; kind: "text" | "voice"; audio_path?: string; audio_seconds?: number | null },
 ) {
-  const { me, supabase, project } = await loadProject(projectId);
+  const { me, supabase, project, model } = await loadProject(projectId);
   const { t } = await getI18n();
   const { data: history } = await supabase
     .from("messages")
@@ -82,13 +105,14 @@ async function runBriefTurn(
         { role: "user" as const, content: newMessage.content },
       ],
       project.brief as Partial<BriefFields>,
+      model,
     );
   } catch (e) {
-    await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "brief", provider: BRAIN.provider, model: BRAIN.model, ok: false, error: errText(e) });
+    await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "brief", provider: BRAIN.provider, model, ok: false, error: errText(e) });
     throw new Error(t.project.aiFailed);
   }
   const { turn, usage } = result;
-  await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "brief", provider: BRAIN.provider, model: BRAIN.model, ok: true, usage });
+  await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "brief", provider: BRAIN.provider, model, ok: true, usage });
 
   await supabase.from("messages").insert({
     workspace_id: me.workspace.id,
@@ -129,7 +153,7 @@ async function runBriefTurn(
     .in("number", [1, 2]);
   for (const o of outs ?? []) {
     const content = o.number === 1 ? { brief: turn.brief } : { questions: turn.questions, missing: missingRequired(turn.brief) };
-    await saveVersion(supabase, o, content, "ai", me.userId, BRAIN.model);
+    await saveVersion(supabase, o, content, "ai", me.userId, model);
   }
 }
 
@@ -165,9 +189,9 @@ export async function sendVoiceNote(projectId: string, form: FormData): Promise<
     try {
       const r = await transcribe(buf, mime);
       text = r.text;
-      await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "transcribe", provider: TRANSCRIBER.provider, model: TRANSCRIBER.model, ok: true, usage: r.usage });
+      await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "transcribe", provider: r.provider, model: r.model, ok: true, usage: r.usage });
     } catch (e) {
-      await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "transcribe", provider: TRANSCRIBER.provider, model: TRANSCRIBER.model, ok: false, error: errText(e) });
+      await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "transcribe", provider: process.env.GEMINI_API_KEY ? "google" : "kie.ai", model: "gemini", ok: false, error: errText(e) });
       return { error: t.project.voiceFailed };
     }
 
@@ -231,7 +255,7 @@ export async function renameProject(projectId: string, name: string): Promise<Re
 export async function writeBriefDocuments(projectId: string): Promise<Result> {
   const { t, locale } = await getI18n();
   try {
-    const { me, supabase, project } = await loadProject(projectId);
+    const { me, supabase, project, model } = await loadProject(projectId);
     const brief = project.brief as BriefFields;
     if (missingRequired(brief).length) return { error: t.project.answerFirst };
 
@@ -246,15 +270,15 @@ export async function writeBriefDocuments(projectId: string): Promise<Result> {
     try {
       const today = new Date().toISOString().slice(0, 10);
       const language = brief.language?.toLowerCase().includes("arab") || locale === "ar" ? "Arabic (Saudi), with names of deliverables in English where usual" : "English";
-      result = await writeStageOne(brief, project.path ?? project.path_suggested, today, language);
+      result = await writeStageOne(brief, project.path ?? project.path_suggested, today, language, model);
     } catch (e) {
-      await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "stage1-docs", provider: BRAIN.provider, model: BRAIN.model, ok: false, error: errText(e) });
+      await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "stage1-docs", provider: BRAIN.provider, model, ok: false, error: errText(e) });
       await supabase.from("outputs").update({ status: "failed" }).eq("project_id", projectId).in("number", [3, 4, 5, 6]);
       revalidatePath(`/p/${projectId}`);
       return { error: t.project.aiFailed };
     }
     const { docs, usage } = result;
-    await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "stage1-docs", provider: BRAIN.provider, model: BRAIN.model, ok: true, usage });
+    await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "stage1-docs", provider: BRAIN.provider, model, ok: true, usage });
 
     const content: Record<number, unknown> = {
       3: docs.summary,
@@ -262,7 +286,7 @@ export async function writeBriefDocuments(projectId: string): Promise<Result> {
       5: docs.pathway,
       6: { cps: docs.cps, kickoff_notes: docs.kickoff_notes },
     };
-    for (const o of outs ?? []) await saveVersion(supabase, o, content[o.number], "ai", me.userId, BRAIN.model);
+    for (const o of outs ?? []) await saveVersion(supabase, o, content[o.number], "ai", me.userId, model);
     if (!project.path) {
       await supabase.from("projects").update({ path: docs.pathway.path }).eq("id", projectId);
     }
