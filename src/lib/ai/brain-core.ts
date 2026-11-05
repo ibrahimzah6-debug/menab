@@ -3,8 +3,8 @@ import { z } from "zod";
 import { KIE_USD_PER_CREDIT } from "./kie";
 import { textModel, type TextModel } from "./catalog";
 
-// How the brain talks to its models. Every writing model runs through Kie.ai, except the
-// free Gemini, which uses Google's own API with Menab's key. Server only.
+// How the brain talks to its models. Every writing model runs through Kie.ai: Claude with the
+// Anthropic message format, GPT with the OpenAI Responses format. Server only.
 
 export type Usage = { inputTokens: number; outputTokens: number; costUsd: number; seconds: number };
 
@@ -14,7 +14,13 @@ export type Msg = { role: "user" | "assistant"; content: string; files?: Attachm
 
 export type Result<T> = { data: T; usage: Usage; model: string; fallbackFrom?: string; firstError?: string };
 
-type Opts = { effort: "low" | "medium"; maxTokens: number };
+// What the brain is doing right now, reported to the person while they wait.
+export type Step =
+  | { kind: "calling"; model: string }
+  | { kind: "retrying"; model: string; reason: string }
+  | { kind: "switching"; from: string; to: string; reason: string };
+
+type Opts = { effort: "low" | "medium"; maxTokens: number; onStep?: (s: Step) => void; timeoutMs?: number };
 
 const secondsSince = (t: number) => Math.round((Date.now() - t) / 100) / 10;
 
@@ -22,14 +28,13 @@ function estimateCost(m: TextModel, input: number, output: number) {
   return Math.round(((input * m.usdPerMillionIn + output * m.usdPerMillionOut) / 1_000_000) * 10000) / 10000;
 }
 
-// The backup when a model fails: Claude models fall back to the free Gemini (or Gemini 4 Argon
-// when there is no Google key); Gemini models fall back to Claude Sonnet.
-function backupFor(m: TextModel): string | null {
-  if (m.provider === "kie-claude") return process.env.GEMINI_API_KEY ? "gemini-3.8-flash" : "gemini-4-argon";
-  return process.env.KIE_API_KEY ? "claude-sonnet-5-5" : null;
+// The backup when a model fails: Claude falls back to GPT, GPT falls back to Claude.
+function backupFor(m: TextModel): string {
+  return m.provider === "kie-claude" ? "gpt-6-1-sol" : "claude-sonnet-5-5";
 }
 
 // Rules from CLAUDE.md: retry once, then switch to the backup. The caller logs which model answered.
+// The retry tells the model what was wrong with its first answer.
 export async function structured<S extends z.ZodType>(
   modelId: string,
   system: string,
@@ -40,23 +45,24 @@ export async function structured<S extends z.ZodType>(
   const m = textModel(modelId);
   let firstError = "";
   for (let attempt = 0; attempt < 2; attempt++) {
+    opts.onStep?.(attempt === 0 ? { kind: "calling", model: m.name } : { kind: "retrying", model: m.name, reason: firstError });
     try {
-      return { ...(await once(m, system, messages, schema, opts)), model: m.id };
+      return { ...(await once(m, system, messages, schema, opts, attempt ? firstError : "")), model: m.id };
     } catch (e) {
       firstError = e instanceof Error ? e.message : String(e);
+      if (/KIE_API_KEY|insufficient|credits/i.test(firstError)) throw e; // account problems: the backup can't help
     }
   }
-  const backupId = backupFor(m);
-  if (!backupId || backupId === m.id) throw new Error(firstError);
-  const backup = textModel(backupId);
-  const r = await once(backup, system, messages, schema, opts);
+  const backup = textModel(backupFor(m));
+  opts.onStep?.({ kind: "switching", from: m.name, to: backup.name, reason: firstError });
+  const r = await once(backup, system, messages, schema, opts, "");
   return { ...r, model: backup.id, fallbackFrom: m.id, firstError };
 }
 
-function once<S extends z.ZodType>(m: TextModel, system: string, messages: Msg[], schema: S, opts: Opts) {
-  if (m.provider === "kie-claude") return kieClaude(m, system, messages, schema, opts);
-  if (m.provider === "kie-gemini") return geminiCall(m, system, messages, schema, "kie");
-  return geminiCall(m, system, messages, schema, "google");
+function once<S extends z.ZodType>(m: TextModel, system: string, messages: Msg[], schema: S, opts: Opts, problem: string) {
+  const sys = problem ? `${system}\n\nYour previous answer could not be used (${problem}). Answer again, filling every field with the right type.` : system;
+  if (m.provider === "kie-gpt") return kieGpt(m, sys, messages, schema, opts);
+  return kieClaude(m, sys, messages, schema, opts);
 }
 
 function jsonSchema(schema: z.ZodType) {
@@ -65,21 +71,90 @@ function jsonSchema(schema: z.ZodType) {
   return s;
 }
 
+type JS = { type?: string | string[]; anyOf?: JS[]; properties?: Record<string, JS>; items?: JS; enum?: unknown[] };
+
+// Models sometimes send an array as a JSON string, a number as text, or leave out an empty
+// field. Bring the answer into shape before it is checked, so a small slip is not a failure.
+function coerce(v: unknown, s: JS | undefined): unknown {
+  if (!s) return v;
+  const options = s.anyOf ?? [s];
+  const nullable = options.some((o) => o.type === "null");
+  const main = options.find((o) => o.type !== "null") ?? s;
+  if (v === undefined || v === "") {
+    if (nullable) return null;
+    if (main.type === "array") return [];
+    if (main.type === "string" && v === undefined) return "";
+  }
+  if (v === null) return nullable ? null : main.type === "array" ? [] : main.type === "string" ? "" : v;
+  if (typeof v === "string" && (main.type === "array" || main.type === "object")) {
+    try {
+      v = JSON.parse(v);
+    } catch {
+      if (main.type === "array") v = v ? (v as string).split(/\n+/).map((x) => x.replace(/^\s*(\d+[.)-]|[-*•])\s*/, "").trim()).filter(Boolean) : [];
+    }
+  }
+  if (typeof v === "string" && (main.type === "number" || main.type === "integer")) {
+    const n = Number(v.replace(/[^\d.-]/g, ""));
+    return Number.isFinite(n) && v.trim() ? n : nullable ? null : v;
+  }
+  if (typeof v === "string" && main.enum && !main.enum.includes(v)) {
+    const lower = v.toLowerCase().trim();
+    const hit = main.enum.find((e) => String(e).toLowerCase() === lower);
+    if (hit !== undefined) return hit;
+    if (nullable) return null;
+    if (main.enum.includes("unknown")) return "unknown";
+  }
+  if (Array.isArray(v) && main.items) return v.map((x) => coerce(x, main.items));
+  if (v && typeof v === "object" && !Array.isArray(v) && main.properties) {
+    const out: Record<string, unknown> = { ...(v as Record<string, unknown>) };
+    for (const [k, ps] of Object.entries(main.properties)) out[k] = coerce(out[k], ps);
+    return out;
+  }
+  return v;
+}
+
+function check<S extends z.ZodType>(m: TextModel, schema: S, raw: unknown): z.infer<S> {
+  const parsed = schema.safeParse(coerce(raw, jsonSchema(schema) as JS));
+  if (parsed.success) return parsed.data as z.infer<S>;
+  const where = parsed.error.issues.slice(0, 3).map((i) => `${i.path.join(".") || "answer"}: ${i.message}`).join("; ");
+  throw new Error(`${m.name} returned an incomplete answer (${where})`);
+}
+
+function parseJsonText(text: string) {
+  const t = text.trim();
+  const fenced = t.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const body = fenced ? fenced[1] : t.slice(Math.max(0, t.indexOf("{")), t.lastIndexOf("}") + 1);
+  return JSON.parse(body);
+}
+
+async function post(url: string, payload: unknown, opts: Opts, name: string) {
+  const key = process.env.KIE_API_KEY;
+  if (!key) throw new Error("KIE_API_KEY is not set in Vercel");
+  try {
+    return await fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 75_000),
+    });
+  } catch (e) {
+    if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) throw new Error(`${name} took too long to answer`);
+    throw new Error(`${name} could not be reached`);
+  }
+}
+
 // Claude through Kie.ai: the Anthropic message format at api.kie.ai/claude/v1/messages.
 // The answer comes back through one "submit" tool, checked against the schema.
 async function kieClaude<S extends z.ZodType>(m: TextModel, system: string, messages: Msg[], schema: S, opts: Opts) {
-  const key = process.env.KIE_API_KEY;
-  if (!key) throw new Error("KIE_API_KEY is not set in Vercel");
   const started = Date.now();
-  const res = await fetch("https://api.kie.ai/claude/v1/messages", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    cache: "no-store",
-    body: JSON.stringify({
+  const res = await post(
+    "https://api.kie.ai/claude/v1/messages",
+    {
       model: m.id,
       max_tokens: opts.maxTokens,
       stream: false,
-      system: `${system}\n\nAlways answer by calling the submit tool exactly once, with every required field.`,
+      system: `${system}\n\nAlways answer by calling the submit tool exactly once, with every field filled.`,
       tools: [{ name: "submit", description: "Submit your complete answer.", input_schema: jsonSchema(schema) }],
       messages: messages.map((x) => ({
         role: x.role,
@@ -94,8 +169,10 @@ async function kieClaude<S extends z.ZodType>(m: TextModel, system: string, mess
             ]
           : x.content,
       })),
-    }),
-  });
+    },
+    opts,
+    m.name,
+  );
   const body = (await res.json().catch(() => null)) as {
     code?: number;
     msg?: string;
@@ -106,94 +183,90 @@ async function kieClaude<S extends z.ZodType>(m: TextModel, system: string, mess
     credits_consumed?: number;
   } | null;
   if (!res.ok || !body || (typeof body.code === "number" && body.code !== 200) || body.error) {
-    throw new Error(`Kie.ai ${m.name}: ${body?.msg ?? body?.error?.message ?? `HTTP ${res.status}`}`);
+    throw new Error(`${m.name}: ${body?.msg ?? body?.error?.message ?? `HTTP ${res.status}`}`);
   }
   if (body.stop_reason === "refusal") throw new Error(`${m.name} declined this request`);
-  const tool = body.content?.find((b) => b.type === "tool_use" && b.name === "submit");
+  if (body.stop_reason === "max_tokens") throw new Error(`${m.name} ran out of room before finishing`);
+  const tool = body.content?.find((b) => b.type === "tool_use");
   let raw: unknown = tool?.input;
   if (!raw) {
-    // Some answers arrive as JSON text instead of a tool call.
     const text = (body.content ?? []).filter((b) => b.type === "text").map((b) => b.text).join("");
     try {
-      raw = JSON.parse(text.replace(/^[\s\S]*?```(json)?|```[\s\S]*$/g, "").trim() || text);
+      raw = parseJsonText(text);
     } catch {
-      throw new Error(`${m.name} did not return a complete answer`);
+      throw new Error(`${m.name} answered without the required format`);
     }
   }
-  const parsed = schema.safeParse(raw);
-  if (!parsed.success) throw new Error(`${m.name} returned an incomplete answer`);
+  const data = check(m, schema, raw);
   const input = body.usage?.input_tokens ?? 0;
   const output = body.usage?.output_tokens ?? 0;
   const costUsd = typeof body.credits_consumed === "number"
     ? Math.round(body.credits_consumed * KIE_USD_PER_CREDIT * 10000) / 10000
     : estimateCost(m, input, output);
-  return { data: parsed.data as z.infer<S>, usage: { inputTokens: input, outputTokens: output, costUsd, seconds: secondsSince(started) } };
+  return { data, usage: { inputTokens: input, outputTokens: output, costUsd, seconds: secondsSince(started) } };
 }
 
-// Gemini: Google's API (free tier, Menab's key) or through Kie.ai. Same native format.
-async function geminiCall<S extends z.ZodType>(m: TextModel, system: string, messages: Msg[], schema: S, via: "google" | "kie") {
+// GPT through Kie.ai: the OpenAI Responses format at api.kie.ai/codex/v1/responses,
+// with the answer shaped by a JSON schema.
+async function kieGpt<S extends z.ZodType>(m: TextModel, system: string, messages: Msg[], schema: S, opts: Opts) {
   const started = Date.now();
-  const key = via === "google" ? process.env.GEMINI_API_KEY : process.env.KIE_API_KEY;
-  if (!key) throw new Error(via === "google" ? "GEMINI_API_KEY is not set in Vercel" : "KIE_API_KEY is not set in Vercel");
-  const url =
-    via === "google"
-      ? `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m.id)}:generateContent`
-      : `https://api.kie.ai/gemini/v1/models/${encodeURIComponent(m.id)}:streamGenerateContent`;
-  const headers: Record<string, string> =
-    via === "google" ? { "x-goog-api-key": key, "Content-Type": "application/json" } : { Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
-  const body = (withSchema: boolean) => ({
-    ...(via === "kie" ? { stream: false } : {}),
-    systemInstruction: {
-      parts: [{ text: withSchema ? system : `${system}\n\nAnswer only with JSON matching this schema:\n${JSON.stringify(jsonSchema(schema))}` }],
+  const res = await post(
+    "https://api.kie.ai/codex/v1/responses",
+    {
+      model: m.id,
+      stream: false,
+      reasoning: { effort: opts.effort },
+      text: { format: { type: "json_schema", name: "answer", strict: false, schema: jsonSchema(schema) } },
+      input: [
+        { role: "system", content: [{ type: "input_text", text: `${system}\n\nAnswer only with JSON that follows the schema.` }] },
+        ...messages.map((x) =>
+          x.role === "assistant"
+            ? { role: "assistant", content: [{ type: "output_text", text: x.content }] }
+            : {
+                role: "user",
+                content: [
+                  ...(x.files ?? [])
+                    .filter((f) => f.mime.startsWith("image/"))
+                    .map((f) => ({ type: "input_image", image_url: `data:${f.mime};base64,${f.base64}` })),
+                  { type: "input_text", text: x.content },
+                ],
+              },
+        ),
+      ],
     },
-    contents: messages.map((x) => ({
-      role: x.role === "assistant" ? "model" : "user",
-      parts: [...(x.files ?? []).map((f) => ({ inline_data: { mime_type: f.mime, data: f.base64 } })), { text: x.content }],
-    })),
-    generationConfig: {
-      responseMimeType: "application/json",
-      ...(withSchema ? { responseJsonSchema: jsonSchema(schema) } : {}),
-    },
-  });
-  const call = (withSchema: boolean) => fetch(url, { method: "POST", headers, cache: "no-store", body: JSON.stringify(body(withSchema)) });
-  let res = await call(true);
-  // Some schemas are too rich for the schema mode: ask again with the schema in the instructions.
-  if (res.status === 400) res = await call(false);
-  const raw = await res.text();
-  let chunks: unknown[];
-  try {
-    const j = JSON.parse(raw);
-    chunks = Array.isArray(j) ? j : [j];
-  } catch {
-    chunks = raw.split("\n").filter((l) => l.startsWith("data:")).map((l) => { try { return JSON.parse(l.slice(5)); } catch { return null; } }).filter(Boolean);
-  }
-  type Chunk = {
+    opts,
+    m.name,
+  );
+  const body = (await res.json().catch(() => null)) as {
     code?: number;
     msg?: string;
-    error?: { message?: string };
-    candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[];
-    usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
-  };
-  const list = chunks as Chunk[];
-  const err = list.find((c) => c?.error || (typeof c?.code === "number" && c.code !== 200));
-  if (!res.ok || err || !list.length) {
-    if (res.status === 429) throw new Error("The free Gemini limit is used up for now. Try again later or pick another model.");
-    throw new Error(`${m.name}: ${err?.error?.message ?? err?.msg ?? `HTTP ${res.status}`}`);
+    error?: { message?: string } | null;
+    status?: string;
+    output?: { type: string; content?: { type: string; text?: string }[] }[];
+    usage?: { input_tokens?: number; output_tokens?: number };
+    credits_consumed?: number;
+  } | null;
+  if (!res.ok || !body || (typeof body.code === "number" && body.code !== 200) || body.error) {
+    throw new Error(`${m.name}: ${body?.msg ?? body?.error?.message ?? `HTTP ${res.status}`}`);
   }
-  const text = list.flatMap((c) => c?.candidates?.[0]?.content?.parts ?? []).filter((p) => p.text && !p.thought).map((p) => p.text).join("");
-  let parsedJson: unknown;
+  if (body.status && body.status !== "completed") throw new Error(`${m.name} stopped before finishing (${body.status})`);
+  const text = (body.output ?? [])
+    .filter((o) => o.type === "message")
+    .flatMap((o) => o.content ?? [])
+    .filter((c) => c.type === "output_text")
+    .map((c) => c.text ?? "")
+    .join("");
+  let raw: unknown;
   try {
-    parsedJson = JSON.parse(text.replace(/^```(json)?|```$/g, "").trim());
+    raw = parseJsonText(text);
   } catch {
-    throw new Error(`${m.name} did not return a complete answer`);
+    throw new Error(`${m.name} answered without the required format`);
   }
-  const parsed = schema.safeParse(parsedJson);
-  if (!parsed.success) throw new Error(`${m.name} returned an incomplete answer`);
-  const usage = [...list].reverse().find((c) => c?.usageMetadata)?.usageMetadata;
-  const input = usage?.promptTokenCount ?? 0;
-  const output = usage?.candidatesTokenCount ?? 0;
-  return {
-    data: parsed.data as z.infer<S>,
-    usage: { inputTokens: input, outputTokens: output, costUsd: m.free ? 0 : estimateCost(m, input, output), seconds: secondsSince(started) },
-  };
+  const data = check(m, schema, raw);
+  const input = body.usage?.input_tokens ?? 0;
+  const output = body.usage?.output_tokens ?? 0;
+  const costUsd = typeof body.credits_consumed === "number"
+    ? Math.round(body.credits_consumed * KIE_USD_PER_CREDIT * 10000) / 10000
+    : estimateCost(m, input, output);
+  return { data, usage: { inputTokens: input, outputTokens: output, costUsd, seconds: secondsSince(started) } };
 }

@@ -6,7 +6,7 @@ import { IconMic, IconPlus } from "@/components/icons";
 import { MenabLoader } from "@/components/menab-loader";
 import { browserClient } from "@/lib/supabase/client";
 import { startWavRecorder, type WavRecorder } from "@/lib/wav-recorder";
-import { chooseTextModel, prepareUpload, sendBriefMessage, transcribeVoice } from "./actions";
+import { chooseTextModel, prepareUpload, transcribeVoice } from "./actions";
 
 type Msg = {
   id: string;
@@ -35,7 +35,24 @@ type Copy = {
   connectors: string;
   soon: string;
   recording: string;
+  fields: Record<string, string>;
+  steps: {
+    read: string;
+    readFiles: string;
+    readVoice: string;
+    call: string;
+    retry: string;
+    switch: string;
+    fields: string;
+    path: string;
+    save: string;
+    slow: string;
+    lost: string;
+  };
 };
+
+type StepLine = { text: string; done: boolean };
+const fillIn = (s: string, v: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? ""));
 
 type ModelOption = { id: string; name: string; price: string };
 type Upload = { name: string; mime: string; path?: string; failed?: boolean };
@@ -74,7 +91,9 @@ export function BriefChat({
   canEdit,
   models,
   model,
+  paths,
 }: {
+  paths: Record<string, string>;
   projectId: string;
   messages: Msg[];
   copy: Copy;
@@ -89,6 +108,7 @@ export function BriefChat({
   const [voice, setVoice] = useState<{ path: string; seconds: number } | undefined>();
   const [pendingText, setPendingText] = useState<string | null>(null);
   const [busy, setBusy] = useState<"text" | "voice" | null>(null);
+  const [steps, setSteps] = useState<StepLine[]>([]);
   const [error, setError] = useState<string | undefined>();
   const [, start] = useTransition();
   const [rec, setRec] = useState<WavRecorder | null>(null);
@@ -102,7 +122,7 @@ export function BriefChat({
     // Scroll only the messages, never the page around them.
     const list = endRef.current?.parentElement;
     if (list) list.scrollTop = list.scrollHeight;
-  }, [messages.length, pendingText, busy]);
+  }, [messages.length, pendingText, busy, steps.length]);
 
   const addFiles = (list: FileList | null) => {
     const picked = Array.from(list ?? []).slice(0, 5 - uploads.length);
@@ -129,22 +149,62 @@ export function BriefChat({
     setPendingText(value || ready.map((f) => f.name).join(", "));
     setBusy("text");
     setError(undefined);
-    start(async () => {
-      const res = await sendBriefMessage(projectId, {
-        text: value,
-        files: ready.map((f) => ({ path: f.path, name: f.name, mime: f.mime })),
-        voice: sentVoice,
-      });
-      setError(res.error);
-      if (res.error) {
-        setText(value);
-        setUploads(sentUploads);
-        setVoice(sentVoice);
+    setSteps([]);
+    const restore = (message: string) => {
+      setError(message);
+      setText(value);
+      setUploads(sentUploads);
+      setVoice(sentVoice);
+    };
+    // Each step arrives as it happens; the current one pulses, finished ones get a check.
+    const push = (line: string) => setSteps((list) => [...list.map((x) => ({ ...x, done: true })), { text: line, done: false }]);
+    const slow = setTimeout(() => push(copy.steps.slow), 25_000);
+    (async () => {
+      let finished = false;
+      try {
+        const res = await fetch(`/p/${projectId}/brief`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: value, files: ready.map((f) => ({ path: f.path, name: f.name, mime: f.mime })), voice: sentVoice }),
+        });
+        if (!res.ok || !res.body) throw new Error(copy.steps.lost);
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        for (;;) {
+          const { value: chunk, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(chunk, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            const e = JSON.parse(line) as { t: string; [k: string]: unknown };
+            if (e.t === "read") push(e.voice ? copy.steps.readVoice : Number(e.files) > 0 ? fillIn(copy.steps.readFiles, { n: Number(e.files) }) : copy.steps.read);
+            else if (e.t === "call") push(fillIn(copy.steps.call, { model: String(e.model) }));
+            else if (e.t === "retry") push(fillIn(copy.steps.retry, { model: String(e.model) }));
+            else if (e.t === "switch") push(fillIn(copy.steps.switch, { from: String(e.from), to: String(e.to) }));
+            else if (e.t === "fields") push(fillIn(copy.steps.fields, { fields: (e.keys as string[]).map((k) => copy.fields[k] ?? k).join(document.documentElement.dir === "rtl" ? "، " : ", ") }));
+            else if (e.t === "path") push(fillIn(copy.steps.path, { path: paths[String(e.path)] ?? String(e.path) }));
+            else if (e.t === "save") push(copy.steps.save);
+            else if (e.t === "done") finished = true;
+            else if (e.t === "error") {
+              finished = true;
+              restore(String(e.message));
+            }
+          }
+        }
+        if (!finished) restore(copy.steps.lost);
+      } catch (e) {
+        restore(e instanceof Error && e.message ? e.message : copy.steps.lost);
+      } finally {
+        clearTimeout(slow);
+        setBusy(null);
+        setPendingText(null);
+        setSteps([]);
+        start(() => router.refresh());
       }
-      setBusy(null);
-      setPendingText(null);
-      router.refresh();
-    });
+    })();
   };
 
   const startRecording = async () => {
@@ -213,7 +273,21 @@ export function BriefChat({
             <p className="body m-0 whitespace-pre-wrap" dir="auto">{pendingText}</p>
           </div>
         )}
-        {busy === "text" && <MenabLoader label={copy.thinking} />}
+        {busy === "text" && (
+          <ol className="m-0 p-0 list-none flex flex-col gap-2" role="status" aria-live="polite">
+            {steps.length === 0 && <li><MenabLoader label={copy.thinking} /></li>}
+            {steps.map((x, i) => (
+              <li key={i} className="flex items-center gap-2.5 small" dir="auto">
+                {x.done ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-ink-muted shrink-0" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg>
+                ) : (
+                  <span className="mn-pulse shrink-0" aria-hidden="true" />
+                )}
+                <span className={x.done ? "text-ink-muted" : "text-ink"}>{x.text}</span>
+              </li>
+            ))}
+          </ol>
+        )}
         <div ref={endRef} />
       </div>
 
@@ -231,6 +305,11 @@ export function BriefChat({
                 </span>
               ))}
             </div>
+          )}
+          {error && (
+            <p role="alert" className="small m-0 mx-3 mt-3 px-3 py-2 rounded-md bg-tint-2 text-ink" dir="auto">
+              {error}
+            </p>
           )}
           {rec ? (
             <div className="px-4 py-4 flex items-center gap-3" role="status">
@@ -279,14 +358,13 @@ export function BriefChat({
                 </div>
               )}
             </div>
-            {error && <p role="alert" className="small m-0 px-2 truncate">{error}</p>}
             <span className="grow" />
 
             {/* Model, chosen right here */}
             <div className="relative" onBlur={closeOnBlur} onKeyDown={(e) => e.key === "Escape" && setMenu(null)}>
               <button
                 type="button"
-                className="h-9 px-3 rounded-full small text-ink-muted hover:bg-tint-2 hover:text-ink flex items-center gap-1"
+                className="h-9 px-3 rounded-full small text-ink-muted hover:bg-tint-2 hover:text-ink flex items-center gap-1 whitespace-nowrap"
                 aria-haspopup="listbox"
                 aria-expanded={menu === "model"}
                 aria-label={copy.model}
