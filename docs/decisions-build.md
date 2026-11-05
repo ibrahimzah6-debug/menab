@@ -63,3 +63,14 @@ Replaces B4.
 - **Account menu:** the person's name opens Settings and Log out, to keep the side menu clear.
 - **Free writing model:** Gemini 3.8 Flash on Google's free tier is in the writing list, marked "Free, daily limit". Google's free tier covers writing only; image (Nano Banana) and video (Veo) models are paid, so they cannot be offered free. One key's free limit is shared by every Menab user, and Google may use free-tier content, so it suits trying things out, not client work.
 - **Smart prompts (planned for M4 and M5):** image and video prompts are not copied from a script line. Menab AI writes each shot's prompt from the whole approved concept: the treatment, visual mood, locked character and location references (with names and descriptions), wardrobe, the shot's size, lens, camera move, light and time of day, the action in order, and what must stay consistent. The person sees and can edit the prompt and the shot options before anything is generated, with the cost shown.
+
+## B10. Backup AI, owner dashboard, quiet composer, languages (Ibrahim, 5 Nov 2026)
+
+- **Automatic backup for writing:** every AI call is tried, retried once, then sent to the other provider: Claude falls back to Gemini 3.8 Flash, Gemini falls back to Claude Sonnet 5.5. The job log records which model answered (`ai_jobs.fallback_from`), and a notice is created (`notifications`).
+- **Owner dashboard** (`/owner`, people in `platform_admins` only): AI calls, cost, failures and backups for the last 30 days, a table by model, every notice, and each workspace with its people, projects and AI cost.
+- **Credits page:** each workspace sees its own AI spend by project and by model. Balance and top-up come with credits in M5.
+- **Composer like Claude's:** "+" adds files (images and PDFs, sent to the model with the message and saved to our storage), and on the right the model, the microphone and a send arrow. Prices sit in the model list and the buttons' tooltips. Connectors and skills under "+" are not in the docs yet; to discuss.
+- **Inline editing:** document text and the idea are edited where they are, by clicking; leaving the field saves a new version.
+- **Loading:** the Menab mark's three parts light up in turn while Menab AI works; the "Menab AI" label on replies is gone.
+- **Top bar:** "Spent" sits in a box, with the globe language button beside it.
+- **All 13 languages now:** English and Arabic are written by hand. Amharic, Urdu, Hindi, Indonesian, Turkish, French, Spanish, German, Portuguese, Russian and Chinese are translated from English by Gemini the first time anyone picks them, stored in `translations`, and redone automatically when the English text changes. Urdu is right to left.

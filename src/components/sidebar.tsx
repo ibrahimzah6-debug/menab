@@ -5,8 +5,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createProject } from "@/app/p/[id]/actions";
 import { setSidebar, switchWorkspace } from "@/lib/preferences";
-import { LanguageMenu, PersonMenu } from "./menus";
+import { PersonMenu } from "./menus";
 import {
+  IconChart,
   IconBooks,
   IconCheckSmall,
   IconCoins,
@@ -40,6 +41,7 @@ type Labels = Record<(typeof ITEMS)[number]["key"], string> & {
   langSwitch: string;
   langSwitchLabel: string;
   viewerNote: string;
+  owner: string;
   account: string;
   language: string;
   soon: string;
@@ -50,12 +52,12 @@ export function Sidebar({
   logo,
   mark,
   labels,
-  locale,
   workspaces,
   currentWorkspace,
   canCreate,
   person,
   role,
+  isOwner,
 }: {
   initialOpen: boolean;
   logo: React.ReactNode;
@@ -67,6 +69,7 @@ export function Sidebar({
   canCreate: boolean;
   person: string;
   role: string;
+  isOwner?: boolean;
 }) {
   const [open, setOpen] = useState(initialOpen);
   const [wsOpen, setWsOpen] = useState(false);
@@ -205,6 +208,17 @@ export function Sidebar({
               </Link>
             );
           })}
+          {isOwner && (
+            <Link
+              href="/owner"
+              aria-current={path.startsWith("/owner") ? "page" : undefined}
+              title={open ? undefined : labels.owner}
+              className={`${item} ${open ? "px-2.5" : "justify-center w-10 mx-auto"} ${path.startsWith("/owner") ? "bg-tint-3 text-ink font-medium" : "text-ink-muted hover:bg-tint-2 hover:text-ink"}`}
+            >
+              <IconChart size={18} />
+              {open && labels.owner}
+            </Link>
+          )}
         </nav>
       )}
 
@@ -212,7 +226,6 @@ export function Sidebar({
 
       <div className={`flex gap-1.5 border-t border-line pt-3 ${open ? "items-center" : "flex-col items-center w-full"}`}>
         <PersonMenu person={person} role={role} compact={!open} labels={{ settings: labels.settings, signOut: labels.signOut, account: labels.account }} />
-        <LanguageMenu locale={locale} label={labels.language} soon={labels.soon} compact={!open} />
       </div>
     </aside>
   );

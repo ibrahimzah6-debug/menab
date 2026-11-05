@@ -13,12 +13,12 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const { locale, dir } = await getI18n();
+  const { uiLocale, dir } = await getI18n();
   const saved = (await cookies()).get("menab-theme")?.value;
   // Light is the default; each person can pick dark or follow their system in Settings.
   const theme = saved === "dark" || saved === "system" ? saved : "light";
   return (
-    <html lang={locale} dir={dir} data-theme={theme}>
+    <html lang={uiLocale} dir={dir} data-theme={theme}>
       <body>{children}</body>
     </html>
   );

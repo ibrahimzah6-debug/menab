@@ -35,10 +35,45 @@ function fallbackParams(modelId: string) {
     : {};
 }
 
-type Msg = { role: "user" | "assistant"; content: string };
+// A file attached to a message: an image or a PDF, sent to the model as-is.
+export type Attachment = { mime: string; base64: string; name: string };
+export type Msg = { role: "user" | "assistant"; content: string; files?: Attachment[] };
 
-// One structured call, on Claude or on Google's Gemini, validated against the same schema.
+export type Result<T> = { data: T; usage: Usage; model: string; fallbackFrom?: string; firstError?: string };
+
+// The other provider takes over when one fails: Claude falls back to Gemini, Gemini to Claude.
+const BACKUP: Record<"anthropic" | "google", string> = { anthropic: "gemini-3.8-flash", google: "claude-sonnet-5-5" };
+
+function backupAvailable(provider: "anthropic" | "google") {
+  return provider === "anthropic" ? Boolean(process.env.GEMINI_API_KEY) : Boolean(process.env.ANTHROPIC_API_KEY);
+}
+
+// One structured call, validated against the schema. Rules from CLAUDE.md: retry once,
+// then switch to the backup provider. The caller logs which model answered.
 async function structured<S extends z.ZodType>(
+  modelId: string,
+  system: string,
+  messages: Msg[],
+  schema: S,
+  opts: { effort: "low" | "medium"; maxTokens: number },
+): Promise<Result<z.infer<S>>> {
+  const m = textModel(modelId);
+  let firstError = "";
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const r = await once(m.id, system, messages, schema, opts);
+      return { ...r, model: m.id };
+    } catch (e) {
+      firstError = e instanceof Error ? e.message : String(e);
+    }
+  }
+  if (!backupAvailable(m.provider)) throw new Error(firstError);
+  const backup = BACKUP[m.provider];
+  const r = await once(backup, system, messages, schema, opts);
+  return { ...r, model: backup, fallbackFrom: m.id, firstError };
+}
+
+async function once<S extends z.ZodType>(
   modelId: string,
   system: string,
   messages: Msg[],
@@ -54,7 +89,19 @@ async function structured<S extends z.ZodType>(
     max_tokens: opts.maxTokens,
     ...fallbackParams(m.id),
     system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
-    messages,
+    messages: messages.map((x) => ({
+      role: x.role,
+      content: x.files?.length
+        ? [
+            ...x.files.map((f) =>
+              f.mime === "application/pdf"
+                ? { type: "document" as const, source: { type: "base64" as const, media_type: "application/pdf" as const, data: f.base64 } }
+                : { type: "image" as const, source: { type: "base64" as const, media_type: f.mime as "image/png" | "image/jpeg" | "image/webp" | "image/gif", data: f.base64 } },
+            ),
+            { type: "text" as const, text: x.content },
+          ]
+        : x.content,
+    })),
     output_config: { effort: opts.effort, format: betaZodOutputFormat(schema) },
   });
   if (res.stop_reason === "refusal" || !res.parsed_output) {
@@ -71,7 +118,10 @@ async function gemini<S extends z.ZodType>(modelId: string, system: string, mess
     systemInstruction: {
       parts: [{ text: withSchema ? system : `${system}\n\nAnswer only with JSON matching this schema:\n${JSON.stringify(z.toJSONSchema(schema))}` }],
     },
-    contents: messages.map((x) => ({ role: x.role === "assistant" ? "model" : "user", parts: [{ text: x.content }] })),
+    contents: messages.map((x) => ({
+      role: x.role === "assistant" ? "model" : "user",
+      parts: [...(x.files ?? []).map((f) => ({ inline_data: { mime_type: f.mime, data: f.base64 } })), { text: x.content }],
+    })),
     generationConfig: {
       responseMimeType: "application/json",
       ...(withSchema ? { responseJsonSchema: z.toJSONSchema(schema) } : {}),
@@ -178,11 +228,11 @@ export function missingRequired(b: Partial<BriefFields>) {
 }
 
 export async function briefTurn(
-  history: { role: "user" | "assistant"; content: string }[],
+  history: Msg[],
   current: Partial<BriefFields>,
   modelId: string,
 ) {
-  const { data: turn, usage } = await structured(
+  const r = await structured(
     modelId,
     `${MENAB}
 
@@ -199,8 +249,8 @@ Required before documents can be written: ${REQUIRED_BRIEF_FIELDS.join(", ")}. A
     BriefTurn,
     { effort: "low", maxTokens: 8000 },
   );
-  turn.questions = turn.questions.slice(0, 3);
-  return { turn, usage };
+  r.data.questions = r.data.questions.slice(0, 3);
+  return { turn: r.data, usage: r.usage, model: r.model, fallbackFrom: r.fallbackFrom, firstError: r.firstError };
 }
 
 // ---------- Stage 1 documents (outputs 3 to 6) ----------
@@ -262,7 +312,7 @@ export async function writeStageOne(
 
 Current documents: ${JSON.stringify(revise.current)}`
     : `Today is ${today}. Write the stage 1 documents for this brief: the brief summary for sign-off (start from the idea), strategy and deliverables (with every cutdown and ratio), the pathway with a rough cost and time range, and a first CPS. The CPS weeks run Sunday to Saturday, as in Saudi. Work back from the deadline; if the deadline is tight, say so in the note. Write in: ${language}.`;
-  const { data: docs, usage } = await structured(
+  const r = await structured(
     modelId,
     MENAB,
     [
@@ -277,5 +327,5 @@ Brief: ${JSON.stringify(brief)}`,
     StageOneDocs,
     { effort: "medium", maxTokens: 16000 },
   );
-  return { docs, usage };
+  return { docs: r.data, usage: r.usage, model: r.model, fallbackFrom: r.fallbackFrom, firstError: r.firstError };
 }

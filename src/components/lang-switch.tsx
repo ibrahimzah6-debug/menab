@@ -12,7 +12,7 @@ export function LangSwitch({ to, label, ariaLabel }: { to: "en" | "ar"; label: s
       aria-label={ariaLabel}
       lang={to}
       disabled={pending}
-      onClick={() => start(() => setLocale(to))}
+      onClick={() => start(async () => void (await setLocale(to)))}
     >
       {label}
     </button>

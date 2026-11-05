@@ -6,7 +6,8 @@ import { briefTurn, missingRequired, writeStageOne, type BriefFields } from "@/l
 import { DEFAULT_TEXT_MODEL, TEXT_MODELS, textModel } from "@/lib/ai/catalog";
 import { transcribe } from "@/lib/ai/transcribe";
 import { getI18n } from "@/lib/i18n/server";
-import { logAiJob, saveVersion, STAGE_OUTPUTS, type Path } from "@/lib/projects";
+import { logAiJob, notify, saveVersion, STAGE_OUTPUTS, type Path } from "@/lib/projects";
+import type { Attachment } from "@/lib/ai/brain";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember, getMemberships } from "@/lib/workspace";
@@ -86,7 +87,14 @@ export async function chooseTextModel(projectId: string, modelId: string): Promi
 // and the person can simply send it again.
 async function runBriefTurn(
   projectId: string,
-  newMessage: { content: string; kind: "text" | "voice"; audio_path?: string; audio_seconds?: number | null },
+  newMessage: {
+    content: string;
+    kind: "text" | "voice";
+    audio_path?: string;
+    audio_seconds?: number | null;
+    files?: Attachment[];
+    attachments?: { path: string; name: string; mime: string }[];
+  },
 ) {
   const { me, supabase, project, model } = await loadProject(projectId);
   const { t } = await getI18n();
@@ -102,17 +110,20 @@ async function runBriefTurn(
     result = await briefTurn(
       [
         ...(history ?? []).map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
-        { role: "user" as const, content: newMessage.content },
+        { role: "user" as const, content: newMessage.content, files: newMessage.files },
       ],
       project.brief as Partial<BriefFields>,
       model,
     );
   } catch (e) {
     await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "brief", provider: textModel(model).provider, model, ok: false, error: errText(e) });
+    await notify({ workspaceId: me.workspace.id, projectId, kind: "ai_failed", title: `${textModel(model).name} and its backup did not answer a brief message`, body: errText(e) });
     throw new Error(e instanceof Error && e.message.includes("Gemini") ? e.message : t.project.aiFailed);
   }
   const { turn, usage } = result;
-  await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "brief", provider: textModel(model).provider, model, ok: true, usage });
+  const used = result.model;
+  await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "brief", provider: textModel(used).provider, model: used, ok: true, usage, fallbackFrom: result.fallbackFrom });
+  if (result.fallbackFrom) await noticeFallback(me.workspace.id, projectId, result.fallbackFrom, used, result.firstError);
 
   await supabase.from("messages").insert({
     workspace_id: me.workspace.id,
@@ -122,6 +133,7 @@ async function runBriefTurn(
     content: newMessage.content.slice(0, 20000),
     audio_path: newMessage.audio_path ?? null,
     audio_seconds: newMessage.audio_seconds ?? null,
+    attachments: newMessage.attachments ?? [],
     created_by: me.userId,
   });
   await supabase.from("messages").insert({
@@ -153,15 +165,45 @@ async function runBriefTurn(
     .in("number", [1, 2]);
   for (const o of outs ?? []) {
     const content = o.number === 1 ? { brief: turn.brief } : { questions: turn.questions, missing: missingRequired(turn.brief) };
-    await saveVersion(supabase, o, content, "ai", me.userId, model);
+    await saveVersion(supabase, o, content, "ai", me.userId, used);
   }
 }
 
-export async function sendBriefMessage(projectId: string, text: string): Promise<Result> {
-  const clean = text.trim().slice(0, 8000);
-  if (!clean) return {};
+async function noticeFallback(workspaceId: string, projectId: string, from: string, to: string, error?: string) {
+  await notify({
+    workspaceId,
+    projectId,
+    kind: "ai_fallback",
+    title: `${textModel(from).name} did not answer, so ${textModel(to).name} took over`,
+    body: error,
+  });
+}
+
+const FILE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf"];
+
+// A brief message with optional files (logo, product photos, references, a PDF brief).
+export async function sendBriefMessage(projectId: string, form: FormData): Promise<Result> {
+  const clean = String(form.get("text") ?? "").trim().slice(0, 8000);
+  const raw = form.getAll("files").filter((f): f is File => f instanceof File && f.size > 0).slice(0, 5);
+  if (!clean && !raw.length) return {};
+  if (raw.some((f) => !FILE_TYPES.includes(f.type))) return { error: "Attach images (PNG, JPG, WEBP) or PDFs." };
+  if (raw.some((f) => f.size > 10 * 1024 * 1024)) return { error: "Each file must be under 10 MB." };
   try {
-    await runBriefTurn(projectId, { content: clean, kind: "text" });
+    const { me } = await loadProject(projectId);
+    const admin = createAdminClient();
+    const files: Attachment[] = [];
+    const attachments: { path: string; name: string; mime: string }[] = [];
+    for (const f of raw) {
+      const buf = Buffer.from(await f.arrayBuffer());
+      const safe = f.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-80);
+      const path = `${me.workspace.id}/projects/${projectId}/files/${Date.now()}-${safe}`;
+      await admin.storage.from("media").upload(path, buf, { contentType: f.type });
+      attachments.push({ path, name: f.name.slice(0, 200), mime: f.type });
+      files.push({ mime: f.type, base64: buf.toString("base64"), name: f.name });
+    }
+    const names = attachments.map((a) => a.name).join(", ");
+    const content = clean || (names ? `(${names})` : "");
+    await runBriefTurn(projectId, { content: names && clean ? `${clean}\n\nAttached: ${names}` : content, kind: "text", files, attachments });
   } catch (e) {
     revalidatePath(`/p/${projectId}`);
     return { error: errText(e) };
@@ -293,7 +335,8 @@ export async function writeBriefDocuments(projectId: string, instruction?: strin
       return { error: e instanceof Error && e.message.includes("Gemini") ? e.message : t.project.aiFailed };
     }
     const { docs, usage } = result;
-    await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "stage1-docs", provider: textModel(model).provider, model, ok: true, usage });
+    await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "stage1-docs", provider: textModel(result.model).provider, model: result.model, ok: true, usage, fallbackFrom: result.fallbackFrom });
+    if (result.fallbackFrom) await noticeFallback(me.workspace.id, projectId, result.fallbackFrom, result.model, result.firstError);
 
     const content: Record<number, unknown> = {
       3: docs.summary,
@@ -301,7 +344,7 @@ export async function writeBriefDocuments(projectId: string, instruction?: strin
       5: docs.pathway,
       6: { cps: docs.cps, kickoff_notes: docs.kickoff_notes },
     };
-    for (const o of outs ?? []) await saveVersion(supabase, o, content[o.number], "ai", me.userId, model);
+    for (const o of outs ?? []) await saveVersion(supabase, o, content[o.number], "ai", me.userId, result.model);
     if (!project.path) {
       await supabase.from("projects").update({ path: docs.pathway.path }).eq("id", projectId);
     }

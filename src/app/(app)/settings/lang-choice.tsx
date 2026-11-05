@@ -19,7 +19,7 @@ export function LangChoice({ current, english, arabic, label }: { current: "en" 
           aria-checked={current === o.value}
           lang={o.value}
           disabled={pending}
-          onClick={() => start(() => setLocale(o.value))}
+          onClick={() => start(async () => void (await setLocale(o.value)))}
           className={`mn-stage cursor-pointer border-0 ${current === o.value ? "mn-stage--current" : "bg-transparent"}`}
         >
           {o.text}

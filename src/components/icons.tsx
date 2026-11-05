@@ -66,3 +66,6 @@ export const IconLayoutBoard = ({ size, className }: P) => (
 export const IconGlobe = ({ size, className }: P) => (
   <svg {...base(size)} className={className}><circle cx="12" cy="12" r="9" /><path d="M3.6 9h16.8M3.6 15h16.8" /><path d="M11.5 3a17 17 0 0 0 0 18M12.5 3a17 17 0 0 1 0 18" /></svg>
 );
+export const IconChart = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg>
+);
