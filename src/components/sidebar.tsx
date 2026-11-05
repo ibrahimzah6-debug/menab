@@ -71,17 +71,24 @@ export function Sidebar({
   role: string;
   isOwner?: boolean;
 }) {
-  const [open, setOpen] = useState(initialOpen);
+  const [desktopOpen, setOpen] = useState(initialOpen);
+  // On a phone the menu slides over the page and closes again after each tap.
+  const [phoneOpen, setPhoneOpen] = useState(false);
+  const open = desktopOpen || phoneOpen;
   const [wsOpen, setWsOpen] = useState(false);
   const [, start] = useTransition();
   const router = useRouter();
   const path = usePathname();
   const wsRef = useRef<HTMLDivElement>(null);
   // Close the workspace list when the page changes.
-  useEffect(() => setWsOpen(false), [path]);
+  useEffect(() => {
+    setWsOpen(false);
+    setPhoneOpen(false);
+  }, [path]);
 
   const toggle = () => {
-    const next = !open;
+    if (phoneOpen) return setPhoneOpen(false);
+    const next = !desktopOpen;
     setOpen(next);
     start(() => setSidebar(next));
   };
@@ -89,10 +96,26 @@ export function Sidebar({
   const item = "mn-nav-item flex items-center gap-3 h-9 rounded-md text-[14px] whitespace-nowrap";
 
   return (
+    <>
+    {/* Phone: a thin bar with the menu button; the menu itself slides over the page. */}
+    <div className="md:hidden sticky top-0 z-30 h-12 shrink-0 flex items-center gap-2 px-3 bg-ground-deep border-b border-line">
+      <button
+        type="button"
+        className="mn-btn mn-btn--ghost mn-btn--sm"
+        style={{ padding: "0 8px" }}
+        aria-label={labels.openMenu}
+        aria-expanded={phoneOpen}
+        onClick={() => setPhoneOpen(true)}
+      >
+        <IconSidebar size={18} />
+      </button>
+      <Link href="/" aria-label="Menab" className="flex items-center h-8">{logo}</Link>
+    </div>
+    {phoneOpen && <div className="md:hidden fixed inset-0 z-40 bg-black/40" aria-hidden="true" onClick={() => setPhoneOpen(false)} />}
     <aside
       aria-label={labels.mainMenu}
-      className={`shrink-0 h-screen sticky top-0 bg-ground-deep border-e border-line flex flex-col gap-3 py-3 transition-[width] duration-200 ${
-        open ? "w-[256px] px-3" : "w-[60px] px-2 items-center"
+      className={`shrink-0 h-screen bg-ground-deep border-e border-line flex-col gap-3 py-3 ${
+        phoneOpen ? "flex fixed inset-y-0 start-0 z-50 w-[280px] max-w-[85vw] px-3" : `hidden md:flex sticky top-0 transition-[width] duration-200 ${desktopOpen ? "w-[256px] px-3" : "w-[60px] px-2 items-center"}`
       }`}
     >
       <div className={`flex items-center ${open ? "justify-between px-1" : "flex-col gap-3"}`}>
@@ -228,5 +251,6 @@ export function Sidebar({
         <PersonMenu person={person} role={role} compact={!open} labels={{ settings: labels.settings, signOut: labels.signOut, account: labels.account }} />
       </div>
     </aside>
+    </>
   );
 }

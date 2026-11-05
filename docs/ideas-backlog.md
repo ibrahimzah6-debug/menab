@@ -18,3 +18,6 @@ Ideas that come up while testing. None of these are in scope until Ibrahim decid
 | I12 | Voice brief model | Ibrahim, 4 Nov | Built (M2) | Gemini 3.8 Flash through Kie.ai turns the voice note into text, Claude reads it |
 | I13 | Switch between workspaces | Ibrahim, 5 Nov | Built (M2) | Switcher at the top of the side menu. Creating a new workspace is not built; one per company is set up by Menab for now |
 | I14 | Check the brief fields against a real ZAH brief | Claude, 5 Nov | Open | Needs one past ZAH brief from Ibrahim |
+| I15 | Departments and partner companies in a workspace (art company, production services company) beside the roles | Ibrahim, 5 Nov | Later | Roles stay as they are for now |
+| I16 | More owner tools for development (logs, prompts, model tests) on the owner dashboard | Ibrahim, 5 Nov | Later | Owner dashboard is limited to `platform_admins` |
+| I17 | Connectors and plugins under "+" in the reply box | Ibrahim, 5 Nov | Later | Shown as Soon |

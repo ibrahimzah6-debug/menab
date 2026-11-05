@@ -100,7 +100,7 @@ export function StageFooter({
 }) {
   const { pending, error, run } = useRun();
   return (
-    <footer className="sticky bottom-0 bg-surface border-t border-line px-5 py-3 flex flex-wrap gap-3 items-center z-10">
+    <footer className="shrink-0 sticky bottom-0 bg-surface border-t border-line px-5 py-3 flex flex-wrap gap-3 items-center z-10">
       <span className="small text-ink-muted" role="status">
         {pending && busyLabel ? <span className="mn-dots">{busyLabel}</span> : error ?? message}
       </span>

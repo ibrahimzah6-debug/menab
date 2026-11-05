@@ -13,7 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getMemberships } from "@/lib/workspace";
 import { BriefChat } from "./brief-chat";
 import { ChangeBox } from "./editors";
-import { InlineDoc, InlineIdea } from "./inline-doc";
+import { BoardCardText, InlineDoc, InlineIdea } from "./inline-doc";
 import { LanguageMenu } from "@/components/menus";
 import { MenabLoader } from "@/components/menab-loader";
 import { StepModelPicker } from "./side-panels";
@@ -129,12 +129,14 @@ export default async function ProjectPage({
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    // On a computer the screen is one fixed height: the reply box stays at the bottom and each
+    // column scrolls on its own. On a phone the columns stack and the page scrolls.
+    <div className="flex flex-col md:h-screen md:overflow-hidden">
       {/* Project bar */}
-      <header className="flex flex-wrap items-center gap-3 px-6 h-14 border-b border-line bg-surface">
+      <header className="shrink-0 flex flex-wrap items-center gap-x-3 gap-y-2 px-4 md:px-6 py-2 min-h-14 border-b border-line bg-surface">
         <Link href="/projects" className="small text-ink-muted hover:text-ink">{t.projects.title}</Link>
         <span className="text-line-strong" aria-hidden="true">/</span>
-        <span className="text-[15px] font-medium truncate max-w-[40ch]">{project.name}</span>
+        <span className="text-[15px] font-medium truncate min-w-0 max-w-[40ch]">{project.name}</span>
         <span className="mn-chip mn-chip--ready">{path ? t.stage.paths[path] : t.stage.paths.none}</span>
         <span className="grow" />
         <span className="mn-label h-9 px-3 rounded-md border border-line grid place-items-center">{fill(p.spent, { spent: money(spent) })}</span>
@@ -142,7 +144,7 @@ export default async function ProjectPage({
       </header>
 
       {/* Stages, and Page or Board */}
-      <div className="px-6 py-4 flex flex-wrap gap-4 items-center justify-between">
+      <div className="shrink-0 px-4 md:px-6 py-3 flex flex-wrap gap-3 items-center justify-between min-w-0">
         <StageBar stages={names} current={currentIndex} label={t.stage.stagesLabel} />
         <div className="mn-stagebar" role="group" aria-label={t.stage.viewLabel}>
           <Link href={href({ o: open || undefined })} aria-current={!board ? "true" : undefined} className={`mn-stage ${!board ? "mn-stage--current" : ""}`}>
@@ -157,26 +159,44 @@ export default async function ProjectPage({
       </div>
 
       {board ? (
-        <main className="flex-1 px-6 pb-6 flex flex-wrap gap-4 items-start">
-          <div className="mn-board flex-[999_1_560px] min-h-[560px] flex flex-wrap gap-6 content-start">
-            {list.map((x) => (
-              <Link key={x.id} href={href({ o: showing === 1 ? x.number : undefined })} className={`mn-card ${statusOf(x.number) === "generating" ? "mn-card--ai" : ""}`} style={{ width: 260 }}>
-                <div className="mn-card__head">
-                  <span className="mn-label" lang="en">{String(x.number).padStart(2, "0")}</span>
-                  <StatusChip status={statusOf(x.number) as OutputStatus} label={statusLabel(t, statusOf(x.number))} />
+        <main className="flex-1 min-h-0 px-4 md:px-6 pb-4 flex flex-col md:flex-row gap-4">
+          <div className="relative mn-board flex-1 min-w-0 md:min-h-0 md:overflow-y-auto flex flex-wrap gap-6 content-start">
+            {list.map((x) => {
+              const st = statusOf(x.number);
+              return (
+                <div key={x.id} className={`mn-card ${st === "generating" ? "mn-card--ai" : ""}`} style={{ width: 260, maxWidth: "100%" }}>
+                  <div className="mn-card__head">
+                    <span className="mn-label" lang="en">{String(x.number).padStart(2, "0")}</span>
+                    <StatusChip status={st as OutputStatus} label={statusLabel(t, st)} />
+                  </div>
+                  <p className="mn-card__title">{t.outputs[x.number]}</p>
+                  <div className={`mn-card__text ${st === "generating" ? "mn-typing" : ""}`}>
+                    {showing === 1 ? (
+                      <BoardCardText
+                        projectId={id}
+                        n={x.number}
+                        content={content[x.number]}
+                        logline={brief.logline ?? ""}
+                        story={brief.story ?? []}
+                        fallback={excerpt(x.number, content[x.number], brief, p)}
+                        editable={editableHere && st !== "generating"}
+                        label={t.outputs[x.number]}
+                      />
+                    ) : (
+                      fill(p.later, { m: MILESTONE[showing] ?? "" })
+                    )}
+                  </div>
+                  <div className="mn-card__meta">
+                    <span>{x.current_version > 0 ? `${textModel(model).name} · v${x.current_version}` : ""}</span>
+                    {showing === 1 && (
+                      <Link href={href({ o: x.number })} className="underline hover:text-ink">{p.openPage}</Link>
+                    )}
+                  </div>
                 </div>
-                <p className="mn-card__title">{t.outputs[x.number]}</p>
-                <p className={`mn-card__text ${statusOf(x.number) === "generating" ? "mn-typing" : ""}`} dir="auto" style={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                  {excerpt(x.number, content[x.number], brief, p) || (showing === 1 ? "" : fill(p.later, { m: MILESTONE[showing] ?? "" }))}
-                </p>
-                <div className="mn-card__meta">
-                  <span>{x.current_version > 0 ? textModel(model).name : ""}</span>
-                  <span>{x.current_version > 0 ? `v${x.current_version}` : ""}</span>
-                </div>
-              </Link>
-            ))}
+              );
+            })}
           </div>
-          <aside className="flex-[1_1_280px] max-w-[320px] min-w-0 bg-surface border border-line rounded-lg p-4 flex flex-col gap-3">
+          <aside className="relative w-full md:w-[320px] shrink-0 md:min-h-0 md:overflow-y-auto bg-surface border border-line rounded-lg p-4 flex flex-col gap-3 self-start">
             <h2 className="m-0 text-[16px] font-medium">{t.stage.assistant}</h2>
             <div className="flex flex-col gap-1.5">
               <span className="mn-label">{p.model}</span>
@@ -188,9 +208,9 @@ export default async function ProjectPage({
           </aside>
         </main>
       ) : (
-        <main className="flex-1 px-6 pb-6 flex flex-wrap gap-4 items-start">
+        <main className="flex-1 min-h-0 px-4 md:px-6 pb-4 flex flex-col md:flex-row gap-4">
           {/* Steps of the stage */}
-          <nav aria-label={t.stage.outputsLabel} className="flex-[0_0_248px] max-w-[248px] bg-ground-deep border border-line rounded-lg p-3 flex flex-col gap-1">
+          <nav aria-label={t.stage.outputsLabel} className="relative w-full md:w-[248px] shrink-0 md:min-h-0 md:overflow-y-auto self-start md:max-h-full bg-ground-deep border border-line rounded-lg p-3 flex flex-col gap-1">
             <span className="mn-label p-2">{fill(t.stage.outputsCount, { n: order.indexOf(showing) + 1, count: list.length })}</span>
             {list.map((x) => {
               const st = statusOf(x.number);
@@ -211,14 +231,14 @@ export default async function ProjectPage({
           </nav>
 
           {showing !== 1 ? (
-            <section className="flex-[999_1_480px] min-w-0 bg-surface border border-line rounded-lg p-6">
+            <section className="flex-1 min-w-0 self-start bg-surface border border-line rounded-lg p-6">
               <span className="mn-label">{fill(t.projects.stageOf, { n: currentIndex + 1, total: order.length })}</span>
               <h1 className="h2 m-0 mt-1 mb-2">{names[currentIndex]}</h1>
               <p className="body text-ink-muted m-0">{fill(p.later, { m: MILESTONE[showing] ?? "" })}</p>
               <p className="small m-0 mt-4"><Link href={href({ o: 3 })} className="underline">{t.outputs[3]}</Link></p>
             </section>
           ) : open === 1 ? (
-            <div className="flex-[999_1_480px] min-w-0 flex">
+            <div className="flex-1 min-w-0 h-[75vh] md:h-auto md:min-h-0 flex">
               <BriefChat
                 projectId={id}
                 canEdit={editableHere}
@@ -230,7 +250,7 @@ export default async function ProjectPage({
               />
             </div>
           ) : (
-            <section className="flex-[999_1_480px] min-w-0 bg-surface border border-line rounded-lg">
+            <section className="relative flex-1 min-w-0 md:min-h-0 md:overflow-y-auto bg-surface border border-line rounded-lg">
               <div className="px-6 py-5 border-b border-line flex items-center gap-3">
                 <div className="grow flex flex-col gap-1">
                   <span className="mn-label" lang="en">{String(open).padStart(2, "0")} · v{outs.find((x) => x.number === open)?.current_version ?? 0}</span>
@@ -258,7 +278,7 @@ export default async function ProjectPage({
           )}
 
           {/* Right panel: the brief while talking, the assistant on documents */}
-          <aside className="flex-[1_1_300px] max-w-[340px] min-w-0 flex flex-col gap-4">
+          <aside className="relative w-full md:w-[320px] lg:w-[340px] shrink-0 md:min-h-0 md:overflow-y-auto flex flex-col gap-4">
             {showing === 1 && open === 1 ? (
               <>
                 <BriefPanel brief={brief} p={p} missing={missing} projectId={id} editable={editableHere} />

@@ -249,3 +249,51 @@ export function InlineIdea({
     </div>
   );
 }
+
+// The main line of a card on the board, edited in place: the idea, the summary's opening,
+// the key message or the reason for the path. Other details open on the page.
+export function BoardCardText({
+  projectId,
+  n,
+  content,
+  logline,
+  story,
+  fallback,
+  editable,
+  label,
+}: {
+  projectId: string;
+  n: number;
+  content: unknown;
+  logline: string;
+  story: string[];
+  fallback: string;
+  editable: boolean;
+  label: string;
+}) {
+  const router = useRouter();
+  const [, start] = useTransition();
+  const { save } = useSave(projectId, n);
+  const c = (content ?? {}) as Record<string, unknown>;
+  let value = fallback;
+  let commit: ((v: string) => void) | null = null;
+  if (n === 1 && logline) {
+    value = logline;
+    commit = (v) =>
+      start(async () => {
+        await saveBriefIdea(projectId, v, story);
+        router.refresh();
+      });
+  } else if (n === 3 && Array.isArray(c.paragraphs)) {
+    const paragraphs = c.paragraphs as string[];
+    value = paragraphs[0] ?? "";
+    commit = (v) => save({ ...c, paragraphs: [v, ...paragraphs.slice(1)] });
+  } else if (n === 4 && typeof c.key_message === "string") {
+    value = c.key_message;
+    commit = (v) => save({ ...c, key_message: v });
+  } else if (n === 5 && typeof c.reason === "string") {
+    value = c.reason;
+    commit = (v) => save({ ...c, reason: v });
+  }
+  return <InlineText label={label} value={value} editable={editable && commit !== null} onCommit={(v) => commit?.(v)} />;
+}

@@ -4,7 +4,7 @@ import { IconCheck } from "@/components/icons";
 export function StageBar({ stages, current, label }: { stages: string[]; current: number; label: string }) {
   return (
     <div className="overflow-x-auto max-w-full">
-      <nav className="mn-stagebar flex-nowrap" aria-label={label}>
+      <nav className="mn-stagebar" style={{ flexWrap: "nowrap" }} aria-label={label}>
         {stages.map((name, i) => {
           const n = String(i + 1).padStart(2, "0");
           if (i < current)
