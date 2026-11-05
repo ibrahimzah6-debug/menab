@@ -4,16 +4,14 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createProject } from "@/app/p/[id]/actions";
-import { setLocale } from "@/lib/i18n/actions";
 import { setSidebar, switchWorkspace } from "@/lib/preferences";
+import { LanguageMenu, PersonMenu } from "./menus";
 import {
   IconBooks,
   IconCheckSmall,
   IconCoins,
   IconFolder,
   IconHome,
-  IconLanguage,
-  IconLogout,
   IconPlus,
   IconSelector,
   IconSettings,
@@ -42,6 +40,9 @@ type Labels = Record<(typeof ITEMS)[number]["key"], string> & {
   langSwitch: string;
   langSwitchLabel: string;
   viewerNote: string;
+  account: string;
+  language: string;
+  soon: string;
 };
 
 export function Sidebar({
@@ -209,39 +210,9 @@ export function Sidebar({
 
       <span className="grow" />
 
-      <div className={`flex flex-col gap-1 border-t border-line pt-3 ${open ? "" : "items-center w-full"}`}>
-        {open && (
-          <div className="px-2 pb-1 flex items-center gap-2">
-            <span className="w-7 h-7 rounded-full bg-tint-3 grid place-items-center text-[12px] font-medium shrink-0">
-              {person.slice(0, 1).toUpperCase()}
-            </span>
-            <span className="flex flex-col min-w-0">
-              <span className="small truncate" dir="auto">{person}</span>
-              <span className="text-[12px] text-ink-faint">{role}</span>
-            </span>
-          </div>
-        )}
-        <button
-          type="button"
-          className={`${item} ${open ? "px-2.5" : "justify-center w-10"} text-ink-muted hover:bg-tint-2 hover:text-ink`}
-          aria-label={labels.langSwitchLabel}
-          title={labels.langSwitchLabel}
-          lang={locale === "ar" ? "en" : "ar"}
-          onClick={() => start(() => setLocale(locale === "ar" ? "en" : "ar"))}
-        >
-          <IconLanguage size={18} />
-          {open && labels.langSwitch}
-        </button>
-        <form action="/auth/signout" method="post" className={open ? "" : "flex justify-center"}>
-          <button
-            className={`${item} ${open ? "px-2.5 w-full" : "justify-center w-10"} text-ink-muted hover:bg-tint-2 hover:text-ink`}
-            title={labels.signOut}
-            aria-label={labels.signOut}
-          >
-            <IconLogout size={18} />
-            {open && labels.signOut}
-          </button>
-        </form>
+      <div className={`flex gap-1.5 border-t border-line pt-3 ${open ? "items-center" : "flex-col items-center w-full"}`}>
+        <PersonMenu person={person} role={role} compact={!open} labels={{ settings: labels.settings, signOut: labels.signOut, account: labels.account }} />
+        <LanguageMenu locale={locale} label={labels.language} soon={labels.soon} compact={!open} />
       </div>
     </aside>
   );

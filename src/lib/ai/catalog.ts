@@ -63,12 +63,15 @@ export type TextModel = {
   usdPerMillionIn: number;
   usdPerMillionOut: number;
   fallback: boolean; // server-side refusal fallback is available
+  provider: "anthropic" | "google";
+  free?: boolean; // Google's free tier: shared daily limits, content may be used by Google
   goodFor: { en: string; ar: string };
 };
 export const TEXT_MODELS: TextModel[] = [
-  { id: "claude-opus-5-5", name: "Claude Opus 5.5", usdPerMillionIn: 4, usdPerMillionOut: 20, fallback: true, goodFor: { en: "Best thinking for briefs, scripts and treatments", ar: "أفضل تفكير للبريف والسكربت ورؤية المخرج" } },
-  { id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5", usdPerMillionIn: 2, usdPerMillionOut: 10, fallback: true, goodFor: { en: "Fast and strong, half the price", ar: "سريع وقوي بنص السعر" } },
-  { id: "claude-haiku-5-5", name: "Claude Haiku 5.5", usdPerMillionIn: 0.1, usdPerMillionOut: 0.5, fallback: false, goodFor: { en: "Cheapest, for quick drafts", ar: "الأرخص، للمسودات السريعة" } },
+  { id: "claude-opus-5-5", name: "Claude Opus 5.5", usdPerMillionIn: 4, usdPerMillionOut: 20, fallback: true, provider: "anthropic", goodFor: { en: "Best thinking for briefs, scripts and treatments", ar: "أفضل تفكير للبريف والسكربت ورؤية المخرج" } },
+  { id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5", usdPerMillionIn: 2, usdPerMillionOut: 10, fallback: true, provider: "anthropic", goodFor: { en: "Fast and strong, half the price", ar: "سريع وقوي بنص السعر" } },
+  { id: "claude-haiku-5-5", name: "Claude Haiku 5.5", usdPerMillionIn: 0.1, usdPerMillionOut: 0.5, fallback: false, provider: "anthropic", goodFor: { en: "Cheapest paid model, for quick drafts", ar: "أرخص نموذج مدفوع، للمسودات السريعة" } },
+  { id: "gemini-3.8-flash", name: "Gemini 3.8 Flash", usdPerMillionIn: 0, usdPerMillionOut: 0, fallback: false, provider: "google", free: true, goodFor: { en: "Free with daily limits, for trying things out", ar: "مجاني بحد يومي، للتجربة" } },
 ];
 export const DEFAULT_TEXT_MODEL = "claude-opus-5-5";
 export function textModel(id: string | null | undefined) {
@@ -90,7 +93,7 @@ export const BRAIN = { provider: "anthropic" } as const;
 export const TRANSCRIBER = {
   provider: "kie.ai",
   model: "gemini-3-8-flash",
-  label: "Gemini (Google, free tier; Kie.ai as backup)",
+  label: "Gemini 3.8 Flash (Google, free tier; Kie.ai as backup)",
   // kie.ai/pricing lists "from $0.225 per million tokens"; used for both directions as an estimate.
   usdPerMillion: 0.225,
 } as const;

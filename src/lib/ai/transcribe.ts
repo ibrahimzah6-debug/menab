@@ -15,7 +15,7 @@ export async function transcribe(audio: Buffer, mimeType: string) {
 }
 
 async function transcribeWithGoogle(audio: Buffer, mimeType: string) {
-  const model = process.env.GEMINI_MODEL || "gemini-flash-latest";
+  const model = process.env.GEMINI_MODEL || "gemini-3.8-flash";
   const started = Date.now();
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: "POST",

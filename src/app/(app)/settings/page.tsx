@@ -52,7 +52,9 @@ export default async function SettingsPage() {
             rank: i + 1,
             name: m.name,
             note: m.goodFor[locale],
-            price: `${isolate(`$${m.usdPerMillionIn} / $${m.usdPerMillionOut}`)} ${locale === "ar" ? "لكل مليون رمز" : "per million tokens"}`,
+            price: m.free
+              ? locale === "ar" ? "مجاني، بحد يومي" : "Free, daily limit"
+              : `${isolate(`$${m.usdPerMillionIn} / $${m.usdPerMillionOut}`)} ${locale === "ar" ? "لكل مليون رمز" : "per million tokens"}`,
           }))}
         />
         {tasks.map(({ task, label }) => (

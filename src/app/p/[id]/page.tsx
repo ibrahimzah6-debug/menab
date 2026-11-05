@@ -12,6 +12,7 @@ import { stagesFor } from "@/lib/stages";
 import { createClient } from "@/lib/supabase/server";
 import { getMemberships } from "@/lib/workspace";
 import { BriefChat } from "./brief-chat";
+import { BriefIdeaEditor, ChangeBox, EditableDoc } from "./editors";
 import { StepModelPicker } from "./side-panels";
 import { PathButtons, RewriteButton, StageFooter } from "./stage-controls";
 
@@ -74,7 +75,9 @@ export default async function ProjectPage({
     rank: i + 1,
     name: m.name,
     note: m.goodFor[locale],
-    price: iso(`~$${estimateUsd(m.id, "briefTurn").toFixed(3)}`) + (locale === "ar" ? " للرد" : " a reply"),
+    price: m.free
+      ? locale === "ar" ? "مجاني، بحد يومي" : "Free, daily limit"
+      : iso(`~$${estimateUsd(m.id, "briefTurn").toFixed(3)}`) + (locale === "ar" ? " للرد" : " a reply"),
   }));
 
   // Which stage the screen shows: the current one, or stage 1 when one of its outputs is opened.
@@ -150,8 +153,8 @@ export default async function ProjectPage({
       </div>
 
       {board ? (
-        <main className="flex-1 px-6 pb-6">
-          <div className="mn-board min-h-[560px] flex flex-wrap gap-6 content-start">
+        <main className="flex-1 px-6 pb-6 flex flex-wrap gap-4 items-start">
+          <div className="mn-board flex-[999_1_560px] min-h-[560px] flex flex-wrap gap-6 content-start">
             {list.map((x) => (
               <Link key={x.id} href={href({ o: showing === 1 ? x.number : undefined })} className={`mn-card ${statusOf(x.number) === "generating" ? "mn-card--ai" : ""}`} style={{ width: 260 }}>
                 <div className="mn-card__head">
@@ -169,6 +172,16 @@ export default async function ProjectPage({
               </Link>
             ))}
           </div>
+          <aside className="flex-[1_1_280px] max-w-[320px] min-w-0 bg-surface border border-line rounded-lg p-4 flex flex-col gap-3">
+            <h2 className="m-0 text-[16px] font-medium">{t.stage.assistant}</h2>
+            <div className="flex flex-col gap-1.5">
+              <span className="mn-label">{p.model}</span>
+              <StepModelPicker projectId={id} label={p.model} options={modelOptions} value={model} defaultLabel={model === workspaceDefault ? p.defaultTag : ""} disabled={!canEdit} />
+            </div>
+            {showing === 1 && docsReady && editableHere && (
+              <ChangeBox projectId={id} copy={p.change} cost={approx(estimateUsd(model, "stageOne"))} />
+            )}
+          </aside>
         </main>
       ) : (
         <main className="flex-1 px-6 pb-6 flex flex-wrap gap-4 items-start">
@@ -220,7 +233,16 @@ export default async function ProjectPage({
                 <StatusChip status={statusOf(open) as OutputStatus} label={statusLabel(t, statusOf(open))} />
               </div>
               <div className="p-6">
-                <DocView n={open} content={content[open]} p={p} generating={statusOf(open) === "generating"} />
+                <EditableDoc
+                  projectId={id}
+                  number={open}
+                  content={(content[open] ?? null) as never}
+                  labels={docLabels(p)}
+                  copy={p.editCopy}
+                  canEdit={editableHere && statusOf(open) !== "generating"}
+                >
+                  <DocView n={open} content={content[open]} p={p} generating={statusOf(open) === "generating"} />
+                </EditableDoc>
               </div>
             </section>
           )}
@@ -229,7 +251,7 @@ export default async function ProjectPage({
           <aside className="flex-[1_1_300px] max-w-[340px] min-w-0 flex flex-col gap-4">
             {showing === 1 && open === 1 ? (
               <>
-                <BriefPanel brief={brief} p={p} missing={missing} />
+                <BriefPanel brief={brief} p={p} missing={missing} projectId={id} editable={editableHere} />
                 <section className="bg-surface border border-line rounded-lg p-4 flex flex-col gap-3">
                   <span className="mn-label">{p.suggestedPath}</span>
                   {project.path_suggested ? (
@@ -271,7 +293,10 @@ export default async function ProjectPage({
                 />
               </div>
               {showing === 1 && open !== 1 && docsReady && editableHere && (
-                <RewriteButton projectId={id} label={p.rewrite} cost={approx(estimateUsd(model, "stageOne"))} />
+                <>
+                  <ChangeBox projectId={id} copy={p.change} cost={approx(estimateUsd(model, "stageOne"))} />
+                  <RewriteButton projectId={id} label={p.rewrite} cost={approx(estimateUsd(model, "stageOne"))} />
+                </>
               )}
             </section>
           </aside>
@@ -322,7 +347,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 // The brief panel starts from the video itself, then delivery, production, and client and timing.
-function BriefPanel({ brief, p, missing }: { brief: Partial<BriefFields>; p: Dictionary["project"]; missing: string[] }) {
+function BriefPanel({ brief, p, missing, projectId, editable }: { brief: Partial<BriefFields>; p: Dictionary["project"]; missing: string[]; projectId: string; editable: boolean }) {
   type K = Exclude<keyof BriefFields, "project_name">;
   const show = (k: K) => {
     const v = brief[k];
@@ -359,6 +384,7 @@ function BriefPanel({ brief, p, missing }: { brief: Partial<BriefFields>; p: Dic
           </ol>
         )}
         {(brief.logline || (brief.story && brief.story.length > 0)) && <span className="text-[11px] text-ink-faint">{p.draft}</span>}
+        {editable && <BriefIdeaEditor projectId={projectId} logline={brief.logline ?? ""} story={brief.story ?? []} copy={p.editCopy} />}
       </div>
       {group(p.sections.video, ["objective", "audience", "feeling", "key_message", "must_show"])}
       {group(p.sections.delivery, ["length_seconds", "cutdowns", "formats", "language"])}
@@ -452,4 +478,35 @@ function DocView({ n, content, p, generating }: { n: number; content: unknown; p
     );
   }
   return null;
+}
+
+// Names for each field when a document is edited.
+function docLabels(p: Dictionary["project"]): Record<string, string> {
+  const d = p.docs;
+  return {
+    title: p.fields.logline,
+    paragraphs: p.sections.video,
+    insight: d.insight,
+    key_message: d.keyMessage,
+    tone: d.tone,
+    platforms: d.platforms,
+    deliverables: d.deliverables,
+    name: d.deliverable,
+    duration_seconds: d.duration,
+    ratio: d.ratio,
+    platform: d.platform,
+    path: p.suggestedPath,
+    reason: p.suggestedPath,
+    ai_scenes: d.aiScenes,
+    shoot_scenes: d.shootScenes,
+    cost_range: d.costRange,
+    time_range: d.timeRange,
+    cps: "CPS",
+    milestones: d.milestones,
+    start: d.from,
+    end: d.to,
+    phase: d.phase,
+    note: d.kickoff,
+    kickoff_notes: d.kickoff,
+  };
 }

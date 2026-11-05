@@ -35,6 +35,80 @@ function fallbackParams(modelId: string) {
     : {};
 }
 
+type Msg = { role: "user" | "assistant"; content: string };
+
+// One structured call, on Claude or on Google's Gemini, validated against the same schema.
+async function structured<S extends z.ZodType>(
+  modelId: string,
+  system: string,
+  messages: Msg[],
+  schema: S,
+  opts: { effort: "low" | "medium"; maxTokens: number },
+): Promise<{ data: z.infer<S>; usage: Usage }> {
+  const started = Date.now();
+  const m = textModel(modelId);
+  if (m.provider === "google") return gemini(m.id, system, messages, schema, started);
+
+  const res = await anthropic().beta.messages.parse({
+    model: m.id,
+    max_tokens: opts.maxTokens,
+    ...fallbackParams(m.id),
+    system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
+    messages,
+    output_config: { effort: opts.effort, format: betaZodOutputFormat(schema) },
+  });
+  if (res.stop_reason === "refusal" || !res.parsed_output) {
+    throw new Error("Menab AI could not finish that. Try saying it another way.");
+  }
+  return { data: res.parsed_output as z.infer<S>, usage: usageOf(m.id, res.usage, started) };
+}
+
+// Gemini on Google's free tier: JSON output checked with the same schema. Free, so the cost is $0.
+async function gemini<S extends z.ZodType>(modelId: string, system: string, messages: Msg[], schema: S, started: number) {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) throw new Error("GEMINI_API_KEY is not set in Vercel");
+  const body = (withSchema: boolean) => ({
+    systemInstruction: {
+      parts: [{ text: withSchema ? system : `${system}\n\nAnswer only with JSON matching this schema:\n${JSON.stringify(z.toJSONSchema(schema))}` }],
+    },
+    contents: messages.map((x) => ({ role: x.role === "assistant" ? "model" : "user", parts: [{ text: x.content }] })),
+    generationConfig: {
+      responseMimeType: "application/json",
+      ...(withSchema ? { responseJsonSchema: z.toJSONSchema(schema) } : {}),
+    },
+  });
+  const call = (withSchema: boolean) =>
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent`, {
+      method: "POST",
+      headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify(body(withSchema)),
+    });
+  let res = await call(true);
+  // Some schemas are too rich for Gemini's schema mode: ask again with the schema in the instructions.
+  if (res.status === 400) res = await call(false);
+  const json = (await res.json().catch(() => null)) as {
+    error?: { message?: string };
+    candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[];
+    usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
+  } | null;
+  if (!res.ok || !json || json.error) {
+    throw new Error(res.status === 429 ? "The free Gemini limit is used up for now. Try again later or pick another model." : `Gemini: ${json?.error?.message ?? res.status}`);
+  }
+  const text = (json.candidates?.[0]?.content?.parts ?? []).filter((p) => p.text && !p.thought).map((p) => p.text).join("");
+  const parsed = schema.safeParse(JSON.parse(text.replace(/^```(json)?|```$/g, "").trim()));
+  if (!parsed.success) throw new Error("Gemini's answer was incomplete. Try again or pick another model.");
+  return {
+    data: parsed.data as z.infer<S>,
+    usage: {
+      inputTokens: json.usageMetadata?.promptTokenCount ?? 0,
+      outputTokens: json.usageMetadata?.candidatesTokenCount ?? 0,
+      costUsd: 0,
+      seconds: Math.round((Date.now() - started) / 100) / 10,
+    },
+  };
+}
+
 const MENAB = `You are Menab AI, the production brain inside Menab (مِناب), a Saudi platform that takes a video from a client brief to delivery: made with AI, shot by a production house, or a hybrid of both. You think like a senior Saudi creative producer at a production house in Riyadh: you care first about the idea and how the video will make people feel, then about how to make it well within the time and money.
 
 How you write:
@@ -108,37 +182,25 @@ export async function briefTurn(
   current: Partial<BriefFields>,
   modelId: string,
 ) {
-  const started = Date.now();
-  const res = await anthropic().beta.messages.parse({
-    model: modelId,
-    max_tokens: 8000,
-    ...fallbackParams(modelId),
-    system: [
-      {
-        type: "text",
-        text: `${MENAB}
+  const { data: turn, usage } = await structured(
+    modelId,
+    `${MENAB}
 
-Your job now: run the brief conversation. Turn what the user says into a structured brief that starts from the video itself: the idea in one line, the story beats, the feeling and the key message. Then delivery, production needs, client and timing. Keep values the user gave earlier unless they change them. You may draft the logline and story beats from what you heard, as a first draft for the user to confirm.
+Your job now: run the brief conversation. Turn what the user says into a structured brief that starts from the video itself: the idea in one line, the story beats, the feeling and the key message. Then delivery, production needs, client and timing. Keep values the user gave earlier unless they change them, and when they change the idea (for example a different character or place), update the logline and story beats to match. You may draft the logline and story beats from what you heard, as a first draft for the user to confirm.
 
 Required before documents can be written: ${REQUIRED_BRIEF_FIELDS.join(", ")}. Ask for those first. When they are filled, ask what would most improve the video. Never more than 3 questions at a time. Budget is optional: never insist on it. Suggest a path as soon as you know whether real products or people must be on camera.`,
-        cache_control: { type: "ephemeral" },
-      },
-    ],
-    messages: [
+    [
       ...history,
       {
         role: "user",
         content: `Brief so far (JSON, may be empty): ${JSON.stringify(current)}\nUpdate it from the conversation above and answer my last message.`,
       },
     ],
-    output_config: { effort: "low", format: betaZodOutputFormat(BriefTurn) },
-  });
-  if (res.stop_reason === "refusal" || !res.parsed_output) {
-    throw new Error("Menab AI could not read that brief. Try saying it another way.");
-  }
-  const turn = res.parsed_output;
+    BriefTurn,
+    { effort: "low", maxTokens: 8000 },
+  );
   turn.questions = turn.questions.slice(0, 3);
-  return { turn, usage: usageOf(modelId, res.usage, started) };
+  return { turn, usage };
 }
 
 // ---------- Stage 1 documents (outputs 3 to 6) ----------
@@ -185,26 +247,35 @@ const StageOneDocs = z.object({
 });
 export type StageOneDocs = z.infer<typeof StageOneDocs>;
 
-export async function writeStageOne(brief: BriefFields, path: string | null, today: string, language: string, modelId: string) {
-  const started = Date.now();
-  const res = await anthropic().beta.messages.parse({
-    model: modelId,
-    max_tokens: 16000,
-    ...fallbackParams(modelId),
-    system: [{ type: "text", text: MENAB, cache_control: { type: "ephemeral" } }],
-    messages: [
+// Writes outputs 3 to 6. With an instruction ("make it the father going to the supermarket"),
+// it revises the current documents and the brief idea instead of starting over.
+export async function writeStageOne(
+  brief: BriefFields,
+  path: string | null,
+  today: string,
+  language: string,
+  modelId: string,
+  revise?: { instruction: string; current: unknown },
+) {
+  const ask = revise
+    ? `Today is ${today}. Revise these stage 1 documents with this change from the producer: "${revise.instruction}". Apply the change everywhere it matters (summary, strategy, pathway, CPS) and keep everything else. Write in: ${language}.
+
+Current documents: ${JSON.stringify(revise.current)}`
+    : `Today is ${today}. Write the stage 1 documents for this brief: the brief summary for sign-off (start from the idea), strategy and deliverables (with every cutdown and ratio), the pathway with a rough cost and time range, and a first CPS. The CPS weeks run Sunday to Saturday, as in Saudi. Work back from the deadline; if the deadline is tight, say so in the note. Write in: ${language}.`;
+  const { data: docs, usage } = await structured(
+    modelId,
+    MENAB,
+    [
       {
         role: "user",
-        content: `Today is ${today}. Write the stage 1 documents for this brief: the brief summary for sign-off (start from the idea), strategy and deliverables (with every cutdown and ratio), the pathway with a rough cost and time range, and a first CPS. The CPS weeks run Sunday to Saturday, as in Saudi. Work back from the deadline; if the deadline is tight, say so in the note. Write in: ${language}.
+        content: `${ask}
 
 Path chosen by the user: ${path ?? "not chosen, suggest one"}
 Brief: ${JSON.stringify(brief)}`,
       },
     ],
-    output_config: { effort: "medium", format: betaZodOutputFormat(StageOneDocs) },
-  });
-  if (res.stop_reason === "refusal" || !res.parsed_output) {
-    throw new Error("Menab AI could not write the documents. Try again.");
-  }
-  return { docs: res.parsed_output, usage: usageOf(modelId, res.usage, started) };
+    StageOneDocs,
+    { effort: "medium", maxTokens: 16000 },
+  );
+  return { docs, usage };
 }

@@ -4,7 +4,7 @@
 const en = {
   langSwitch: "العربية",
   langSwitchLabel: "Switch to Arabic",
-  frame: { openMenu: "Open the menu", closeMenu: "Close the menu", workspaces: "Workspaces" },
+  frame: { openMenu: "Open the menu", closeMenu: "Close the menu", workspaces: "Workspaces", soon: "Soon" },
   nav: {
     newProject: "New project",
     newProjectLater: "Starting a project from a brief arrives in M2.",
@@ -176,6 +176,8 @@ const en = {
     draft: "First draft, from what you said",
     model: "Model",
     rewrite: "Rewrite the documents",
+    editCopy: { edit: "Edit", save: "Save as new version", cancel: "Cancel", saved: "Saved", oneLine: "One item per line.", idea: "The idea", story: "What happens" },
+    change: { label: "Tell Menab what to change", placeholder: "For example: make it the father rushing to the supermarket before iftar", apply: "Apply the change", working: "Menab AI is rewriting" },
     defaultTag: "Default",
     sec: "{n} sec",
     yes: "Yes, on camera",
@@ -343,7 +345,7 @@ export type Dictionary = typeof en;
 const ar: Dictionary = {
   langSwitch: "English",
   langSwitchLabel: "التبديل إلى الإنجليزية",
-  frame: { openMenu: "افتح القائمة", closeMenu: "أغلق القائمة", workspaces: "مساحات العمل" },
+  frame: { openMenu: "افتح القائمة", closeMenu: "أغلق القائمة", workspaces: "مساحات العمل", soon: "قريباً" },
   nav: {
     newProject: "مشروع جديد",
     newProjectLater: "بدء مشروع من البريف يجي في M2.",
@@ -515,6 +517,8 @@ const ar: Dictionary = {
     draft: "مسودة أولى من كلامك",
     model: "النموذج",
     rewrite: "أعد كتابة المستندات",
+    editCopy: { edit: "تعديل", save: "احفظ كنسخة جديدة", cancel: "إلغاء", saved: "تم الحفظ", oneLine: "كل عنصر في سطر.", idea: "الفكرة", story: "وش يصير" },
+    change: { label: "قل لمِناب وش يغيّر", placeholder: "مثلاً: خلّه الأب يسابق الوقت للسوبرماركت قبل الفطور", apply: "طبّق التغيير", working: "مِناب AI يعيد الكتابة" },
     defaultTag: "الافتراضي",
     sec: "{n} ثانية",
     yes: "نعم، قدام الكاميرا",

@@ -63,3 +63,6 @@ export const IconLayoutPage = ({ size, className }: P) => (
 export const IconLayoutBoard = ({ size, className }: P) => (
   <svg {...base(size)} className={className}><rect x="3" y="4" width="7" height="6" rx="1" /><rect x="14" y="4" width="7" height="9" rx="1" /><rect x="3" y="14" width="7" height="6" rx="1" /><rect x="14" y="16" width="7" height="4" rx="1" /></svg>
 );
+export const IconGlobe = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}><circle cx="12" cy="12" r="9" /><path d="M3.6 9h16.8M3.6 15h16.8" /><path d="M11.5 3a17 17 0 0 0 0 18M12.5 3a17 17 0 0 1 0 18" /></svg>
+);

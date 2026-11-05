@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { briefTurn, missingRequired, writeStageOne, type BriefFields } from "@/lib/ai/brain";
-import { BRAIN, DEFAULT_TEXT_MODEL, TEXT_MODELS, textModel } from "@/lib/ai/catalog";
+import { DEFAULT_TEXT_MODEL, TEXT_MODELS, textModel } from "@/lib/ai/catalog";
 import { transcribe } from "@/lib/ai/transcribe";
 import { getI18n } from "@/lib/i18n/server";
 import { logAiJob, saveVersion, STAGE_OUTPUTS, type Path } from "@/lib/projects";
@@ -108,11 +108,11 @@ async function runBriefTurn(
       model,
     );
   } catch (e) {
-    await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "brief", provider: BRAIN.provider, model, ok: false, error: errText(e) });
-    throw new Error(t.project.aiFailed);
+    await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "brief", provider: textModel(model).provider, model, ok: false, error: errText(e) });
+    throw new Error(e instanceof Error && e.message.includes("Gemini") ? e.message : t.project.aiFailed);
   }
   const { turn, usage } = result;
-  await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "brief", provider: BRAIN.provider, model, ok: true, usage });
+  await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "brief", provider: textModel(model).provider, model, ok: true, usage });
 
   await supabase.from("messages").insert({
     workspace_id: me.workspace.id,
@@ -252,7 +252,7 @@ export async function renameProject(projectId: string, name: string): Promise<Re
 
 // ---------- Stage 1 documents ----------
 
-export async function writeBriefDocuments(projectId: string): Promise<Result> {
+export async function writeBriefDocuments(projectId: string, instruction?: string): Promise<Result> {
   const { t, locale } = await getI18n();
   try {
     const { me, supabase, project, model } = await loadProject(projectId);
@@ -270,15 +270,30 @@ export async function writeBriefDocuments(projectId: string): Promise<Result> {
     try {
       const today = new Date().toISOString().slice(0, 10);
       const language = brief.language?.toLowerCase().includes("arab") || locale === "ar" ? "Arabic (Saudi), with names of deliverables in English where usual" : "English";
-      result = await writeStageOne(brief, project.path ?? project.path_suggested, today, language, model);
+      // A rewrite with an instruction revises the current documents instead of starting over.
+      let revise: { instruction: string; current: unknown } | undefined;
+      const clean = instruction?.trim().slice(0, 2000);
+      if (clean) {
+        const current: Record<number, unknown> = {};
+        for (const o of outs ?? []) {
+          if (o.current_version < 1) continue;
+          const { data: v } = await supabase.from("versions").select("content").eq("output_id", o.id).eq("version", o.current_version).maybeSingle();
+          current[o.number] = v?.content;
+        }
+        revise = { instruction: clean, current: { summary: current[3], strategy: current[4], pathway: current[5], cps_and_kickoff: current[6] } };
+      }
+      result = await writeStageOne(brief, project.path ?? project.path_suggested, today, language, model, revise);
     } catch (e) {
-      await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "stage1-docs", provider: BRAIN.provider, model, ok: false, error: errText(e) });
-      await supabase.from("outputs").update({ status: "failed" }).eq("project_id", projectId).in("number", [3, 4, 5, 6]);
+      await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "stage1-docs", provider: textModel(model).provider, model, ok: false, error: errText(e) });
+      // Keep earlier versions; only steps that never had one are marked failed.
+      for (const o of outs ?? []) {
+        await supabase.from("outputs").update({ status: o.current_version > 0 ? "ready" : "failed" }).eq("id", o.id);
+      }
       revalidatePath(`/p/${projectId}`);
-      return { error: t.project.aiFailed };
+      return { error: e instanceof Error && e.message.includes("Gemini") ? e.message : t.project.aiFailed };
     }
     const { docs, usage } = result;
-    await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "stage1-docs", provider: BRAIN.provider, model, ok: true, usage });
+    await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "stage1-docs", provider: textModel(model).provider, model, ok: true, usage });
 
     const content: Record<number, unknown> = {
       3: docs.summary,
@@ -332,6 +347,53 @@ export async function approveStage(projectId: string, stage: number): Promise<Re
       }
       await supabase.from("projects").update({ current_stage: next, updated_at: now }).eq("id", projectId);
     }
+  } catch (e) {
+    return { error: errText(e) };
+  }
+  revalidatePath(`/p/${projectId}`);
+  return {};
+}
+
+// ---------- Edits by people ----------
+
+// Saves a person's edit as a new version. The earlier version is kept and can be restored.
+export async function saveOutputEdit(projectId: string, number: number, content: unknown): Promise<Result> {
+  if (![3, 4, 5, 6].includes(number)) return { error: "This step can't be edited here." };
+  try {
+    const { me, supabase, project } = await loadProject(projectId);
+    if (project.current_stage !== 1) return { error: "This stage is approved. Changes come with a new version in a later milestone." };
+    const { data: o } = await supabase
+      .from("outputs")
+      .select("id, workspace_id, current_version")
+      .eq("project_id", projectId)
+      .eq("number", number)
+      .maybeSingle();
+    if (!o) return { error: "Step not found." };
+    await saveVersion(supabase, o, content, "edit", me.userId, null);
+  } catch (e) {
+    return { error: errText(e) };
+  }
+  revalidatePath(`/p/${projectId}`);
+  return {};
+}
+
+// The idea and story beats on the brief panel can be edited directly.
+export async function saveBriefIdea(projectId: string, logline: string, story: string[]): Promise<Result> {
+  try {
+    const { me, supabase, project } = await loadProject(projectId);
+    const brief = {
+      ...((project.brief ?? {}) as Record<string, unknown>),
+      logline: logline.trim().slice(0, 600) || null,
+      story: story.map((x) => x.trim()).filter(Boolean).slice(0, 12).map((x) => x.slice(0, 300)),
+    };
+    await supabase.from("projects").update({ brief, updated_at: new Date().toISOString() }).eq("id", projectId);
+    const { data: o } = await supabase
+      .from("outputs")
+      .select("id, workspace_id, current_version")
+      .eq("project_id", projectId)
+      .eq("number", 1)
+      .maybeSingle();
+    if (o) await saveVersion(supabase, o, { brief }, "edit", me.userId, null);
   } catch (e) {
     return { error: errText(e) };
   }

@@ -22,7 +22,7 @@ export async function AppFrame({ children, defaultOpen = true }: { children: Rea
         logo={<Logo height={20} />}
         mark={<Logo height={18} mark />}
         locale={locale}
-        labels={{ ...t.nav, ...t.frame, signOut: t.account.signOut, langSwitch: t.langSwitch, langSwitchLabel: t.langSwitchLabel, viewerNote: t.projects.viewerNote }}
+        labels={{ ...t.nav, ...t.frame, signOut: t.account.signOut, langSwitch: t.langSwitch, langSwitchLabel: t.langSwitchLabel, viewerNote: t.projects.viewerNote, account: t.settings.account, language: t.settings.language, soon: t.frame.soon }}
         workspaces={all.map((m) => m.workspace)}
         currentWorkspace={member?.workspace ?? null}
         canCreate={Boolean(member && ["admin", "producer"].includes(member.role))}
