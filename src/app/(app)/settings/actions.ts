@@ -105,3 +105,34 @@ export async function renameWorkspace(name: string): Promise<{ error?: string }>
   revalidatePath("/", "layout");
   return {};
 }
+
+// ---------- Memory ----------
+
+export async function setMemoryOn(on: boolean): Promise<{ error?: string }> {
+  const m = await getCurrentMember();
+  if (!m || m.role !== "admin") return { error: "Only an Admin can change this." };
+  const { error } = await createAdminClient().from("workspaces").update({ memory_on: on }).eq("id", m.workspace.id);
+  if (error) return { error: "Could not save. Try again." };
+  revalidatePath("/settings");
+  return {};
+}
+
+export async function addMemory(content: string): Promise<{ error?: string }> {
+  const m = await getCurrentMember();
+  if (!m || !["admin", "producer", "coordinator"].includes(m.role)) return { error: "Viewers can read memory but not change it." };
+  const clean = content.trim().slice(0, 300);
+  if (!clean) return {};
+  const { error } = await (await createClient()).from("memories").insert({ workspace_id: m.workspace.id, content: clean, source: "person" });
+  if (error) return { error: "Could not save. Try again." };
+  revalidatePath("/settings");
+  return {};
+}
+
+export async function removeMemory(id: string): Promise<{ error?: string }> {
+  const m = await getCurrentMember();
+  if (!m || !["admin", "producer", "coordinator"].includes(m.role)) return { error: "Viewers can read memory but not change it." };
+  const { error } = await (await createClient()).from("memories").delete().eq("id", id).eq("workspace_id", m.workspace.id);
+  if (error) return { error: "Could not remove it. Try again." };
+  revalidatePath("/settings");
+  return {};
+}

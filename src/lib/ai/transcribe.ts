@@ -149,3 +149,78 @@ async function transcribeWithKie(audio: Buffer, mimeType: string) {
     usage: { inputTokens, outputTokens, costUsd, seconds: Math.round((Date.now() - started) / 100) / 10 },
   };
 }
+
+// The same, but the words arrive as Gemini writes them, so they appear in the reply box
+// right away. Falls back to the normal call (with its own backups) if streaming fails before
+// any words came.
+export async function transcribeStreaming(audio: Buffer, mimeType: string, onText: (delta: string) => void, signal?: AbortSignal) {
+  const key = process.env.KIE_API_KEY;
+  const started = Date.now();
+  let got = "";
+  if (key) {
+    try {
+      const res = await fetch(`https://api.kie.ai/gemini/v1/models/${TRANSCRIBER.model}:streamGenerateContent`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        cache: "no-store",
+        signal: signal ? AbortSignal.any([AbortSignal.timeout(60_000), signal]) : AbortSignal.timeout(60_000),
+        body: JSON.stringify({
+          stream: true,
+          contents: [{ role: "user", parts: [{ inline_data: { mime_type: mimeType, data: audio.toString("base64") } }, { text: PROMPT }] }],
+          generationConfig: { thinkingConfig: { thinkingLevel: "minimal" } },
+        }),
+      });
+      if (res.ok && res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let usage: { promptTokenCount?: number; candidatesTokenCount?: number } | undefined;
+        let credits: number | undefined;
+        let failed = "";
+        const handle = (line: string) => {
+          const data = line.startsWith("data:") ? line.slice(5).trim() : line.trim();
+          if (!data || data === "[DONE]") return;
+          let c: { code?: number; msg?: string; credits_consumed?: number; usageMetadata?: typeof usage; candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[] };
+          try {
+            c = JSON.parse(data);
+          } catch {
+            return;
+          }
+          if (typeof c.code === "number" && c.code !== 200) failed = c.msg ?? `code ${c.code}`;
+          if (c.usageMetadata) usage = c.usageMetadata;
+          if (typeof c.credits_consumed === "number") credits = c.credits_consumed;
+          const text = (c.candidates?.[0]?.content?.parts ?? []).filter((p) => p.text && !p.thought).map((p) => p.text).join("");
+          if (text) {
+            got += text;
+            onText(text);
+          }
+        };
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          lines.forEach(handle);
+        }
+        handle(buffer);
+        if (got.trim()) {
+          const inputTokens = usage?.promptTokenCount ?? 0;
+          const outputTokens = usage?.candidatesTokenCount ?? 0;
+          const costUsd = credits != null
+            ? Math.round(credits * KIE_USD_PER_CREDIT * 10000) / 10000
+            : Math.round(((inputTokens + outputTokens) * TRANSCRIBER.usdPerMillion) / 1_000_000 * 10000) / 10000;
+          return { text: got.trim(), provider: "kie.ai", model: TRANSCRIBER.model, usage: { inputTokens, outputTokens, costUsd, seconds: Math.round((Date.now() - started) / 100) / 10 } };
+        }
+        // Nothing came back (for example the gateway refused a setting): use the normal call below.
+        void failed;
+      }
+    } catch (e) {
+      if (signal?.aborted) throw e;
+      if (got) throw e; // half a transcript: let the person try again rather than doubling words
+    }
+  }
+  const r = await transcribe(audio, mimeType);
+  onText(r.text);
+  return r;
+}

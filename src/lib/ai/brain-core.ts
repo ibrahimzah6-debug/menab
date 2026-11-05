@@ -20,7 +20,22 @@ export type Step =
   | { kind: "retrying"; model: string; reason: string }
   | { kind: "switching"; from: string; to: string; reason: string };
 
-type Opts = { effort: "low" | "medium"; maxTokens: number; onStep?: (s: Step) => void; timeoutMs?: number };
+type Opts = {
+  effort: "low" | "medium";
+  maxTokens: number;
+  onStep?: (s: Step) => void;
+  timeoutMs?: number;
+  // The person pressed Stop: every call ends at once and nothing is retried.
+  signal?: AbortSignal;
+};
+
+export class StoppedError extends Error {
+  constructor() {
+    super("Stopped");
+  }
+}
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const secondsSince = (t: number) => Math.round((Date.now() - t) / 100) / 10;
 
@@ -49,10 +64,14 @@ export async function structured<S extends z.ZodType>(
     try {
       return { ...(await once(m, system, messages, schema, opts, attempt ? firstError : "")), model: m.id };
     } catch (e) {
+      if (opts.signal?.aborted) throw new StoppedError();
       firstError = e instanceof Error ? e.message : String(e);
       if (/KIE_API_KEY|insufficient|credits/i.test(firstError)) throw e; // account problems: the backup can't help
+      // A busy provider often answers a moment later.
+      if (attempt === 0 && /tight|busy|overload|internal|try again/i.test(firstError)) await wait(1500);
     }
   }
+  if (opts.signal?.aborted) throw new StoppedError();
   const backup = textModel(backupFor(m));
   opts.onStep?.({ kind: "switching", from: m.name, to: backup.name, reason: firstError });
   const r = await once(backup, system, messages, schema, opts, "");
@@ -136,9 +155,10 @@ async function post(url: string, payload: unknown, opts: Opts, name: string) {
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       cache: "no-store",
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(opts.timeoutMs ?? 75_000),
+      signal: opts.signal ? AbortSignal.any([AbortSignal.timeout(opts.timeoutMs ?? 75_000), opts.signal]) : AbortSignal.timeout(opts.timeoutMs ?? 75_000),
     });
   } catch (e) {
+    if (opts.signal?.aborted) throw new StoppedError();
     if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) throw new Error(`${name} took too long to answer`);
     throw new Error(`${name} could not be reached`);
   }
@@ -153,7 +173,10 @@ async function kieClaude<S extends z.ZodType>(m: TextModel, system: string, mess
     {
       model: m.id,
       max_tokens: opts.maxTokens,
-      stream: false,
+      // Streaming is Kie.ai's normal mode for Claude and holds up better under load than one
+      // long wait; thinking is off for chat turns and on for the documents.
+      stream: true,
+      thinkingFlag: opts.effort !== "low",
       system: `${system}\n\nAlways answer by calling the submit tool exactly once, with every field filled.`,
       tools: [{ name: "submit", description: "Submit your complete answer.", input_schema: jsonSchema(schema) }],
       messages: messages.map((x) => ({
@@ -173,15 +196,7 @@ async function kieClaude<S extends z.ZodType>(m: TextModel, system: string, mess
     opts,
     m.name,
   );
-  const body = (await res.json().catch(() => null)) as {
-    code?: number;
-    msg?: string;
-    error?: { message?: string };
-    stop_reason?: string;
-    content?: { type: string; name?: string; input?: unknown; text?: string }[];
-    usage?: { input_tokens?: number; output_tokens?: number };
-    credits_consumed?: number;
-  } | null;
+  const body = await readClaude(res, opts);
   if (!res.ok || !body || (typeof body.code === "number" && body.code !== 200) || body.error) {
     throw new Error(`${m.name}: ${body?.msg ?? body?.error?.message ?? `HTTP ${res.status}`}`);
   }
@@ -269,4 +284,87 @@ async function kieGpt<S extends z.ZodType>(m: TextModel, system: string, message
     ? Math.round(body.credits_consumed * KIE_USD_PER_CREDIT * 10000) / 10000
     : estimateCost(m, input, output);
   return { data, usage: { inputTokens: input, outputTokens: output, costUsd, seconds: secondsSince(started) } };
+}
+
+type ClaudeBody = {
+  code?: number;
+  msg?: string;
+  error?: { message?: string };
+  stop_reason?: string;
+  content?: { type: string; name?: string; input?: unknown; text?: string }[];
+  usage?: { input_tokens?: number; output_tokens?: number };
+  credits_consumed?: number;
+};
+
+// Reads Claude's answer, streamed (server-sent events) or as one JSON, into one shape.
+async function readClaude(res: Response, opts: Opts): Promise<ClaudeBody | null> {
+  const type = res.headers.get("content-type") ?? "";
+  if (!type.includes("event-stream") || !res.body) {
+    const raw = await res.text();
+    try {
+      return JSON.parse(raw) as ClaudeBody;
+    } catch {
+      return null;
+    }
+  }
+  const out: ClaudeBody = { content: [], usage: {} };
+  const blocks: { type: string; name?: string; text: string; json: string }[] = [];
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const handle = (data: string) => {
+    let e: Record<string, unknown>;
+    try {
+      e = JSON.parse(data);
+    } catch {
+      return;
+    }
+    if (typeof e.code === "number" && e.code !== 200) Object.assign(out, { code: e.code, msg: e.msg });
+    if (e.error) out.error = e.error as ClaudeBody["error"];
+    if (typeof e.credits_consumed === "number") out.credits_consumed = e.credits_consumed;
+    const t = e.type;
+    if (t === "message_start") {
+      const u = (e.message as { usage?: ClaudeBody["usage"] })?.usage;
+      if (u?.input_tokens) out.usage!.input_tokens = u.input_tokens;
+    } else if (t === "content_block_start") {
+      const b = e.content_block as { type: string; name?: string; text?: string };
+      blocks[e.index as number] = { type: b.type, name: b.name, text: b.text ?? "", json: "" };
+    } else if (t === "content_block_delta") {
+      const b = blocks[e.index as number];
+      const d = e.delta as { type: string; text?: string; partial_json?: string };
+      if (!b) return;
+      if (d.type === "text_delta") b.text += d.text ?? "";
+      if (d.type === "input_json_delta") b.json += d.partial_json ?? "";
+    } else if (t === "message_delta") {
+      const d = e.delta as { stop_reason?: string };
+      if (d?.stop_reason) out.stop_reason = d.stop_reason;
+      const u = e.usage as ClaudeBody["usage"];
+      if (u?.output_tokens) out.usage!.output_tokens = u.output_tokens;
+      if (u?.input_tokens) out.usage!.input_tokens = u.input_tokens;
+    }
+  };
+  for (;;) {
+    if (opts.signal?.aborted) {
+      reader.cancel().catch(() => {});
+      throw new StoppedError();
+    }
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) if (line.startsWith("data:")) handle(line.slice(5).trim());
+  }
+  if (buffer.startsWith("data:")) handle(buffer.slice(5).trim());
+  out.content = blocks.filter(Boolean).map((b) => {
+    if (b.type !== "tool_use") return { type: b.type, text: b.text };
+    let input: unknown;
+    try {
+      input = b.json ? JSON.parse(b.json) : undefined;
+    } catch {
+      input = undefined;
+    }
+    return { type: "tool_use", name: b.name, input };
+  });
+  return out;
 }
