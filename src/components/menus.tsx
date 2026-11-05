@@ -104,16 +104,27 @@ export function LanguageMenu({ locale, label, soon, compact, placement = "up" }:
 
 export function PersonMenu({
   person,
+  email,
   role,
+  photo,
   compact,
   labels,
 }: {
   person: string;
+  email?: string;
   role: string;
+  photo?: string;
   compact: boolean;
-  labels: { settings: string; signOut: string; account: string };
+  labels: { settings: string; signOut: string; account: string; usage: string; help: string; language: string };
 }) {
   const { open, setOpen, props } = usePopup();
+  const item = "flex items-center gap-2.5 px-2.5 h-9 rounded-sm small hover:bg-tint-2 text-start w-full";
+  const avatar = (size: number) => (
+    <span className="rounded-full bg-tint-3 grid place-items-center font-medium shrink-0 overflow-hidden" style={{ width: size, height: size, fontSize: size * 0.42 }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {photo ? <img src={photo} alt="" className="w-full h-full object-cover" /> : person.slice(0, 1).toUpperCase()}
+    </span>
+  );
   return (
     <div className={`relative ${compact ? "" : "grow min-w-0"}`} {...props}>
       <button
@@ -125,9 +136,7 @@ export function PersonMenu({
         title={compact ? person : undefined}
         onClick={() => setOpen((v) => !v)}
       >
-        <span className="w-7 h-7 rounded-full bg-tint-3 grid place-items-center text-[12px] font-medium shrink-0">
-          {person.slice(0, 1).toUpperCase()}
-        </span>
+        {avatar(28)}
         {!compact && (
           <span className="flex flex-col min-w-0">
             <span className="small truncate" dir="auto">{person}</span>
@@ -136,13 +145,34 @@ export function PersonMenu({
         )}
       </button>
       {open && (
-        <div role="menu" className={`${popup} bottom-full mb-2 start-0 w-[220px]`} style={{ boxShadow: "var(--shadow-float)" }}>
-          <Link role="menuitem" href="/settings" className="flex items-center gap-2 px-2.5 h-9 rounded-sm small hover:bg-tint-2">
+        <div role="menu" className={`${popup} bottom-full mb-2 start-0 w-[248px]`} style={{ boxShadow: "var(--shadow-float)" }}>
+          {email && (
+            <div className="px-2.5 py-2 flex items-center gap-2.5 border-b border-line mb-1">
+              {avatar(32)}
+              <span className="flex flex-col min-w-0">
+                <span className="small font-medium truncate" dir="auto">{person}</span>
+                <span className="text-[12px] text-ink-faint truncate" dir="ltr" style={{ textAlign: "start" }}>{email}</span>
+              </span>
+            </div>
+          )}
+          <Link role="menuitem" href="/settings" className={item}>
             <IconSettings size={16} />
             {labels.settings}
           </Link>
-          <form action="/auth/signout" method="post">
-            <button role="menuitem" className="w-full flex items-center gap-2 px-2.5 h-9 rounded-sm small hover:bg-tint-2 text-start">
+          <Link role="menuitem" href="/settings?s=usage" className={item}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg>
+            {labels.usage}
+          </Link>
+          <Link role="menuitem" href="/settings?s=language" className={item}>
+            <IconGlobe size={16} />
+            {labels.language}
+          </Link>
+          <Link role="menuitem" href="/settings?s=help" className={item}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01" /></svg>
+            {labels.help}
+          </Link>
+          <form action="/auth/signout" method="post" className="border-t border-line mt-1 pt-1">
+            <button role="menuitem" className={item}>
               <IconLogout size={16} />
               {labels.signOut}
             </button>

@@ -1,4 +1,7 @@
+import { after } from "next/server";
 import { cookies } from "next/headers";
+import { warmTranslations } from "@/lib/i18n/translate";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { getI18n } from "@/lib/i18n/server";
 import { getCurrentMember, getMemberships, getUserEmail } from "@/lib/workspace";
@@ -16,9 +19,21 @@ export async function AppFrame({ children, defaultOpen = false }: { children: Re
   const all = await getMemberships();
   const saved = (await cookies()).get("menab-menu")?.value;
   const open = saved ? saved === "open" : defaultOpen;
+  // The profile photo, through a short-lived link.
+  let photo: string | undefined;
+  if (member?.avatarPath) {
+    try {
+      const { data } = await createAdminClient().storage.from("media").createSignedUrl(member.avatarPath, 3600);
+      photo = data?.signedUrl;
+    } catch {
+      photo = undefined;
+    }
+  }
+  // After the page is sent, prepare a couple of languages nobody has picked yet.
+  after(() => warmTranslations(2));
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row">
+    <div className="min-h-screen flex flex-col md:flex-row" data-menu={open ? "open" : "closed"}>
       <Sidebar
         initialOpen={open}
         logo={<Logo height={20} />}
@@ -29,6 +44,8 @@ export async function AppFrame({ children, defaultOpen = false }: { children: Re
         currentWorkspace={member?.workspace ?? null}
         canCreate={Boolean(member && ["admin", "producer"].includes(member.role))}
         person={member?.fullName || email}
+        email={email}
+        photo={photo}
         role={member ? t.roles[member.role] : ""}
         isOwner={await isPlatformAdmin()}
       />

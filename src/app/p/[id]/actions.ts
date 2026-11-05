@@ -18,14 +18,42 @@ const errText = (e: unknown) => (e instanceof Error ? e.message : "Something wen
 
 // ---------- Create ----------
 
-export async function createProject() {
+// Starting briefs for the templates (mvp-definition.md: Commercial with Ramadan ad, product
+// launch and event recap). The brief chat continues from here.
+const PRESETS = {
+  ramadan: { length_seconds: 30, cutdowns: ["15 sec", "6 sec"], formats: ["16:9 TV and YouTube", "9:16 Instagram and TikTok"], real_products: "unknown", real_people: "unknown", feeling: { en: "Warm, emotional, family", ar: "دافئ وعاطفي وعائلي" }, objective: { en: "A Ramadan brand film that ties the brand to family moments", ar: "فيلم رمضاني يربط العلامة بلحظات العيلة" } },
+  launch: { length_seconds: 30, cutdowns: ["15 sec", "6 sec"], formats: ["16:9 YouTube", "9:16 Instagram and TikTok", "1:1 feed"], real_products: "yes", real_people: "unknown", feeling: null, objective: { en: "Launch a new product: what it is, what it does and why now", ar: "إطلاق منتج جديد: وش هو ووش يسوي وليش الحين" } },
+  event: { length_seconds: 60, cutdowns: ["15 sec teaser"], formats: ["16:9 YouTube", "9:16 Instagram and TikTok"], real_products: "unknown", real_people: "yes", feeling: { en: "Energetic, cut to music", ar: "حماسي ومقطّع على الموسيقى" }, objective: { en: "Recap the best moments of an event", ar: "ملخص لأحلى لحظات الفعالية" } },
+} as const;
+type Preset = keyof typeof PRESETS;
+
+export async function createProject(form?: FormData) {
   const me = await getCurrentMember();
   if (!me || !["admin", "producer"].includes(me.role)) redirect("/projects");
-  const { t } = await getI18n();
+  const { t, locale } = await getI18n();
+  const asked = form?.get("preset");
+  const preset = typeof asked === "string" && asked in PRESETS ? (asked as Preset) : null;
   const supabase = await createClient();
+  const p = preset ? PRESETS[preset] : null;
+  const brief = p
+    ? {
+        project_name: t.templates.preset[preset!].name,
+        objective: p.objective[locale],
+        feeling: p.feeling ? p.feeling[locale] : null,
+        length_seconds: p.length_seconds,
+        cutdowns: [...p.cutdowns],
+        formats: [...p.formats],
+        real_products: p.real_products,
+        real_people: p.real_people,
+        story: [],
+        must_show: [],
+        references: [],
+        locations: [],
+      }
+    : undefined;
   const { data: project, error } = await supabase
     .from("projects")
-    .insert({ workspace_id: me.workspace.id, name: t.project.untitled, created_by: me.userId })
+    .insert({ workspace_id: me.workspace.id, name: preset ? t.templates.preset[preset].name : t.project.untitled, created_by: me.userId, ...(brief ? { brief } : {}) })
     .select("id")
     .single();
   if (error || !project) redirect("/projects?error=create");
@@ -41,6 +69,15 @@ export async function createProject() {
   await supabase.from("outputs").insert(
     STAGE_OUTPUTS[1].map((n) => ({ workspace_id: me.workspace.id, project_id: project.id, stage: 1, number: n })),
   );
+  if (preset) {
+    await supabase.from("messages").insert({
+      workspace_id: me.workspace.id,
+      project_id: project.id,
+      role: "assistant",
+      content: t.templates.preset[preset].opening,
+      created_by: me.userId,
+    });
+  }
   redirect(`/p/${project.id}`);
 }
 

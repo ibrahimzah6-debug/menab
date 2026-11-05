@@ -96,3 +96,14 @@ Replaces B4.
 - **Voice:** Gemini 3.8 Flash through Kie.ai first (paid, a fraction of a cent, reliable), tried twice; Google's free tier is the last backup. The free tier answered "high demand" to every voice note.
 - **Board:** a canvas. Drag empty space to move, scroll to pan, zoom with the buttons or Ctrl and the wheel.
 - **Strategy and deliverables:** tone, length, ratio and platform are dropdowns with "Other…" to type your own; platforms are chips you switch on and off.
+
+## B13. Libraries, templates, settings, workspaces, ready languages (Ibrahim, 6 Nov 2026)
+
+- **Libraries** (information-architecture.md, system-architecture.md): brand kits (logo, colors, fonts, tone, notes), characters (photos, age, who they are, look, wardrobe, voice), locations (photos, city, real or AI, notes) and files (logos, product photos, references, music, footage, documents). Tables `brand_kits`, `characters`, `locations`, `assets`, RLS per workspace. Files go straight to the private `media` bucket under `<workspace>/library/`. Locking a copy into a project comes with M4 (Look and characters).
+- **Templates** (mvp-definition.md): Commercial with three ready setups: Ramadan ad, product launch, event recap. Starting one creates a project with the brief already holding length, cutdowns, formats and objective, and an opening message from Menab AI. Document templates are listed with the stage that writes them.
+- **Settings** in sections, like Claude: Account (photo, name, password), Workspace, Appearance, Language (all 13), AI models, Notifications, Usage, Get help. The menu under the person's name: Settings, Usage, Language, Get help, Log out. Profile photo in `members.avatar_path`.
+- **New workspace:** owners (platform admins) add a workspace from the switcher and join it as Admin. One workspace per company stays the rule.
+- **Languages ready ahead:** after each page view, two missing languages are translated in the background (Gemini through Kie.ai), so picking any language switches at once. Google's free tier had refused every translation.
+- **Board zoom** scales the layout as it is; the columns no longer change.
+- **Stage screen with the menu open:** the steps and the right panel get narrower and their text smaller; the middle keeps its room.
+- **Voice:** transcription runs with thinking turned off, to answer faster.

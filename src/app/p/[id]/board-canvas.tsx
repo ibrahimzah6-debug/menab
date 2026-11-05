@@ -6,7 +6,8 @@ const MIN = 0.4;
 const MAX = 2;
 
 // The board as a canvas: drag the empty space to move around, scroll to pan, and zoom with
-// the buttons or Ctrl (Cmd on Mac) and the mouse wheel. Cards stay editable inside it.
+// the buttons or Ctrl (Cmd on Mac) and the mouse wheel. Zooming scales the layout as it is;
+// the columns never change. Cards stay editable inside it.
 export function BoardCanvas({ children, labels }: { children: React.ReactNode; labels: { zoomIn: string; zoomOut: string; reset: string } }) {
   const ref = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
@@ -71,7 +72,7 @@ export function BoardCanvas({ children, labels }: { children: React.ReactNode; l
     >
       <div
         className="absolute top-0 left-0 p-6 select-text"
-        style={{ width: `${100 / zoom}%`, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: "0 0" }}
+        style={{ width: "100%", transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: "0 0" }}
       >
         <div className="flex flex-wrap gap-6 content-start" dir={rtl ? "rtl" : "ltr"}>{children}</div>
       </div>

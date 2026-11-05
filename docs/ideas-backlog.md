@@ -21,3 +21,5 @@ Ideas that come up while testing. None of these are in scope until Ibrahim decid
 | I15 | Departments and partner companies in a workspace (art company, production services company) beside the roles | Ibrahim, 5 Nov | Later | Roles stay as they are for now |
 | I16 | More owner tools for development (logs, prompts, model tests) on the owner dashboard | Ibrahim, 5 Nov | Later | Owner dashboard is limited to `platform_admins` |
 | I17 | Connectors and plugins under "+" in the reply box | Ibrahim, 5 Nov | Later | Shown as Soon |
+| I18 | Billing, plans and upgrades in Settings | Ibrahim, 6 Nov | Later | With credits and top-up (M5 and after) |
+| I19 | Apps and extensions, API keys, guest passes in the person menu | Ibrahim, 6 Nov | Later | Not in the docs yet |

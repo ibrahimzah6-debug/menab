@@ -72,25 +72,35 @@ async function transcribeWithKie(audio: Buffer, mimeType: string) {
   const key = process.env.KIE_API_KEY;
   if (!key) throw new Error("KIE_API_KEY is not set in Vercel");
   const started = Date.now();
-  const res = await fetch(`https://api.kie.ai/gemini/v1/models/${TRANSCRIBER.model}:streamGenerateContent`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    cache: "no-store",
-    signal: AbortSignal.timeout(60_000),
-    body: JSON.stringify({
-      stream: false,
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { inline_data: { mime_type: mimeType, data: audio.toString("base64") } },
-            { text: PROMPT },
-          ],
-        },
-      ],
-    }),
-  });
-  const raw = await res.text();
+  // Thinking is turned off: writing down what was said needs no reasoning, and it roughly
+  // halves the wait. If the gateway refuses the setting, ask again without it.
+  const call = (fast: boolean) =>
+    fetch(`https://api.kie.ai/gemini/v1/models/${TRANSCRIBER.model}:streamGenerateContent`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(60_000),
+      body: JSON.stringify({
+        stream: false,
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { inline_data: { mime_type: mimeType, data: audio.toString("base64") } },
+              { text: PROMPT },
+            ],
+          },
+        ],
+        ...(fast ? { generationConfig: { thinkingConfig: { thinkingLevel: "minimal" } } } : {}),
+      }),
+    });
+  let res = await call(true);
+  let raw = await res.text();
+  // Kie.ai can report a refused setting with HTTP 200 and a code in the body.
+  if (res.status === 400 || res.status === 422 || /"code"\s*:\s*4(00|22)\b/.test(raw.slice(0, 300))) {
+    res = await call(false);
+    raw = await res.text();
+  }
   let body: unknown;
   try {
     body = JSON.parse(raw);

@@ -195,7 +195,7 @@ export default async function ProjectPage({
               );
             })}
           </BoardCanvas>
-          <aside className="relative w-full md:w-[320px] shrink-0 md:min-h-0 md:overflow-y-auto bg-surface border border-line rounded-lg p-4 flex flex-col gap-3 self-start">
+          <aside className="stage-side relative w-full md:w-[320px] shrink-0 md:min-h-0 md:overflow-y-auto bg-surface border border-line rounded-lg p-4 flex flex-col gap-3 self-start">
             <h2 className="m-0 text-[16px] font-medium">{t.stage.assistant}</h2>
             <div className="flex flex-col gap-1.5">
               <span className="mn-label">{p.model}</span>
@@ -209,7 +209,7 @@ export default async function ProjectPage({
       ) : (
         <main className="flex-1 min-h-0 px-4 md:px-6 pb-4 flex flex-col md:flex-row gap-4">
           {/* Steps of the stage */}
-          <nav aria-label={t.stage.outputsLabel} className="relative w-full md:w-[248px] shrink-0 md:min-h-0 md:overflow-y-auto self-start md:max-h-full bg-ground-deep border border-line rounded-lg p-3 flex flex-col gap-1">
+          <nav aria-label={t.stage.outputsLabel} className="stage-steps relative w-full md:w-[248px] shrink-0 md:min-h-0 md:overflow-y-auto self-start md:max-h-full bg-ground-deep border border-line rounded-lg p-3 flex flex-col gap-1">
             <span className="mn-label p-2">{fill(t.stage.outputsCount, { n: order.indexOf(showing) + 1, count: list.length })}</span>
             {list.map((x) => {
               const st = statusOf(x.number);
@@ -278,7 +278,7 @@ export default async function ProjectPage({
           )}
 
           {/* Right panel: the brief while talking, the assistant on documents */}
-          <aside className="relative w-full md:w-[320px] lg:w-[340px] shrink-0 md:min-h-0 md:overflow-y-auto flex flex-col gap-4">
+          <aside className="stage-side relative w-full md:w-[320px] lg:w-[340px] shrink-0 md:min-h-0 md:overflow-y-auto flex flex-col gap-4">
             {showing === 1 && open === 1 ? (
               <>
                 <BriefPanel brief={brief} p={p} missing={missing} projectId={id} editable={editableHere} />

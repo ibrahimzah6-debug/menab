@@ -59,8 +59,8 @@ export async function ensureTranslation(locale: string): Promise<{ ok: boolean; 
   const lang = MACHINE_LOCALES[locale];
   if (!lang) return { ok: false, error: "Unknown language" };
   if (await storedTranslation(locale)) return { ok: true };
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) return { ok: false, error: "GEMINI_API_KEY is not set in Vercel" };
+  const key = process.env.GEMINI_API_KEY ?? "";
+  if (!key && !process.env.KIE_API_KEY) return { ok: false, error: "KIE_API_KEY is not set in Vercel" };
 
   // The dictionary is translated in small parts, a few at a time, so one long answer can't
   // time out or come back cut off. A part that fails is tried once more.
@@ -104,11 +104,62 @@ Rules:
 
 JSON:
 ${JSON.stringify(part)}`;
+  // Gemini through Kie.ai first (reliable); Google's free tier only as the backup.
+  const errors: string[] = [];
+  if (process.env.KIE_API_KEY) {
+    try {
+      return await viaKie(prompt, process.env.KIE_API_KEY);
+    } catch (e) {
+      errors.push(e instanceof Error ? e.message : String(e));
+    }
+  }
+  if (key) {
+    try {
+      return await viaGoogle(prompt, key);
+    } catch (e) {
+      errors.push(e instanceof Error ? e.message : String(e));
+    }
+  }
+  throw new Error(errors.join(" | ") || "No translation model is set up");
+}
+
+const parseJson = (text: string) => JSON.parse(text.replace(/^\s*```(json)?|```\s*$/g, "").trim()) as Record<string, unknown>;
+
+async function viaKie(prompt: string, key: string) {
+  const res = await fetch("https://api.kie.ai/gemini/v1/models/gemini-3-8-flash:streamGenerateContent", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    cache: "no-store",
+    signal: AbortSignal.timeout(120_000),
+    body: JSON.stringify({
+      stream: false,
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json", maxOutputTokens: 16000 },
+    }),
+  });
+  const raw = await res.text();
+  let chunks: unknown[];
+  try {
+    const j = JSON.parse(raw);
+    chunks = Array.isArray(j) ? j : [j];
+  } catch {
+    chunks = raw.split("\n").filter((l) => l.startsWith("data:")).map((l) => { try { return JSON.parse(l.slice(5)); } catch { return null; } }).filter(Boolean);
+  }
+  type Chunk = { code?: number; msg?: string; candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[] };
+  const list = chunks as Chunk[];
+  const err = list.find((c) => c && typeof c.code === "number" && c.code !== 200);
+  if (!res.ok || err) throw new Error(`Kie.ai translation: ${err?.msg ?? `HTTP ${res.status}`}`);
+  const text = list.flatMap((c) => c?.candidates?.[0]?.content?.parts ?? []).filter((p) => p.text && !p.thought).map((p) => p.text).join("");
+  return parseJson(text);
+}
+
+async function viaGoogle(prompt: string, key: string) {
   const model = process.env.GEMINI_MODEL || "gemini-3.8-flash";
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: "POST",
     headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
     cache: "no-store",
+    signal: AbortSignal.timeout(120_000),
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: { responseMimeType: "application/json", maxOutputTokens: 16000 },
@@ -120,5 +171,23 @@ ${JSON.stringify(part)}`;
   } | null;
   if (!res.ok || !json || json.error) throw new Error(json?.error?.message ?? `HTTP ${res.status}`);
   const text = (json.candidates?.[0]?.content?.parts ?? []).filter((p) => p.text && !p.thought).map((p) => p.text).join("");
-  return JSON.parse(text.replace(/^```(json)?|```$/g, "").trim()) as Record<string, unknown>;
+  return parseJson(text);
+}
+
+// Prepares languages nobody has picked yet, a couple at a time, in the background after a page
+// is shown. Once ready, switching to them is instant.
+let warming = false;
+export async function warmTranslations(max = 2) {
+  if (warming || (!process.env.KIE_API_KEY && !process.env.GEMINI_API_KEY)) return;
+  warming = true;
+  try {
+    const { data } = await createAdminClient().from("translations").select("locale").eq("version", DICTIONARY_VERSION);
+    const done = new Set((data ?? []).map((r) => r.locale as string));
+    const missing = Object.keys(MACHINE_LOCALES).filter((l) => !done.has(l)).slice(0, max);
+    for (const l of missing) await ensureTranslation(l);
+  } catch {
+    // Not urgent: the next page view tries again.
+  } finally {
+    warming = false;
+  }
 }
