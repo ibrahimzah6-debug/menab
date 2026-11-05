@@ -8,10 +8,11 @@ import { createClient } from "@/lib/supabase/server";
 import { workspaceUsage } from "@/lib/usage";
 import { getCurrentMember } from "@/lib/workspace";
 import { LanguageList, PasswordForm, ProfileForm, WorkspaceForm } from "./account-forms";
+import { MemoryPanel } from "./memory";
 import { DefaultModel } from "./models";
 import { ThemeChoice } from "./theme-choice";
 
-const SECTIONS = ["account", "workspace", "appearance", "language", "models", "notifications", "usage", "help"] as const;
+const SECTIONS = ["account", "workspace", "appearance", "language", "models", "memory", "notifications", "usage", "help"] as const;
 type Section = (typeof SECTIONS)[number];
 
 // Settings with its own side list of sections, like Claude's: account first, then the
@@ -45,6 +46,13 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     section === "notifications" && member
       ? (await supabase.from("notifications").select("id, title, body, created_at").eq("workspace_id", member.workspace.id).order("created_at", { ascending: false }).limit(12)).data ?? []
       : [];
+  const memory =
+    section === "memory" && member
+      ? {
+          on: (await supabase.from("workspaces").select("memory_on").eq("id", member.workspace.id).maybeSingle()).data?.memory_on !== false,
+          items: (await supabase.from("memories").select("id, content, source").eq("workspace_id", member.workspace.id).order("created_at", { ascending: false }).limit(100)).data ?? [],
+        }
+      : null;
   const usage = section === "usage" && member ? await workspaceUsage(member.workspace.id, 30) : null;
   const spent = usage ? usage.jobs.reduce((n, j) => n + Number(j.cost_usd ?? 0), 0) : 0;
   const themeCookie = (await cookies()).get("menab-theme")?.value;
@@ -173,6 +181,13 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 </section>
               )}
             </>
+          )}
+
+          {section === "memory" && member && memory && (
+            <section className={card}>
+              <p className="small text-ink-muted m-0">{s.memoryBody}</p>
+              <MemoryPanel on={memory.on} items={memory.items} canEdit={member.role !== "viewer"} isAdmin={member.role === "admin"} c={s.memory} />
+            </section>
           )}
 
           {section === "notifications" && (

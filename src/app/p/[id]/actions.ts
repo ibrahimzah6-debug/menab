@@ -218,7 +218,12 @@ export async function writeBriefDocuments(projectId: string, instruction?: strin
         }
         revise = { instruction: clean, current: { summary: current[3], strategy: current[4], pathway: current[5], cps_and_kickoff: current[6] } };
       }
-      result = await writeStageOne(brief, project.path ?? project.path_suggested, today, language, model, revise);
+      // Workspace memory (Settings, Memory), unless it is turned off.
+      const { data: ws } = await supabase.from("workspaces").select("memory_on").eq("id", project.workspace_id).maybeSingle();
+      const memory = ws?.memory_on === false
+        ? []
+        : ((await supabase.from("memories").select("content").eq("workspace_id", project.workspace_id).order("created_at", { ascending: false }).limit(40)).data ?? []).map((r) => r.content as string);
+      result = await writeStageOne(brief, project.path ?? project.path_suggested, today, language, model, revise, undefined, memory);
     } catch (e) {
       await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "stage1-docs", provider: textModel(model).provider, model, ok: false, error: errText(e) });
       // Keep earlier versions; only steps that never had one are marked failed.

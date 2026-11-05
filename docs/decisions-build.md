@@ -107,3 +107,11 @@ Replaces B4.
 - **Board zoom** scales the layout as it is; the columns no longer change.
 - **Stage screen with the menu open:** the steps and the right panel get narrower and their text smaller; the middle keeps its room.
 - **Voice:** transcription runs with thinking turned off, to answer faster.
+
+## B14. Stop, steps that stay, memory, Claude streaming, live voice (Ibrahim, 6 Nov 2026)
+
+- **Claude through Kie.ai failed every time** ("Resources are tight", "Internal error", too slow), so GPT took over. Claude now streams (Kie.ai's default mode), thinking is off for chat replies and on for the documents, and a busy answer waits 1.5 seconds before the retry.
+- **Stop:** while Menab works, Send becomes Stop. Stopping ends the model call on the server, saves nothing, and puts the message back in the box. Voice notes can be stopped the same way.
+- **Steps on one line:** the words change as Menab works; pressing the line shows every step. After the reply the line stays above the answer ("Worked for 9 sec with GPT 6.1 Sol") and opens the same list. Saved in `messages.steps`.
+- **Memory** (Ibrahim's request; not in the original docs): Menab keeps lasting facts about a company and its team (`memories`, per workspace) and reads them on every brief turn and on the stage documents. It suggests at most two new facts per turn, shown as a step; people add their own and remove any in Settings, Memory. An Admin can turn memory off (`workspaces.memory_on`). Never IDs or private personal data.
+- **Voice:** the words stream into the reply box as Gemini writes them (`/p/[id]/voice`), so they show up sooner.

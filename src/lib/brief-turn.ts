@@ -1,5 +1,6 @@
 import "server-only";
 import { briefTurn, missingRequired, type Attachment, type BriefFields, type Step } from "@/lib/ai/brain";
+import { StoppedError } from "@/lib/ai/brain-core";
 import { DEFAULT_TEXT_MODEL, textModel } from "@/lib/ai/catalog";
 import { getI18n } from "@/lib/i18n/server";
 import { logAiJob, notify, saveVersion } from "@/lib/projects";
@@ -65,13 +66,23 @@ export type BriefEvent =
   | { t: "switch"; from: string; to: string }
   | { t: "fields"; keys: string[] }
   | { t: "path"; path: string }
+  | { t: "memory"; items: string[] }
   | { t: "save" }
   | { t: "done" }
   | { t: "error"; message: string };
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
-export async function runBriefMessage(projectId: string, payload: BriefPayload, emit: (e: BriefEvent) => void) {
+// Steps saved with the reply, so the person can open "what Menab did" afterwards.
+export type SavedSteps = { events: BriefEvent[]; seconds: number; model: string };
+
+export async function runBriefMessage(projectId: string, payload: BriefPayload, send: (e: BriefEvent) => void, signal?: AbortSignal) {
+  const started = Date.now();
+  const events: BriefEvent[] = [];
+  const emit = (e: BriefEvent) => {
+    events.push(e);
+    send(e);
+  };
   const clean = payload.text.trim().slice(0, 8000);
   const list = (payload.files ?? []).slice(0, 5);
   if (!clean && !list.length) return;
@@ -104,6 +115,13 @@ export async function runBriefMessage(projectId: string, payload: BriefPayload, 
     else emit({ t: "switch", from: s.from, to: s.to });
   };
 
+  // What Menab remembers about this company (Settings, Memory), unless it is turned off.
+  const { data: ws } = await supabase.from("workspaces").select("memory_on").eq("id", project.workspace_id).maybeSingle();
+  const memoryOn = ws?.memory_on !== false;
+  const memory = memoryOn
+    ? ((await supabase.from("memories").select("content").eq("workspace_id", project.workspace_id).order("created_at", { ascending: false }).limit(40)).data ?? []).map((r) => r.content as string)
+    : [];
+
   const before = (project.brief ?? {}) as Partial<BriefFields>;
   let result;
   try {
@@ -115,12 +133,16 @@ export async function runBriefMessage(projectId: string, payload: BriefPayload, 
       before,
       model,
       onStep,
+      { signal, memory },
     );
   } catch (e) {
+    if (signal?.aborted || e instanceof StoppedError) throw new StoppedError();
     await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "brief", provider: textModel(model).provider, model, ok: false, error: errText(e) });
     await notify({ workspaceId: me.workspace.id, projectId, kind: "ai_failed", title: `${textModel(model).name} and its backup did not answer a brief message`, body: errText(e) });
     throw new Error(t.project.aiFailed);
   }
+  // Stopped while the answer came in: keep nothing.
+  if (signal?.aborted) throw new StoppedError();
   const { turn, usage } = result;
   const used = result.model;
   await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "brief", provider: textModel(used).provider, model: used, ok: true, usage, fallbackFrom: result.fallbackFrom });
@@ -129,7 +151,17 @@ export async function runBriefMessage(projectId: string, payload: BriefPayload, 
   const changed = (Object.keys(turn.brief) as (keyof BriefFields)[]).filter((k) => k !== "project_name" && !same(before[k], turn.brief[k]));
   if (changed.length) emit({ t: "fields", keys: changed });
   if (turn.path.suggested && turn.path.suggested !== project.path_suggested) emit({ t: "path", path: turn.path.suggested });
+  // New lasting facts, skipping ones Menab already knows.
+  if (memoryOn && turn.remember.length) {
+    const known = new Set(memory.map((m) => m.toLowerCase()));
+    const fresh = turn.remember.filter((m) => !known.has(m.toLowerCase())).map((m) => m.slice(0, 300));
+    if (fresh.length) {
+      await supabase.from("memories").insert(fresh.map((content) => ({ workspace_id: me.workspace.id, content, source: "ai", project_id: projectId })));
+      emit({ t: "memory", items: fresh });
+    }
+  }
   emit({ t: "save" });
+  const steps: SavedSteps = { events: [...events], seconds: Math.round((Date.now() - started) / 100) / 10, model: textModel(used).name };
 
   await supabase.from("messages").insert({
     workspace_id: me.workspace.id,
@@ -147,6 +179,7 @@ export async function runBriefMessage(projectId: string, payload: BriefPayload, 
     project_id: projectId,
     role: "assistant",
     content: turn.reply.slice(0, 20000),
+    steps,
     created_by: me.userId,
   });
 

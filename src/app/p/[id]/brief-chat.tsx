@@ -6,7 +6,7 @@ import { IconMic, IconPlus } from "@/components/icons";
 import { MenabLoader } from "@/components/menab-loader";
 import { browserClient } from "@/lib/supabase/client";
 import { startWavRecorder, type WavRecorder } from "@/lib/wav-recorder";
-import { chooseTextModel, prepareUpload, transcribeVoice } from "./actions";
+import { chooseTextModel, prepareUpload } from "./actions";
 
 type Msg = {
   id: string;
@@ -15,7 +15,10 @@ type Msg = {
   content: string;
   audio_seconds: number | null;
   attachments?: { name: string; mime: string }[];
+  steps?: { events: StepEvent[]; seconds: number; model: string } | null;
 };
+
+type StepEvent = { t: string; [k: string]: unknown };
 
 type Copy = {
   placeholder: string;
@@ -48,10 +51,13 @@ type Copy = {
     save: string;
     slow: string;
     lost: string;
+    memory: string;
+    stopped: string;
+    summary: string;
+    count: string;
+    stop: string;
   };
 };
-
-type StepLine = { text: string; done: boolean };
 const fillIn = (s: string, v: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? ""));
 
 type ModelOption = { id: string; name: string; price: string };
@@ -72,6 +78,83 @@ const FileIcon = () => (
 const Plug = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0zM12 16v5" /></svg>
 );
+
+// One step of Menab's work in plain words.
+function stepText(e: StepEvent, copy: Copy, paths: Record<string, string>) {
+  const sep = typeof document !== "undefined" && document.documentElement.dir === "rtl" ? "، " : ", ";
+  switch (e.t) {
+    case "read":
+      return e.voice ? copy.steps.readVoice : Number(e.files) > 0 ? fillIn(copy.steps.readFiles, { n: Number(e.files) }) : copy.steps.read;
+    case "call":
+      return fillIn(copy.steps.call, { model: String(e.model) });
+    case "retry":
+      return fillIn(copy.steps.retry, { model: String(e.model) });
+    case "switch":
+      return fillIn(copy.steps.switch, { from: String(e.from), to: String(e.to) });
+    case "fields":
+      return fillIn(copy.steps.fields, { fields: (e.keys as string[]).map((k) => copy.fields[k] ?? k).join(sep) });
+    case "path":
+      return fillIn(copy.steps.path, { path: paths[String(e.path)] ?? String(e.path) });
+    case "memory":
+      return fillIn(copy.steps.memory, { items: (e.items as string[]).join(sep) });
+    case "save":
+      return copy.steps.save;
+    case "slow":
+      return copy.steps.slow;
+    default:
+      return null;
+  }
+}
+
+const Check = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-ink-muted shrink-0" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg>
+);
+const Chevron = ({ open }: { open: boolean }) => (
+  <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" className={`shrink-0 transition-transform ${open ? "rotate-180" : ""}`}><path d="M3 4.5l3 3 3-3" /></svg>
+);
+
+// What Menab is doing, on one line whose words change; press it to see every step.
+// After the reply it stays above the answer as a short summary that opens the same list.
+function StepsLine({ events, live, summary, copy, paths }: { events: StepEvent[]; live: boolean; summary?: string; copy: Copy; paths: Record<string, string> }) {
+  const [open, setOpen] = useState(false);
+  const lines = events.map((e) => stepText(e, copy, paths)).filter((x): x is string => Boolean(x));
+  const head = live ? lines[lines.length - 1] ?? copy.thinking : summary ?? fillIn(copy.steps.count, { n: lines.length });
+  return (
+    <div className="flex flex-col gap-2" role={live ? "status" : undefined} aria-live={live ? "polite" : undefined}>
+      <button type="button" className="self-start flex items-center gap-2.5 small text-start text-ink-muted hover:text-ink" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        {live ? <span className="mn-pulse shrink-0" aria-hidden="true" /> : <Check />}
+        <span className={live ? "text-ink" : ""} dir="auto">{head}</span>
+        {lines.length > 0 && <Chevron open={open} />}
+      </button>
+      {open && lines.length > 0 && (
+        <ol className="m-0 ms-1.5 ps-4 border-s border-line list-none flex flex-col gap-1.5">
+          {lines.map((x, i) => (
+            <li key={i} className="flex items-center gap-2 text-[13px] text-ink-muted" dir="auto">
+              {live && i === lines.length - 1 ? <span className="mn-pulse shrink-0" aria-hidden="true" style={{ width: 8, height: 8 }} /> : <Check />}
+              <span>{x}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+async function* readLines(res: Response) {
+  if (!res.body) return;
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) if (line.trim()) yield JSON.parse(line) as StepEvent;
+  }
+  if (buffer.trim()) yield JSON.parse(buffer) as StepEvent;
+}
 
 async function upload(projectId: string, kind: "file" | "voice", blob: Blob, name: string) {
   const prep = await prepareUpload(projectId, kind, name, blob.type, blob.size);
@@ -108,7 +191,8 @@ export function BriefChat({
   const [voice, setVoice] = useState<{ path: string; seconds: number } | undefined>();
   const [pendingText, setPendingText] = useState<string | null>(null);
   const [busy, setBusy] = useState<"text" | "voice" | null>(null);
-  const [steps, setSteps] = useState<StepLine[]>([]);
+  const [steps, setSteps] = useState<StepEvent[]>([]);
+  const stopRef = useRef<AbortController | null>(null);
   const [error, setError] = useState<string | undefined>();
   const [, start] = useTransition();
   const [rec, setRec] = useState<WavRecorder | null>(null);
@@ -156,9 +240,9 @@ export function BriefChat({
       setUploads(sentUploads);
       setVoice(sentVoice);
     };
-    // Each step arrives as it happens; the current one pulses, finished ones get a check.
-    const push = (line: string) => setSteps((list) => [...list.map((x) => ({ ...x, done: true })), { text: line, done: false }]);
-    const slow = setTimeout(() => push(copy.steps.slow), 25_000);
+    const controller = new AbortController();
+    stopRef.current = controller;
+    const slow = setTimeout(() => setSteps((x) => [...x, { t: "slow" }]), 25_000);
     (async () => {
       let finished = false;
       try {
@@ -166,39 +250,23 @@ export function BriefChat({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text: value, files: ready.map((f) => ({ path: f.path, name: f.name, mime: f.mime })), voice: sentVoice }),
+          signal: controller.signal,
         });
         if (!res.ok || !res.body) throw new Error(copy.steps.lost);
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-        for (;;) {
-          const { value: chunk, done } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(chunk, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
-          for (const line of lines) {
-            if (!line.trim()) continue;
-            const e = JSON.parse(line) as { t: string; [k: string]: unknown };
-            if (e.t === "read") push(e.voice ? copy.steps.readVoice : Number(e.files) > 0 ? fillIn(copy.steps.readFiles, { n: Number(e.files) }) : copy.steps.read);
-            else if (e.t === "call") push(fillIn(copy.steps.call, { model: String(e.model) }));
-            else if (e.t === "retry") push(fillIn(copy.steps.retry, { model: String(e.model) }));
-            else if (e.t === "switch") push(fillIn(copy.steps.switch, { from: String(e.from), to: String(e.to) }));
-            else if (e.t === "fields") push(fillIn(copy.steps.fields, { fields: (e.keys as string[]).map((k) => copy.fields[k] ?? k).join(document.documentElement.dir === "rtl" ? "، " : ", ") }));
-            else if (e.t === "path") push(fillIn(copy.steps.path, { path: paths[String(e.path)] ?? String(e.path) }));
-            else if (e.t === "save") push(copy.steps.save);
-            else if (e.t === "done") finished = true;
-            else if (e.t === "error") {
-              finished = true;
-              restore(String(e.message));
-            }
-          }
+        for await (const e of readLines(res)) {
+          if (e.t === "done") finished = true;
+          else if (e.t === "error") {
+            finished = true;
+            restore(String(e.message));
+          } else setSteps((x) => [...x.filter((y) => y.t !== "slow"), e]);
         }
         if (!finished) restore(copy.steps.lost);
       } catch (e) {
-        restore(e instanceof Error && e.message ? e.message : copy.steps.lost);
+        if (controller.signal.aborted) restore(copy.steps.stopped);
+        else restore(e instanceof Error && e.message ? e.message : copy.steps.lost);
       } finally {
         clearTimeout(slow);
+        stopRef.current = null;
         setBusy(null);
         setPendingText(null);
         setSteps([]);
@@ -216,22 +284,40 @@ export function BriefChat({
     }
   };
 
-  // Stop, upload, and put the words in the reply box to check before sending.
+  // Stop, upload, and let the words stream into the reply box to check before sending.
   const stopRecording = async () => {
     if (!rec) return;
     const r = rec;
     setRec(null);
     setBusy("voice");
+    setError(undefined);
+    const before = text.trim();
+    const controller = new AbortController();
+    stopRef.current = controller;
+    let heard = "";
     try {
       const { blob, seconds } = await r.stop();
       const path = await upload(projectId, "voice", blob, "voice-note.wav");
-      const res = await transcribeVoice(projectId, path);
-      if (res.error || !res.text) throw new Error(res.error ?? copy.micBlocked);
-      setText((t) => (t.trim() ? `${t.trim()} ${res.text}` : res.text!));
+      const res = await fetch(`/p/${projectId}/voice`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path }),
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(copy.micBlocked);
+      for await (const e of readLines(res)) {
+        if (e.t === "text") {
+          heard += String(e.d);
+          setText(before ? `${before} ${heard.trimStart()}` : heard.trimStart());
+        } else if (e.t === "error") throw new Error(String(e.message));
+      }
+      if (!heard.trim()) throw new Error(copy.micBlocked);
       setVoice({ path, seconds });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (controller.signal.aborted) setText(before);
+      else setError(e instanceof Error ? e.message : String(e));
     } finally {
+      stopRef.current = null;
       setBusy(null);
     }
   };
@@ -265,7 +351,12 @@ export function BriefChat({
               )}
             </div>
           ) : (
-            <p key={m.id} className="body m-0 whitespace-pre-wrap max-w-[78%]" dir="auto">{m.content}</p>
+            <div key={m.id} className="flex flex-col gap-2 max-w-[78%]">
+              {m.steps?.events?.length ? (
+                <StepsLine events={m.steps.events} live={false} summary={fillIn(copy.steps.summary, { s: m.steps.seconds, model: m.steps.model })} copy={copy} paths={paths} />
+              ) : null}
+              <p className="body m-0 whitespace-pre-wrap" dir="auto">{m.content}</p>
+            </div>
           ),
         )}
         {pendingText && (
@@ -273,21 +364,7 @@ export function BriefChat({
             <p className="body m-0 whitespace-pre-wrap" dir="auto">{pendingText}</p>
           </div>
         )}
-        {busy === "text" && (
-          <ol className="m-0 p-0 list-none flex flex-col gap-2" role="status" aria-live="polite">
-            {steps.length === 0 && <li><MenabLoader label={copy.thinking} /></li>}
-            {steps.map((x, i) => (
-              <li key={i} className="flex items-center gap-2.5 small" dir="auto">
-                {x.done ? (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-ink-muted shrink-0" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg>
-                ) : (
-                  <span className="mn-pulse shrink-0" aria-hidden="true" />
-                )}
-                <span className={x.done ? "text-ink-muted" : "text-ink"}>{x.text}</span>
-              </li>
-            ))}
-          </ol>
-        )}
+        {busy === "text" && <StepsLine events={steps} live copy={copy} paths={paths} />}
         <div ref={endRef} />
       </div>
 
@@ -316,10 +393,11 @@ export function BriefChat({
               <span className="mn-pulse" aria-hidden="true" />
               <span className="small text-ink-muted">{copy.recording}</span>
             </div>
-          ) : busy === "voice" ? (
+          ) : busy === "voice" && !text ? (
             <div className="px-4 py-4"><MenabLoader label={copy.listening} /></div>
           ) : (
             <textarea
+              readOnly={busy === "voice"}
               rows={2}
               value={text}
               dir="auto"
@@ -409,7 +487,12 @@ export function BriefChat({
                 <IconMic size={18} />
               </button>
             )}
-            {!rec && (
+            {!rec && busy && (
+              <button type="button" className={`${iconBtn} bg-primary text-on-primary`} aria-label={copy.steps.stop} title={copy.steps.stop} onClick={() => stopRef.current?.abort()}>
+                <Stop />
+              </button>
+            )}
+            {!rec && !busy && (
               <button
                 type="button"
                 className={`${iconBtn} bg-primary text-on-primary`}

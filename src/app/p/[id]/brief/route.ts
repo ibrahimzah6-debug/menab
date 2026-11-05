@@ -11,16 +11,27 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
-      const emit = (e: BriefEvent) => controller.enqueue(encoder.encode(JSON.stringify(e) + "\n"));
+      const emit = (e: BriefEvent) => {
+        try {
+          controller.enqueue(encoder.encode(JSON.stringify(e) + "\n"));
+        } catch {
+          // The person left or pressed Stop.
+        }
+      };
       try {
         if (!payload || typeof payload.text !== "string") throw new Error("Nothing to send.");
-        await runBriefMessage(id, { text: payload.text, files: Array.isArray(payload.files) ? payload.files : [], voice: payload.voice }, emit);
+        // Stop in the chat closes this request; the brain stops and nothing is saved.
+        await runBriefMessage(id, { text: payload.text, files: Array.isArray(payload.files) ? payload.files : [], voice: payload.voice }, emit, req.signal);
         revalidatePath(`/p/${id}`);
         emit({ t: "done" });
       } catch (e) {
         emit({ t: "error", message: e instanceof Error ? e.message : "Something went wrong" });
       }
-      controller.close();
+      try {
+        controller.close();
+      } catch {
+        // Already closed.
+      }
     },
   });
   return new Response(stream, { headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no" } });

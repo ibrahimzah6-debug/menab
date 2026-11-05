@@ -55,7 +55,7 @@ export default async function ProjectPage({
 
   const [{ data: outputs }, { data: messages }, { data: jobs }, { data: setting }] = await Promise.all([
     supabase.from("outputs").select("id, number, stage, status, current_version").eq("project_id", id).order("number"),
-    supabase.from("messages").select("id, role, kind, content, audio_seconds, attachments").eq("project_id", id).order("created_at"),
+    supabase.from("messages").select("id, role, kind, content, audio_seconds, attachments, steps").eq("project_id", id).order("created_at"),
     supabase.from("ai_jobs").select("cost_usd").eq("project_id", id),
     supabase.from("model_settings").select("model_id").eq("workspace_id", project.workspace_id).eq("task", "text").maybeSingle(),
   ]);
