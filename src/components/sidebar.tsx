@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createProject } from "@/app/p/[id]/actions";
-import { setSidebar, switchWorkspace } from "@/lib/preferences";
+import { createWorkspace, setSidebar, switchWorkspace } from "@/lib/preferences";
 import { PersonMenu } from "./menus";
 import {
   IconChart,
@@ -45,6 +45,12 @@ type Labels = Record<(typeof ITEMS)[number]["key"], string> & {
   account: string;
   language: string;
   soon: string;
+  newWorkspace: string;
+  workspaceName: string;
+  add: string;
+  usage: string;
+  help: string;
+  languageItem: string;
 };
 
 export function Sidebar({
@@ -56,6 +62,8 @@ export function Sidebar({
   currentWorkspace,
   canCreate,
   person,
+  email,
+  photo,
   role,
   isOwner,
 }: {
@@ -68,6 +76,8 @@ export function Sidebar({
   currentWorkspace: { id: string; name: string } | null;
   canCreate: boolean;
   person: string;
+  email?: string;
+  photo?: string;
   role: string;
   isOwner?: boolean;
 }) {
@@ -76,6 +86,8 @@ export function Sidebar({
   const [phoneOpen, setPhoneOpen] = useState(false);
   const open = desktopOpen || phoneOpen;
   const [wsOpen, setWsOpen] = useState(false);
+  const [naming, setNaming] = useState(false);
+  const [wsError, setWsError] = useState<string | undefined>();
   const [, start] = useTransition();
   const router = useRouter();
   const path = usePathname();
@@ -85,6 +97,13 @@ export function Sidebar({
     setWsOpen(false);
     setPhoneOpen(false);
   }, [path]);
+
+  // The stage screen narrows its side columns while the menu is open, so the middle keeps its room.
+  const asideRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const frame = asideRef.current?.parentElement;
+    if (frame) frame.dataset.menu = desktopOpen ? "open" : "closed";
+  }, [desktopOpen]);
 
   const toggle = () => {
     if (phoneOpen) return setPhoneOpen(false);
@@ -113,6 +132,7 @@ export function Sidebar({
     </div>
     {phoneOpen && <div className="md:hidden fixed inset-0 z-40 bg-black/40" aria-hidden="true" onClick={() => setPhoneOpen(false)} />}
     <aside
+      ref={asideRef}
       aria-label={labels.mainMenu}
       className={`shrink-0 h-screen bg-ground-deep border-e border-line flex-col gap-3 py-3 ${
         phoneOpen ? "flex fixed inset-y-0 start-0 z-50 w-[280px] max-w-[85vw] px-3" : `hidden md:flex sticky top-0 transition-[width] duration-200 ${desktopOpen ? "w-[256px] px-3" : "w-[60px] px-2 items-center"}`
@@ -190,6 +210,38 @@ export function Sidebar({
                   </button>
                 </li>
               ))}
+              {isOwner && (
+                <li className="border-t border-line mt-1 pt-1">
+                  {naming ? (
+                    <form
+                      className="flex flex-col gap-1.5 p-1"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const name = String(new FormData(e.currentTarget).get("name") ?? "");
+                        start(async () => {
+                          const res = await createWorkspace(name);
+                          setWsError(res.error);
+                          if (!res.error) {
+                            setNaming(false);
+                            setWsOpen(false);
+                            router.push("/");
+                            router.refresh();
+                          }
+                        });
+                      }}
+                    >
+                      <input name="name" autoFocus required maxLength={120} dir="auto" placeholder={labels.workspaceName} aria-label={labels.workspaceName} className="mn-input" style={{ height: 34, fontSize: 13 }} />
+                      {wsError && <span className="text-[12px] text-ink" role="alert">{wsError}</span>}
+                      <button className="mn-btn mn-btn--primary mn-btn--sm justify-center">{labels.add}</button>
+                    </form>
+                  ) : (
+                    <button type="button" className="w-full flex items-center gap-2 px-2 h-9 rounded-sm hover:bg-tint-2 text-start small text-ink-muted hover:text-ink" onClick={() => setNaming(true)}>
+                      <IconPlus size={16} />
+                      {labels.newWorkspace}
+                    </button>
+                  )}
+                </li>
+              )}
             </ul>
           )}
         </div>
@@ -248,7 +300,7 @@ export function Sidebar({
       <span className="grow" />
 
       <div className={`flex gap-1.5 border-t border-line pt-3 ${open ? "items-center" : "flex-col items-center w-full"}`}>
-        <PersonMenu person={person} role={role} compact={!open} labels={{ settings: labels.settings, signOut: labels.signOut, account: labels.account }} />
+        <PersonMenu person={person} email={email} role={role} photo={photo} compact={!open} labels={{ settings: labels.settings, signOut: labels.signOut, account: labels.account, usage: labels.usage, help: labels.help, language: labels.languageItem }} />
       </div>
     </aside>
     </>

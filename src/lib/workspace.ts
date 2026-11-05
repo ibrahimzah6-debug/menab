@@ -9,6 +9,7 @@ export type CurrentMember = {
   userId: string;
   email: string;
   fullName: string | null;
+  avatarPath: string | null;
   role: Role;
   workspace: { id: string; name: string };
 };
@@ -25,7 +26,7 @@ export const getMemberships = cache(async (): Promise<CurrentMember[]> => {
 
   const { data } = await supabase
     .from("members")
-    .select("id, user_id, email, full_name, role, workspace:workspaces(id, name)")
+    .select("id, user_id, email, full_name, avatar_path, role, workspace:workspaces(id, name)")
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
 
@@ -38,6 +39,7 @@ export const getMemberships = cache(async (): Promise<CurrentMember[]> => {
         userId: m.user_id,
         email: m.email,
         fullName: m.full_name,
+        avatarPath: m.avatar_path,
         role: m.role as Role,
         workspace: { id: ws.id, name: ws.name },
       };

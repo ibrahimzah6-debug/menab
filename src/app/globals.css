@@ -100,3 +100,16 @@ html[lang="ar"] .mn-label:not([lang="en"]) { font-family: var(--font-sans); lett
 .mn-pulse { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--ink); animation: mn-pulse 1.2s ease-in-out infinite; }
 @keyframes mn-pulse { 0%, 100% { transform: scale(.6); opacity: .4; } 50% { transform: scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .mn-pulse { animation: none; } }
+
+/* Stage screen with the side menu open: the steps and the right panel get narrower and their
+   text a little smaller, so the middle column keeps its room. */
+@media (min-width: 768px) {
+  [data-menu="open"] .stage-steps { width: 196px; font-size: 13px; }
+  [data-menu="open"] .stage-side { width: 280px; }
+  [data-menu="open"] .stage-side .small,
+  [data-menu="open"] .stage-side .body { font-size: 13px; line-height: 19px; }
+}
+@media (min-width: 768px) and (max-width: 1279px) {
+  [data-menu="open"] .stage-steps { width: 168px; }
+  [data-menu="open"] .stage-side { width: 248px; }
+}
