@@ -62,35 +62,26 @@ export async function ensureTranslation(locale: string): Promise<{ ok: boolean; 
   const key = process.env.GEMINI_API_KEY;
   if (!key) return { ok: false, error: "GEMINI_API_KEY is not set in Vercel" };
 
-  const prompt = `Translate the values of this JSON into ${lang.name} for the interface of Menab, a video production web app used by producers.
-Rules:
-- Return the same JSON with the same keys and structure. Translate only string values.
-- Keep every placeholder in curly braces exactly, e.g. {n}, {name}, {cost}.
-- Keep these as they are: Menab, Menab AI, CPS, PPM, GAMR, GACA, Kie.ai, Gemini, Claude, model names, milestone codes like M2 or v2, file types, emails.
-- Plain, friendly, short product wording. Buttons start with a verb. No em dashes.
-- Values written in Arabic script (the language switch label) stay as they are.
-
-JSON:
-${JSON.stringify(dictionaries.en)}`;
+  // The dictionary is translated in small parts, a few at a time, so one long answer can't
+  // time out or come back cut off. A part that fails is tried once more.
+  const en = dictionaries.en as unknown as Record<string, unknown>;
+  const parts: Record<string, unknown>[] = [];
+  let part: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(en)) {
+    part[k] = v;
+    if (JSON.stringify(part).length > 6000) {
+      parts.push(part);
+      part = {};
+    }
+  }
+  if (Object.keys(part).length) parts.push(part);
 
   try {
-    const model = process.env.GEMINI_MODEL || "gemini-3.8-flash";
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-      method: "POST",
-      headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
-      cache: "no-store",
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: "application/json", maxOutputTokens: 60000 },
-      }),
-    });
-    const json = (await res.json().catch(() => null)) as {
-      error?: { message?: string };
-      candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[];
-    } | null;
-    if (!res.ok || !json || json.error) return { ok: false, error: json?.error?.message ?? `HTTP ${res.status}` };
-    const text = (json.candidates?.[0]?.content?.parts ?? []).filter((p) => p.text && !p.thought).map((p) => p.text).join("");
-    const parsed = JSON.parse(text.replace(/^```(json)?|```$/g, "").trim());
+    const parsed: Record<string, unknown> = {};
+    for (let i = 0; i < parts.length; i += 3) {
+      const done = await Promise.all(parts.slice(i, i + 3).map((x) => translatePart(x, lang.name, key).catch(() => translatePart(x, lang.name, key))));
+      for (const d of done) Object.assign(parsed, d);
+    }
     const dict = mergeWithEnglish(dictionaries.en, parsed) as Dictionary;
     await createAdminClient()
       .from("translations")
@@ -100,4 +91,34 @@ ${JSON.stringify(dictionaries.en)}`;
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Translation failed" };
   }
+}
+
+async function translatePart(part: Record<string, unknown>, language: string, key: string): Promise<Record<string, unknown>> {
+  const prompt = `Translate the values of this JSON into ${language} for the interface of Menab, a video production web app used by producers.
+Rules:
+- Return the same JSON with the same keys and structure. Translate only string values.
+- Keep every placeholder in curly braces exactly, e.g. {n}, {name}, {cost}.
+- Keep these as they are: Menab, Menab AI, CPS, PPM, GAMR, GACA, Kie.ai, Gemini, Claude, model names, milestone codes like M2 or v2, file types, emails.
+- Plain, friendly, short product wording. Buttons start with a verb. No em dashes.
+- Values written in Arabic script (the language switch label) stay as they are.
+
+JSON:
+${JSON.stringify(part)}`;
+  const model = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+    method: "POST",
+    headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
+    cache: "no-store",
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json", maxOutputTokens: 16000 },
+    }),
+  });
+  const json = (await res.json().catch(() => null)) as {
+    error?: { message?: string };
+    candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[];
+  } | null;
+  if (!res.ok || !json || json.error) throw new Error(json?.error?.message ?? `HTTP ${res.status}`);
+  const text = (json.candidates?.[0]?.content?.parts ?? []).filter((p) => p.text && !p.thought).map((p) => p.text).join("");
+  return JSON.parse(text.replace(/^```(json)?|```$/g, "").trim()) as Record<string, unknown>;
 }

@@ -180,85 +180,91 @@ async function noticeFallback(workspaceId: string, projectId: string, from: stri
 }
 
 const FILE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf"];
+const MAX_FILE = 10 * 1024 * 1024;
+const MAX_VOICE = 20 * 1024 * 1024;
 
-// A brief message with optional files (logo, product photos, references, a PDF brief).
-export async function sendBriefMessage(projectId: string, form: FormData): Promise<Result> {
-  const clean = String(form.get("text") ?? "").trim().slice(0, 8000);
-  const raw = form.getAll("files").filter((f): f is File => f instanceof File && f.size > 0).slice(0, 5);
-  if (!clean && !raw.length) return {};
-  if (raw.some((f) => !FILE_TYPES.includes(f.type))) return { error: "Attach images (PNG, JPG, WEBP) or PDFs." };
-  if (raw.some((f) => f.size > 10 * 1024 * 1024)) return { error: "Each file must be under 10 MB." };
+// Files and voice notes go straight from the browser to Menab's storage with a one-time
+// upload link, so their size never passes through the app server.
+export async function prepareUpload(
+  projectId: string,
+  kind: "file" | "voice",
+  name: string,
+  mime: string,
+  size: number,
+): Promise<{ path?: string; token?: string; error?: string }> {
+  if (kind === "file" && !FILE_TYPES.includes(mime)) return { error: "Attach images (PNG, JPG, WEBP) or PDFs." };
+  if (kind === "file" && size > MAX_FILE) return { error: "Each file must be under 10 MB." };
+  if (kind === "voice" && (mime !== "audio/wav" || size > MAX_VOICE)) return { error: "That recording is too long. Keep voice notes under 5 minutes." };
+  try {
+    const { me } = await loadProject(projectId);
+    const safe = name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-80) || "file";
+    const path = `${me.workspace.id}/projects/${projectId}/${kind === "voice" ? "voice" : "files"}/${Date.now()}-${safe}`;
+    const { data, error } = await createAdminClient().storage.from("media").createSignedUploadUrl(path);
+    if (error || !data) return { error: "Could not start the upload. Try again." };
+    return { path: data.path, token: data.token };
+  } catch (e) {
+    return { error: errText(e) };
+  }
+}
+
+function ownPath(path: string, workspaceId: string, projectId: string) {
+  return path.startsWith(`${workspaceId}/projects/${projectId}/`) && !path.includes("..");
+}
+
+// Turns a recorded voice note into text with Gemini. The text goes into the reply box first,
+// so the person can read it and decide to send it.
+export async function transcribeVoice(projectId: string, path: string): Promise<{ text?: string; error?: string }> {
+  const { t } = await getI18n();
+  try {
+    const { me } = await loadProject(projectId);
+    if (!ownPath(path, me.workspace.id, projectId)) return { error: "Recording not found." };
+    const { data: file } = await createAdminClient().storage.from("media").download(path);
+    if (!file) return { error: "Recording not found." };
+    const buf = Buffer.from(await file.arrayBuffer());
+    try {
+      const r = await transcribe(buf, "audio/wav");
+      await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "transcribe", provider: r.provider, model: r.model, ok: true, usage: r.usage });
+      return { text: r.text };
+    } catch (e) {
+      await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "transcribe", provider: process.env.GEMINI_API_KEY ? "google" : "kie.ai", model: "gemini", ok: false, error: errText(e) });
+      await notify({ workspaceId: me.workspace.id, projectId, kind: "ai_failed", title: "A voice note could not be turned into text", body: errText(e) });
+      return { error: t.project.voiceFailed };
+    }
+  } catch (e) {
+    return { error: errText(e) };
+  }
+}
+
+// A brief message with optional files (logo, product photos, references, a PDF brief) and,
+// when it came from a voice note, that recording.
+export async function sendBriefMessage(
+  projectId: string,
+  payload: { text: string; files: { path: string; name: string; mime: string }[]; voice?: { path: string; seconds: number } },
+): Promise<Result> {
+  const clean = payload.text.trim().slice(0, 8000);
+  const list = (payload.files ?? []).slice(0, 5);
+  if (!clean && !list.length) return {};
   try {
     const { me } = await loadProject(projectId);
     const admin = createAdminClient();
     const files: Attachment[] = [];
-    const attachments: { path: string; name: string; mime: string }[] = [];
-    for (const f of raw) {
-      const buf = Buffer.from(await f.arrayBuffer());
-      const safe = f.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-80);
-      const path = `${me.workspace.id}/projects/${projectId}/files/${Date.now()}-${safe}`;
-      await admin.storage.from("media").upload(path, buf, { contentType: f.type });
-      attachments.push({ path, name: f.name.slice(0, 200), mime: f.type });
-      files.push({ mime: f.type, base64: buf.toString("base64"), name: f.name });
+    for (const f of list) {
+      if (!ownPath(f.path, me.workspace.id, projectId) || !FILE_TYPES.includes(f.mime)) return { error: "File not found." };
+      const { data } = await admin.storage.from("media").download(f.path);
+      if (!data) return { error: "File not found." };
+      files.push({ mime: f.mime, base64: Buffer.from(await data.arrayBuffer()).toString("base64"), name: f.name });
     }
-    const names = attachments.map((a) => a.name).join(", ");
-    const content = clean || (names ? `(${names})` : "");
-    await runBriefTurn(projectId, { content: names && clean ? `${clean}\n\nAttached: ${names}` : content, kind: "text", files, attachments });
-  } catch (e) {
-    revalidatePath(`/p/${projectId}`);
-    return { error: errText(e) };
-  }
-  revalidatePath(`/p/${projectId}`);
-  return {};
-}
-
-export async function sendVoiceNote(projectId: string, form: FormData): Promise<Result> {
-  const file = form.get("audio");
-  const seconds = Number(form.get("seconds") ?? 0);
-  if (!(file instanceof Blob) || file.size === 0) return { error: "No recording found." };
-  if (file.size > 15 * 1024 * 1024) return { error: "That recording is too long. Keep voice notes under 5 minutes." };
-  const { t } = await getI18n();
-  try {
-    const { me, supabase } = await loadProject(projectId);
-    const buf = Buffer.from(await file.arrayBuffer());
-    const mime = (file.type || "audio/webm").split(";")[0];
-    const ext = mime.includes("mp4") ? "m4a" : mime.includes("ogg") ? "ogg" : "webm";
-    const path = `${me.workspace.id}/projects/${projectId}/voice/${Date.now()}.${ext}`;
-    // Our own copy of every voice note.
-    await createAdminClient().storage.from("media").upload(path, buf, { contentType: mime });
-
-    let text: string;
-    try {
-      const r = await transcribe(buf, mime);
-      text = r.text;
-      await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "transcribe", provider: r.provider, model: r.model, ok: true, usage: r.usage });
-    } catch (e) {
-      await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "transcribe", provider: process.env.GEMINI_API_KEY ? "google" : "kie.ai", model: "gemini", ok: false, error: errText(e) });
-      return { error: t.project.voiceFailed };
-    }
-
-    const voice = {
-      content: text,
-      kind: "voice" as const,
-      audio_path: path,
-      audio_seconds: Number.isFinite(seconds) ? Math.round(seconds) : null,
-    };
-    try {
-      await runBriefTurn(projectId, voice);
-    } catch (e) {
-      // Keep the transcript so the person does not have to record again; the next message continues from it.
-      await supabase.from("messages").insert({
-        workspace_id: me.workspace.id,
-        project_id: projectId,
-        role: "user",
-        kind: "voice",
-        content: text.slice(0, 20000),
-        audio_path: path,
-        audio_seconds: voice.audio_seconds,
-        created_by: me.userId,
-      });
-      throw e;
-    }
+    const names = list.map((a) => a.name).join(", ");
+    const content = clean ? (names ? `${clean}\n\nAttached: ${names}` : clean) : `(${names})`;
+    const voice = payload.voice && ownPath(payload.voice.path, me.workspace.id, projectId) ? payload.voice : undefined;
+    await runBriefTurn(projectId, {
+      content,
+      kind: voice ? "voice" : "text",
+      audio_path: voice?.path,
+      audio_seconds: voice ? Math.round(voice.seconds) : null,
+      files,
+      attachments: list.map((f) => ({ path: f.path, name: f.name.slice(0, 200), mime: f.mime })),
+    });
   } catch (e) {
     revalidatePath(`/p/${projectId}`);
     return { error: errText(e) };

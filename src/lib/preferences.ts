@@ -15,7 +15,7 @@ export async function setTheme(theme: Theme) {
 }
 
 export async function setSidebar(open: boolean) {
-  (await cookies()).set("menab-sidebar", open ? "open" : "closed", { path: "/", maxAge: YEAR, sameSite: "lax" });
+  (await cookies()).set("menab-menu", open ? "open" : "closed", { path: "/", maxAge: YEAR, sameSite: "lax" });
 }
 
 export async function switchWorkspace(workspaceId: string) {

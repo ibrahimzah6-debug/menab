@@ -6,18 +6,19 @@ import { isPlatformAdmin } from "@/lib/usage";
 import { Logo } from "./logo";
 import { Sidebar } from "./sidebar";
 
-// The same frame on every screen: a side menu that opens and closes, like Claude.
-export async function AppFrame({ children, defaultOpen = true }: { children: React.ReactNode; defaultOpen?: boolean }) {
+// The same frame on every screen: a side menu that opens and closes, like Claude. It starts
+// closed; on a phone it slides over the page from a menu button.
+export async function AppFrame({ children, defaultOpen = false }: { children: React.ReactNode; defaultOpen?: boolean }) {
   const { locale, t } = await getI18n();
   const email = await getUserEmail();
   if (!email) redirect("/login");
   const member = await getCurrentMember();
   const all = await getMemberships();
-  const saved = (await cookies()).get("menab-sidebar")?.value;
+  const saved = (await cookies()).get("menab-menu")?.value;
   const open = saved ? saved === "open" : defaultOpen;
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex flex-col md:flex-row">
       <Sidebar
         initialOpen={open}
         logo={<Logo height={20} />}

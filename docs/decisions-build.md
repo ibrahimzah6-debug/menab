@@ -74,3 +74,15 @@ Replaces B4.
 - **Loading:** the Menab mark's three parts light up in turn while Menab AI works; the "Menab AI" label on replies is gone.
 - **Top bar:** "Spent" sits in a box, with the globe language button beside it.
 - **All 13 languages now:** English and Arabic are written by hand. Amharic, Urdu, Hindi, Indonesian, Turkish, French, Spanish, German, Portuguese, Russian and Chinese are translated from English by Gemini the first time anyone picks them, stored in `translations`, and redone automatically when the English text changes. Urdu is right to left.
+
+## B11. Writing through Kie.ai only, quieter voice, fixed reply box (Ibrahim, 5 Nov 2026)
+
+- **No direct Anthropic account:** every writing model runs through Kie.ai (Claude through `api.kie.ai/claude/v1/messages`, Gemini through Kie's Gemini endpoint). Google's free Gemini key stays for voice and the free writing option. The list: Claude Fable 5, Claude Opus 5.5 (default), Claude Sonnet 5.5, Gemini 4 Argon, Claude Haiku 5.5, Gemini 3.8 Flash (free). Backup rule unchanged: retry once, then the other family.
+- **Voice:** always Gemini, no model choice and no seconds counter. The browser records a small WAV file (Gemini does not accept the browser's default WebM), uploads it straight to our storage, and the text lands in the reply box first. The person reads it and decides to send.
+- **Uploads:** files and voice notes go from the browser to storage with a one-time upload link, so their size never passes through the app server (which caps each request near 1 MB).
+- **"+" menu:** Photos, Files (PDF), and Connectors marked Soon.
+- **Stage screen:** one fixed height on a computer. The reply box stays at the bottom, only the messages scroll, and the steps and the right panel scroll on their own.
+- **Side menu:** closed by default. On a phone a thin top bar opens it over the page.
+- **Board:** the main line of each card (the idea, the summary's opening, the key message, the reason for the path) is edited on the card. "Open page" opens the full step.
+- **Loading:** a single dot that grows and fades, like Claude and ChatGPT.
+- **Languages:** the interface is translated in small parts, three at a time, each tried twice, so a first switch no longer fails on one long answer.

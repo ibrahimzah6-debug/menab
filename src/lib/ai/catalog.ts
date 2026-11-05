@@ -60,18 +60,22 @@ export const DEFAULT_MODEL: Record<ModelTask, string> = {
 export type TextModel = {
   id: string;
   name: string;
+  // "from" prices per million tokens on Kie.ai (input), with output estimated at 5 times input.
+  // The real cost of each call is read back from Kie.ai.
   usdPerMillionIn: number;
   usdPerMillionOut: number;
-  fallback: boolean; // server-side refusal fallback is available
-  provider: "anthropic" | "google";
+  provider: "kie-claude" | "kie-gemini" | "google";
   free?: boolean; // Google's free tier: shared daily limits, content may be used by Google
   goodFor: { en: string; ar: string };
 };
+// Writing models, ranked. All through Kie.ai, except the free Gemini on Google's own API.
 export const TEXT_MODELS: TextModel[] = [
-  { id: "claude-opus-5-5", name: "Claude Opus 5.5", usdPerMillionIn: 4, usdPerMillionOut: 20, fallback: true, provider: "anthropic", goodFor: { en: "Best thinking for briefs, scripts and treatments", ar: "أفضل تفكير للبريف والسكربت ورؤية المخرج" } },
-  { id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5", usdPerMillionIn: 2, usdPerMillionOut: 10, fallback: true, provider: "anthropic", goodFor: { en: "Fast and strong, half the price", ar: "سريع وقوي بنص السعر" } },
-  { id: "claude-haiku-5-5", name: "Claude Haiku 5.5", usdPerMillionIn: 0.1, usdPerMillionOut: 0.5, fallback: false, provider: "anthropic", goodFor: { en: "Cheapest paid model, for quick drafts", ar: "أرخص نموذج مدفوع، للمسودات السريعة" } },
-  { id: "gemini-3.8-flash", name: "Gemini 3.8 Flash", usdPerMillionIn: 0, usdPerMillionOut: 0, fallback: false, provider: "google", free: true, goodFor: { en: "Free with daily limits, for trying things out", ar: "مجاني بحد يومي، للتجربة" } },
+  { id: "claude-fable-5", name: "Claude Fable 5", usdPerMillionIn: 4, usdPerMillionOut: 20, provider: "kie-claude", goodFor: { en: "Strongest thinking, for the hardest briefs", ar: "أقوى تفكير، لأصعب البريفات" } },
+  { id: "claude-opus-5-5", name: "Claude Opus 5.5", usdPerMillionIn: 1.6, usdPerMillionOut: 8, provider: "kie-claude", goodFor: { en: "Best balance for briefs, scripts and treatments", ar: "أفضل توازن للبريف والسكربت ورؤية المخرج" } },
+  { id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5", usdPerMillionIn: 0.8, usdPerMillionOut: 4, provider: "kie-claude", goodFor: { en: "Fast and strong, half the price", ar: "سريع وقوي بنص السعر" } },
+  { id: "gemini-4-argon", name: "Gemini 4 Argon", usdPerMillionIn: 0.8, usdPerMillionOut: 4, provider: "kie-gemini", goodFor: { en: "Google's strongest, a second opinion", ar: "أقوى نماذج قوقل، رأي ثاني" } },
+  { id: "claude-haiku-5-5", name: "Claude Haiku 5.5", usdPerMillionIn: 0.06, usdPerMillionOut: 0.3, provider: "kie-claude", goodFor: { en: "Cheapest paid model, for quick drafts", ar: "أرخص نموذج مدفوع، للمسودات السريعة" } },
+  { id: "gemini-3.8-flash", name: "Gemini 3.8 Flash", usdPerMillionIn: 0, usdPerMillionOut: 0, provider: "google", free: true, goodFor: { en: "Free with daily limits, for trying things out", ar: "مجاني بحد يومي، للتجربة" } },
 ];
 export const DEFAULT_TEXT_MODEL = "claude-opus-5-5";
 export function textModel(id: string | null | undefined) {
@@ -88,7 +92,6 @@ export function estimateUsd(modelId: string, action: keyof typeof TYPICAL_TOKENS
   return (t.in * m.usdPerMillionIn + t.out * m.usdPerMillionOut) / 1_000_000;
 }
 
-export const BRAIN = { provider: "anthropic" } as const;
 
 export const TRANSCRIBER = {
   provider: "kie.ai",
