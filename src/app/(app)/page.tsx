@@ -2,6 +2,7 @@ import { Logo } from "@/components/logo";
 import { ProjectList } from "@/components/project-list";
 import { fill } from "@/lib/i18n/dictionaries";
 import { getI18n } from "@/lib/i18n/server";
+import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember, getUserEmail } from "@/lib/workspace";
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
@@ -20,6 +21,10 @@ export default async function HomePage() {
   const name = (me?.fullName || email || "").split(/[ @]/)[0];
   // Riyadh time decides the greeting.
   const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: "Asia/Riyadh" }).format(new Date()));
+  const supabase = await createClient();
+  const { data: notices } = me
+    ? await supabase.from("notifications").select("id, title, created_at").eq("workspace_id", me.workspace.id).order("created_at", { ascending: false }).limit(5)
+    : { data: [] };
   const greeting = fill(hour >= 4 && hour < 12 ? t.home.morning : t.home.evening, { name });
 
   return (
@@ -38,7 +43,15 @@ export default async function HomePage() {
       </Panel>
       <div className="grid gap-4 md:grid-cols-3">
         <Panel title={t.home.waiting}><p className="small text-ink-muted m-0">{t.home.nothingWaiting}</p></Panel>
-        <Panel title={t.home.activity}><p className="small text-ink-muted m-0">{t.home.noActivity}</p></Panel>
+        <Panel title={t.home.activity}>
+          {notices && notices.length ? (
+            <ul className="m-0 p-0 list-none flex flex-col gap-1.5">
+              {notices.map((n) => <li key={n.id} className="small text-ink-muted" dir="auto">{n.title}</li>)}
+            </ul>
+          ) : (
+            <p className="small text-ink-muted m-0">{t.home.noActivity}</p>
+          )}
+        </Panel>
         <Panel title={t.home.balance}><p className="small text-ink-muted m-0">{t.home.balanceLater}</p></Panel>
       </div>
     </div>

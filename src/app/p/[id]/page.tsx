@@ -12,7 +12,10 @@ import { stagesFor } from "@/lib/stages";
 import { createClient } from "@/lib/supabase/server";
 import { getMemberships } from "@/lib/workspace";
 import { BriefChat } from "./brief-chat";
-import { BriefIdeaEditor, ChangeBox, EditableDoc } from "./editors";
+import { ChangeBox } from "./editors";
+import { InlineDoc, InlineIdea } from "./inline-doc";
+import { LanguageMenu } from "@/components/menus";
+import { MenabLoader } from "@/components/menab-loader";
 import { StepModelPicker } from "./side-panels";
 import { PathButtons, RewriteButton, StageFooter } from "./stage-controls";
 
@@ -36,7 +39,7 @@ export default async function ProjectPage({
 }) {
   const { id } = await params;
   const { o, view } = await searchParams;
-  const { locale, t } = await getI18n();
+  const { locale, uiLocale, t } = await getI18n();
   const p = t.project;
   const supabase = await createClient();
 
@@ -51,7 +54,7 @@ export default async function ProjectPage({
 
   const [{ data: outputs }, { data: messages }, { data: jobs }, { data: setting }] = await Promise.all([
     supabase.from("outputs").select("id, number, stage, status, current_version").eq("project_id", id).order("number"),
-    supabase.from("messages").select("id, role, kind, content, audio_seconds").eq("project_id", id).order("created_at"),
+    supabase.from("messages").select("id, role, kind, content, audio_seconds, attachments").eq("project_id", id).order("created_at"),
     supabase.from("ai_jobs").select("cost_usd").eq("project_id", id),
     supabase.from("model_settings").select("model_id").eq("workspace_id", project.workspace_id).eq("task", "text").maybeSingle(),
   ]);
@@ -134,7 +137,8 @@ export default async function ProjectPage({
         <span className="text-[15px] font-medium truncate max-w-[40ch]">{project.name}</span>
         <span className="mn-chip mn-chip--ready">{path ? t.stage.paths[path] : t.stage.paths.none}</span>
         <span className="grow" />
-        <span className="mn-label">{fill(p.spent, { spent: money(spent) })}</span>
+        <span className="mn-label h-9 px-3 rounded-md border border-line grid place-items-center">{fill(p.spent, { spent: money(spent) })}</span>
+        <LanguageMenu locale={uiLocale} label={t.settings.language} soon={t.frame.preparing} compact={false} placement="down" />
       </header>
 
       {/* Stages, and Page or Board */}
@@ -221,6 +225,8 @@ export default async function ProjectPage({
                 cost={approx(estimateUsd(model, "briefTurn"))}
                 messages={(messages ?? []) as never}
                 copy={p}
+                models={modelOptions.map((m) => ({ id: m.id, name: m.name, price: m.price }))}
+                model={model}
               />
             </div>
           ) : (
@@ -233,16 +239,20 @@ export default async function ProjectPage({
                 <StatusChip status={statusOf(open) as OutputStatus} label={statusLabel(t, statusOf(open))} />
               </div>
               <div className="p-6">
-                <EditableDoc
-                  projectId={id}
-                  number={open}
-                  content={(content[open] ?? null) as never}
-                  labels={docLabels(p)}
-                  copy={p.editCopy}
-                  canEdit={editableHere && statusOf(open) !== "generating"}
-                >
-                  <DocView n={open} content={content[open]} p={p} generating={statusOf(open) === "generating"} />
-                </EditableDoc>
+                {content[open] ? (
+                  <InlineDoc
+                    projectId={id}
+                    n={open}
+                    content={content[open]}
+                    d={p.docs}
+                    editable={editableHere && statusOf(open) !== "generating"}
+                    savedNote={p.editCopy.saved}
+                  />
+                ) : statusOf(open) === "generating" ? (
+                  <MenabLoader size={20} label={p.writing} />
+                ) : (
+                  <p className="body text-ink-muted m-0">{p.docs.notWritten}</p>
+                )}
               </div>
             </section>
           )}
@@ -279,7 +289,6 @@ export default async function ProjectPage({
             <section className="bg-surface border border-line rounded-lg p-4 flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <h2 className="m-0 text-[16px] font-medium">{t.stage.assistant}</h2>
-                {showing === 1 && <span className="mn-label">{fill(t.stage.sees, { what: open === 1 ? p.chat : t.outputs[open] })}</span>}
               </div>
               <div className="flex flex-col gap-1.5">
                 <span className="mn-label">{p.model}</span>
@@ -374,17 +383,11 @@ function BriefPanel({ brief, p, missing, projectId, editable }: { brief: Partial
       <div className="mt-2 rounded-md bg-ground-deep border border-line p-3 flex flex-col gap-2">
         <span className="mn-label">{p.understanding}</span>
         {brief.logline ? (
-          <p className="body m-0 font-medium" dir="auto">{brief.logline}</p>
+          <InlineIdea projectId={projectId} logline={brief.logline} story={brief.story ?? []} editable={editable} labels={{ idea: p.editCopy.idea, story: p.editCopy.story }} />
         ) : (
           <p className="small text-ink-faint m-0">{p.start}</p>
         )}
-        {brief.story && brief.story.length > 0 && (
-          <ol className="m-0 ps-5 flex flex-col gap-0.5 list-decimal">
-            {brief.story.map((b, i) => <li key={i} className="small" dir="auto">{b}</li>)}
-          </ol>
-        )}
-        {(brief.logline || (brief.story && brief.story.length > 0)) && <span className="text-[11px] text-ink-faint">{p.draft}</span>}
-        {editable && <BriefIdeaEditor projectId={projectId} logline={brief.logline ?? ""} story={brief.story ?? []} copy={p.editCopy} />}
+        {brief.logline && <span className="text-[11px] text-ink-faint">{p.draft}</span>}
       </div>
       {group(p.sections.video, ["objective", "audience", "feeling", "key_message", "must_show"])}
       {group(p.sections.delivery, ["length_seconds", "cutdowns", "formats", "language"])}
@@ -392,121 +395,4 @@ function BriefPanel({ brief, p, missing, projectId, editable }: { brief: Partial
       {group(p.sections.client, ["client", "product", "deadline", "budget"])}
     </section>
   );
-}
-
-function DocView({ n, content, p, generating }: { n: number; content: unknown; p: Dictionary["project"]; generating: boolean }) {
-  if (generating && !content) return <p className="body text-ink-muted m-0 mn-typing">{p.writing}</p>;
-  if (!content) return <p className="body text-ink-muted m-0">{p.docs.notWritten}</p>;
-  const d = p.docs;
-  if (n === 3) {
-    const c = content as StageOneDocs["summary"];
-    return (
-      <div className="flex flex-col gap-3 max-w-[760px]">
-        <h2 className="h3 m-0" dir="auto">{c.title}</h2>
-        {c.paragraphs.map((x, i) => <p key={i} className="body m-0 mn-prose" dir="auto">{x}</p>)}
-      </div>
-    );
-  }
-  if (n === 4) {
-    const c = content as StageOneDocs["strategy"];
-    return (
-      <div className="flex flex-col gap-4 max-w-[860px]">
-        <Row label={d.insight}>{c.insight}</Row>
-        <Row label={d.keyMessage}>{c.key_message}</Row>
-        <Row label={d.tone}>{c.tone}</Row>
-        <Row label={d.platforms}>{c.platforms.join(", ")}</Row>
-        <div>
-          <h3 className="mn-label m-0 mb-2">{d.deliverables}</h3>
-          <table className="w-full border-collapse small">
-            <thead>
-              <tr>{[d.deliverable, d.duration, d.ratio, d.platform].map((h) => <th key={h} className="mn-label text-start py-2 pe-3">{h}</th>)}</tr>
-            </thead>
-            <tbody>
-              {c.deliverables.map((x, i) => (
-                <tr key={i} className="border-t border-line">
-                  <td className="py-2 pe-3" dir="auto">{x.name}</td>
-                  <td className="py-2 pe-3 data">{x.duration_seconds}s</td>
-                  <td className="py-2 pe-3 data">{x.ratio}</td>
-                  <td className="py-2 pe-3" dir="auto">{x.platform}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  }
-  if (n === 5) {
-    const c = content as StageOneDocs["pathway"];
-    return (
-      <div className="flex flex-col gap-2 max-w-[860px]">
-        <p className="body m-0 mb-2" dir="auto">{c.reason}</p>
-        <Row label={d.aiScenes}>{c.ai_scenes.join(" · ") || "–"}</Row>
-        <Row label={d.shootScenes}>{c.shoot_scenes.join(" · ") || "–"}</Row>
-        <Row label={d.costRange}>{c.cost_range}</Row>
-        <Row label={d.timeRange}>{c.time_range}</Row>
-      </div>
-    );
-  }
-  if (n === 6) {
-    const c = content as { cps: StageOneDocs["cps"]; kickoff_notes: string[] };
-    return (
-      <div className="flex flex-col gap-4">
-        <table className="w-full border-collapse small">
-          <thead>
-            <tr>{[d.milestones, d.from, d.to, d.phase].map((h) => <th key={h} className="mn-label text-start py-2 pe-3">{h}</th>)}</tr>
-          </thead>
-          <tbody>
-            {c.cps.milestones.map((m, i) => (
-              <tr key={i} className="border-t border-line">
-                <td className="py-2 pe-3" dir="auto">{m.name}</td>
-                <td className="py-2 pe-3 data" dir="ltr">{m.start}</td>
-                <td className="py-2 pe-3 data" dir="ltr">{m.end}</td>
-                <td className="py-2 pe-3"><span className="mn-chip mn-chip--waiting">{d.phases[m.phase]}</span></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <p className="small text-ink-muted m-0" dir="auto">{c.cps.note}</p>
-        {c.kickoff_notes.length > 0 && (
-          <div>
-            <h3 className="mn-label m-0 mb-2">{d.kickoff}</h3>
-            <ul className="m-0 ps-5 flex flex-col gap-1 list-disc">{c.kickoff_notes.map((x, i) => <li key={i} className="body" dir="auto">{x}</li>)}</ul>
-          </div>
-        )}
-      </div>
-    );
-  }
-  return null;
-}
-
-// Names for each field when a document is edited.
-function docLabels(p: Dictionary["project"]): Record<string, string> {
-  const d = p.docs;
-  return {
-    title: p.fields.logline,
-    paragraphs: p.sections.video,
-    insight: d.insight,
-    key_message: d.keyMessage,
-    tone: d.tone,
-    platforms: d.platforms,
-    deliverables: d.deliverables,
-    name: d.deliverable,
-    duration_seconds: d.duration,
-    ratio: d.ratio,
-    platform: d.platform,
-    path: p.suggestedPath,
-    reason: p.suggestedPath,
-    ai_scenes: d.aiScenes,
-    shoot_scenes: d.shootScenes,
-    cost_range: d.costRange,
-    time_range: d.timeRange,
-    cps: "CPS",
-    milestones: d.milestones,
-    start: d.from,
-    end: d.to,
-    phase: d.phase,
-    note: d.kickoff,
-    kickoff_notes: d.kickoff,
-  };
 }

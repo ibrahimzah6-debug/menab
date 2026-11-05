@@ -7,20 +7,22 @@ import { setLocale } from "@/lib/i18n/actions";
 import { IconCheckSmall, IconGlobe, IconLogout, IconSettings } from "./icons";
 
 // Languages in the menu. English and Arabic are complete; the others are planned and shown as coming soon.
-export const LANGUAGES: { code: string; name: string; ready: boolean }[] = [
-  { code: "en", name: "English", ready: true },
-  { code: "ar", name: "العربية", ready: true },
-  { code: "am", name: "አማርኛ (Amharic)", ready: false },
-  { code: "ur", name: "اردو (Urdu)", ready: false },
-  { code: "hi", name: "हिन्दी (Hindi)", ready: false },
-  { code: "id", name: "Bahasa Indonesia", ready: false },
-  { code: "tr", name: "Türkçe", ready: false },
-  { code: "fr", name: "Français", ready: false },
-  { code: "es", name: "Español", ready: false },
-  { code: "de", name: "Deutsch", ready: false },
-  { code: "pt", name: "Português", ready: false },
-  { code: "ru", name: "Русский", ready: false },
-  { code: "zh", name: "中文", ready: false },
+// English and Arabic are written by hand; the others are translated by Gemini the first time
+// someone picks them (see src/lib/i18n/translate.ts).
+export const LANGUAGES: { code: string; name: string }[] = [
+  { code: "en", name: "English" },
+  { code: "ar", name: "العربية" },
+  { code: "am", name: "አማርኛ" },
+  { code: "ur", name: "اردو" },
+  { code: "hi", name: "हिन्दी" },
+  { code: "id", name: "Bahasa Indonesia" },
+  { code: "tr", name: "Türkçe" },
+  { code: "fr", name: "Français" },
+  { code: "es", name: "Español" },
+  { code: "de", name: "Deutsch" },
+  { code: "pt", name: "Português" },
+  { code: "ru", name: "Русский" },
+  { code: "zh", name: "中文" },
 ];
 
 function usePopup() {
@@ -40,11 +42,12 @@ function usePopup() {
   return { open, setOpen, props };
 }
 
-const popup = "absolute z-40 bottom-full mb-2 bg-surface border border-line-strong rounded-md p-1 m-0 list-none";
+const popup = "absolute z-40 bg-surface border border-line-strong rounded-md p-1 m-0 list-none";
 
-export function LanguageMenu({ locale, label, soon, compact }: { locale: string; label: string; soon: string; compact: boolean }) {
+export function LanguageMenu({ locale, label, soon, compact, placement = "up" }: { locale: string; label: string; soon: string; compact: boolean; placement?: "up" | "down" }) {
   const { open, setOpen, props } = usePopup();
-  const [, start] = useTransition();
+  const [pending, start] = useTransition();
+  const [note, setNote] = useState<string | undefined>();
   return (
     <div className="relative" {...props}>
       <button
@@ -59,8 +62,13 @@ export function LanguageMenu({ locale, label, soon, compact }: { locale: string;
         <IconGlobe size={17} />
         {!compact && <span className="data uppercase">{locale}</span>}
       </button>
+      {(pending || note) && (
+        <span role="status" className={`absolute ${placement === "down" ? "top-full mt-2 end-0" : "bottom-full mb-2 start-0"} z-40 whitespace-nowrap text-[12px] bg-surface border border-line rounded-md px-2.5 py-1.5`}>
+          {pending ? soon : note}
+        </span>
+      )}
       {open && (
-        <ul role="listbox" aria-label={label} className={`${popup} start-0 w-[260px] max-h-[360px] overflow-y-auto`} style={{ boxShadow: "var(--shadow-float)" }}>
+        <ul role="listbox" aria-label={label} className={`${popup} ${placement === "down" ? "top-full mt-2 end-0" : "bottom-full mb-2 start-0"} w-[260px] max-h-[360px] overflow-y-auto`} style={{ boxShadow: "var(--shadow-float)" }}>
           {LANGUAGES.map((l) => {
             const current = l.code === locale;
             return (
@@ -69,16 +77,19 @@ export function LanguageMenu({ locale, label, soon, compact }: { locale: string;
                   type="button"
                   role="option"
                   aria-selected={current}
-                  disabled={!l.ready}
                   lang={l.code}
-                  className={`w-full flex items-center gap-2 px-2.5 h-9 rounded-sm text-start small ${current ? "bg-tint-3 font-medium" : "hover:bg-tint-2"} disabled:opacity-50 disabled:hover:bg-transparent`}
+                  className={`w-full flex items-center gap-2 px-2.5 h-9 rounded-sm text-start small ${current ? "bg-tint-3 font-medium" : "hover:bg-tint-2"}`}
                   onClick={() => {
                     setOpen(false);
-                    if (!current && l.ready) start(() => setLocale(l.code as "en" | "ar"));
+                    setNote(undefined);
+                    if (!current)
+                      start(async () => {
+                        const res = await setLocale(l.code);
+                        setNote(res.error);
+                      });
                   }}
                 >
                   <span className="grow truncate">{l.name}</span>
-                  {!l.ready && <span className="text-[11px] text-ink-faint">{soon}</span>}
                   {current && <IconCheckSmall size={15} />}
                   <span className="data text-[11px] px-1.5 rounded-sm bg-tint-2 uppercase">{l.code}</span>
                 </button>
@@ -125,7 +136,7 @@ export function PersonMenu({
         )}
       </button>
       {open && (
-        <div role="menu" className={`${popup} start-0 w-[220px]`} style={{ boxShadow: "var(--shadow-float)" }}>
+        <div role="menu" className={`${popup} bottom-full mb-2 start-0 w-[220px]`} style={{ boxShadow: "var(--shadow-float)" }}>
           <Link role="menuitem" href="/settings" className="flex items-center gap-2 px-2.5 h-9 rounded-sm small hover:bg-tint-2">
             <IconSettings size={16} />
             {labels.settings}

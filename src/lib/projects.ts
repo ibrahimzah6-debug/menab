@@ -57,6 +57,7 @@ export async function logAiJob(job: {
   ok: boolean;
   usage?: { inputTokens: number; outputTokens: number; costUsd: number; seconds: number };
   error?: string;
+  fallbackFrom?: string;
 }) {
   try {
     await createAdminClient().from("ai_jobs").insert({
@@ -72,9 +73,31 @@ export async function logAiJob(job: {
       cost_usd: job.ok ? job.usage?.costUsd ?? 0 : 0,
       seconds: job.usage?.seconds ?? null,
       error: job.error?.slice(0, 500) ?? null,
+      fallback_from: job.fallbackFrom ?? null,
       created_by: job.userId,
     });
   } catch {
     // Logging must never break the user's action.
+  }
+}
+
+// A notice for the workspace (and the owner dashboard), for example when the backup AI answered.
+export async function notify(n: {
+  workspaceId: string | null;
+  kind: "ai_fallback" | "ai_failed" | "generation_done" | "approval_waiting" | "info";
+  title: string;
+  body?: string;
+  projectId?: string | null;
+}) {
+  try {
+    await createAdminClient().from("notifications").insert({
+      workspace_id: n.workspaceId,
+      kind: n.kind,
+      title: n.title.slice(0, 300),
+      body: n.body?.slice(0, 2000) ?? null,
+      project_id: n.projectId ?? null,
+    });
+  } catch {
+    // A notice must never break the user's action.
   }
 }
