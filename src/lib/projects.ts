@@ -101,3 +101,20 @@ export async function notify(n: {
     // A notice must never break the user's action.
   }
 }
+
+// Marks outputs as being written, unless they already are (a second press, or a second tab).
+// Returns false when another run started in the last 6 minutes, so nobody pays twice. A run
+// that died more than 6 minutes ago no longer blocks.
+export async function claimForWriting(supabase: SupabaseClient, projectId: string, numbers: number[]) {
+  const recent = new Date(Date.now() - 6 * 60_000).toISOString();
+  const { data: busy } = await supabase
+    .from("outputs")
+    .select("number")
+    .eq("project_id", projectId)
+    .in("number", numbers)
+    .eq("status", "generating")
+    .gte("updated_at", recent);
+  if (busy?.length) return false;
+  await supabase.from("outputs").update({ status: "generating", updated_at: new Date().toISOString() }).eq("project_id", projectId).in("number", numbers);
+  return true;
+}

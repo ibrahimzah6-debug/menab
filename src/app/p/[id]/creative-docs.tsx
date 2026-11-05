@@ -423,7 +423,7 @@ export function Versions({ projectId, n, list, current, editable, c }: { project
             {[...list].sort((a, b) => b.version - a.version).map((v) => (
               <li key={v.version} className="flex items-center gap-2 px-2 h-9 rounded-sm hover:bg-tint-2 small">
                 <span className="data">v{v.version}</span>
-                <span className="text-ink-muted grow truncate">{c.sources[v.source as keyof C["sources"]] ?? v.source} · {new Date(v.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                <span className="text-ink-muted grow truncate">{c.sources[v.source as keyof C["sources"]] ?? v.source} · {new Date(v.created_at).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Riyadh" })}</span>
                 {v.version === current ? (
                   <span className="text-[11px] text-ink-faint">{c.current}</span>
                 ) : (

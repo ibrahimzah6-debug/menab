@@ -84,7 +84,8 @@ const Plug = () => (
 
 // One step of Menab's work in plain words.
 function stepText(e: StepEvent, copy: Copy, paths: Record<string, string>) {
-  const sep = typeof document !== "undefined" && document.documentElement.dir === "rtl" ? "، " : ", ";
+  // Same answer on the server and in the browser: the comma follows the language of the copy.
+  const sep = /[\u0600-\u06FF]/.test(copy.steps.read) ? "، " : ", ";
   switch (e.t) {
     case "read":
       return e.voice ? copy.steps.readVoice : Number(e.files) > 0 ? fillIn(copy.steps.readFiles, { n: Number(e.files) }) : copy.steps.read;

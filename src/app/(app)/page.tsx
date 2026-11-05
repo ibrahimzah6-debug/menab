@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Logo } from "@/components/logo";
 import { ProjectList } from "@/components/project-list";
 import { fill } from "@/lib/i18n/dictionaries";
@@ -25,6 +26,18 @@ export default async function HomePage() {
   const { data: notices } = me
     ? await supabase.from("notifications").select("id, title, created_at").eq("workspace_id", me.workspace.id).order("created_at", { ascending: false }).limit(5)
     : { data: [] };
+  // What waits for this person: stages ready to approve and choices only a person can make.
+  const { data: open } = me
+    ? await supabase.from("projects").select("id, name, path, current_stage, outputs(number, status)").eq("workspace_id", me.workspace.id).in("current_stage", [1, 2]).order("updated_at", { ascending: false }).limit(30)
+    : { data: [] };
+  const ready = (outs: { number: number; status: string }[], n: number) => ["ready", "edited", "approved"].includes(outs.find((o) => o.number === n)?.status ?? "");
+  const todo = (open ?? []).flatMap((pr) => {
+    const outs = (pr.outputs ?? []) as { number: number; status: string }[];
+    if (pr.current_stage === 1 && [3, 4, 5, 6].every((n) => ready(outs, n))) return [{ id: pr.id, name: pr.name, what: pr.path ? t.home.todo.approveBrief : t.home.todo.choosePath, href: `/p/${pr.id}?o=3` }];
+    if (pr.current_stage === 2 && ready(outs, 12)) return [{ id: pr.id, name: pr.name, what: t.home.todo.approveCreative, href: `/p/${pr.id}?o=12` }];
+    if (pr.current_stage === 2 && ready(outs, 7) && !ready(outs, 8)) return [{ id: pr.id, name: pr.name, what: t.home.todo.pickDirection, href: `/p/${pr.id}?o=8` }];
+    return [];
+  });
   const greeting = fill(hour >= 4 && hour < 12 ? t.home.morning : t.home.evening, { name });
 
   return (
@@ -42,7 +55,22 @@ export default async function HomePage() {
         <ProjectList limit={6} />
       </Panel>
       <div className="grid gap-4 md:grid-cols-3">
-        <Panel title={t.home.waiting}><p className="small text-ink-muted m-0">{t.home.nothingWaiting}</p></Panel>
+        <Panel title={t.home.waiting}>
+          {todo.length ? (
+            <ul className="m-0 p-0 list-none flex flex-col gap-2">
+              {todo.slice(0, 6).map((x) => (
+                <li key={x.id}>
+                  <Link href={x.href} className="flex flex-col rounded-md -mx-2 px-2 py-1.5 hover:bg-tint-2">
+                    <span className="small font-medium" dir="auto">{x.name}</span>
+                    <span className="text-[12px] text-ink-muted">{x.what}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="small text-ink-muted m-0">{t.home.nothingWaiting}</p>
+          )}
+        </Panel>
         <Panel title={t.home.activity}>
           {notices && notices.length ? (
             <ul className="m-0 p-0 list-none flex flex-col gap-1.5">

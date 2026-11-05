@@ -133,3 +133,17 @@ Replaces B4.
 - **Approval:** output 12 lists the five outputs with their status; one Approve opens stage 3 (built in M4). Approved work is read only.
 - **Fewer brief questions** (Ibrahim): the brief chat asks only for missing required fields, at most two at a time, never twice, and fills sensible defaults it states in one line. Story, feeling and style move to the Creative stage, where the person picks a direction instead of answering questions.
 - **Microphone where speaking is quicker:** the change box, the meeting notes, memory and ideas, alongside the brief chat (`/api/voice`, Google's free Gemini 3.5 Transcribe).
+
+## B17. Full check of the site (6 Nov 2026)
+
+- **Checked:** Supabase security and performance advisors; every server action and endpoint for who may call it; every page in English and Arabic on a computer and in English on a phone (errors, broken pages, text cut off, raw placeholders); signed-out access; how each stage leads to the next.
+- **Fixed:**
+  - The brief chat, "Write the brief documents", the idea editor and the path could still be changed on the server after stage 1 was approved; they are now locked with the stage.
+  - Pressing a write button twice ran the AI twice and charged twice (seen on 5 Nov). Outputs are now claimed while they are written; a second press is refused for 6 minutes.
+  - In a Creative run, once the backup answers, the remaining pieces go straight to it.
+  - The director's treatment gets 150 seconds before it is stopped (one took 106).
+  - Home's "Waiting for your approval" was fixed text; it now lists real projects: approve the brief, choose a path, pick a direction, approve the creative.
+  - Dates are shown in Riyadh time everywhere, and the list separator in the steps no longer differs between server and browser (a source of a page error).
+  - Signed-out calls to the AI endpoints get a plain 401 instead of the login page.
+- **Left as is, on purpose:** four tables with row security and no policies (only the server reads them); young indexes not used yet.
+- **For Ibrahim (optional):** turn on leaked password protection in Supabase, Authentication, Passwords.

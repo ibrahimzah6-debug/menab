@@ -215,7 +215,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                         <span className="small font-medium" dir="auto">{n.title}</span>
                         {n.body && <span className="text-[12px] text-ink-muted line-clamp-2" dir="auto">{n.body}</span>}
                         <span className="text-[11px] text-ink-faint data">
-                          {new Date(n.created_at).toLocaleString(locale === "ar" ? "ar-SA" : "en-GB", { dateStyle: "medium", timeStyle: "short" })}
+                          {new Date(n.created_at).toLocaleString(locale === "ar" ? "ar-SA" : "en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Riyadh" })}
                         </span>
                       </li>
                     ))}
