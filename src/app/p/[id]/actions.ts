@@ -2,15 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { briefTurn, missingRequired, writeStageOne, type BriefFields } from "@/lib/ai/brain";
-import { DEFAULT_TEXT_MODEL, TEXT_MODELS, textModel } from "@/lib/ai/catalog";
+import { missingRequired, writeStageOne, type BriefFields } from "@/lib/ai/brain";
+import { TEXT_MODELS, textModel } from "@/lib/ai/catalog";
 import { transcribe } from "@/lib/ai/transcribe";
 import { getI18n } from "@/lib/i18n/server";
 import { logAiJob, notify, saveVersion, STAGE_OUTPUTS, type Path } from "@/lib/projects";
-import type { Attachment } from "@/lib/ai/brain";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentMember, getMemberships } from "@/lib/workspace";
+import { getCurrentMember } from "@/lib/workspace";
+import { FILE_TYPES, loadProject, noticeFallback, ownPath, runBriefMessage, type BriefPayload } from "@/lib/brief-turn";
 
 export type Result = { error?: string };
 
@@ -46,29 +46,6 @@ export async function createProject() {
 
 // ---------- Brief chat ----------
 
-async function loadProject(projectId: string) {
-  const supabase = await createClient();
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id, workspace_id, name, client, brief, path, path_suggested, current_stage, models")
-    .eq("id", projectId)
-    .maybeSingle();
-  if (!project) throw new Error("Project not found.");
-  // The person's role in the project's own workspace.
-  const me = (await getMemberships()).find((m) => m.workspace.id === project.workspace_id);
-  if (!me) throw new Error("Log in again.");
-  if (!["admin", "producer", "coordinator"].includes(me.role)) throw new Error("Viewers can read and comment only.");
-  const { data: setting } = await supabase
-    .from("model_settings")
-    .select("model_id")
-    .eq("workspace_id", project.workspace_id)
-    .eq("task", "text")
-    .maybeSingle();
-  // The model picked on this project's steps, else the workspace default, else Menab's default.
-  const models = (project.models ?? {}) as { text?: string };
-  const model = textModel(models.text ?? setting?.model_id ?? DEFAULT_TEXT_MODEL).id;
-  return { me, supabase, project, model };
-}
 
 export async function chooseTextModel(projectId: string, modelId: string): Promise<Result> {
   if (!TEXT_MODELS.some((m) => m.id === modelId)) return { error: "Unknown model" };
@@ -83,103 +60,6 @@ export async function chooseTextModel(projectId: string, modelId: string): Promi
   return {};
 }
 
-// The user's new message is only saved once Menab AI answers, so a failed call leaves no trace
-// and the person can simply send it again.
-async function runBriefTurn(
-  projectId: string,
-  newMessage: {
-    content: string;
-    kind: "text" | "voice";
-    audio_path?: string;
-    audio_seconds?: number | null;
-    files?: Attachment[];
-    attachments?: { path: string; name: string; mime: string }[];
-  },
-) {
-  const { me, supabase, project, model } = await loadProject(projectId);
-  const { t } = await getI18n();
-  const { data: history } = await supabase
-    .from("messages")
-    .select("role, content")
-    .eq("project_id", projectId)
-    .order("created_at", { ascending: true })
-    .limit(60);
-
-  let result;
-  try {
-    result = await briefTurn(
-      [
-        ...(history ?? []).map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
-        { role: "user" as const, content: newMessage.content, files: newMessage.files },
-      ],
-      project.brief as Partial<BriefFields>,
-      model,
-    );
-  } catch (e) {
-    await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "brief", provider: textModel(model).provider, model, ok: false, error: errText(e) });
-    await notify({ workspaceId: me.workspace.id, projectId, kind: "ai_failed", title: `${textModel(model).name} and its backup did not answer a brief message`, body: errText(e) });
-    throw new Error(e instanceof Error && e.message.includes("Gemini") ? e.message : t.project.aiFailed);
-  }
-  const { turn, usage } = result;
-  const used = result.model;
-  await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "brief", provider: textModel(used).provider, model: used, ok: true, usage, fallbackFrom: result.fallbackFrom });
-  if (result.fallbackFrom) await noticeFallback(me.workspace.id, projectId, result.fallbackFrom, used, result.firstError);
-
-  await supabase.from("messages").insert({
-    workspace_id: me.workspace.id,
-    project_id: projectId,
-    role: "user",
-    kind: newMessage.kind,
-    content: newMessage.content.slice(0, 20000),
-    audio_path: newMessage.audio_path ?? null,
-    audio_seconds: newMessage.audio_seconds ?? null,
-    attachments: newMessage.attachments ?? [],
-    created_by: me.userId,
-  });
-  await supabase.from("messages").insert({
-    workspace_id: me.workspace.id,
-    project_id: projectId,
-    role: "assistant",
-    content: turn.reply.slice(0, 20000),
-    created_by: me.userId,
-  });
-
-  const keepName = project.name !== t.project.untitled && project.name !== "New project" && project.name !== "مشروع جديد";
-  await supabase
-    .from("projects")
-    .update({
-      brief: turn.brief,
-      name: keepName ? project.name : (turn.brief.project_name || project.name).slice(0, 160),
-      client: turn.brief.client?.slice(0, 160) ?? project.client,
-      path_suggested: turn.path.suggested,
-      path_reason: turn.path.reason || null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", projectId);
-
-  // Outputs 1 (brief intake) and 2 (questions) keep a version each time they change.
-  const { data: outs } = await supabase
-    .from("outputs")
-    .select("id, workspace_id, number, current_version")
-    .eq("project_id", projectId)
-    .in("number", [1, 2]);
-  for (const o of outs ?? []) {
-    const content = o.number === 1 ? { brief: turn.brief } : { questions: turn.questions, missing: missingRequired(turn.brief) };
-    await saveVersion(supabase, o, content, "ai", me.userId, used);
-  }
-}
-
-async function noticeFallback(workspaceId: string, projectId: string, from: string, to: string, error?: string) {
-  await notify({
-    workspaceId,
-    projectId,
-    kind: "ai_fallback",
-    title: `${textModel(from).name} did not answer, so ${textModel(to).name} took over`,
-    body: error,
-  });
-}
-
-const FILE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf"];
 const MAX_FILE = 10 * 1024 * 1024;
 const MAX_VOICE = 20 * 1024 * 1024;
 
@@ -207,9 +87,6 @@ export async function prepareUpload(
   }
 }
 
-function ownPath(path: string, workspaceId: string, projectId: string) {
-  return path.startsWith(`${workspaceId}/projects/${projectId}/`) && !path.includes("..");
-}
 
 // Turns a recorded voice note into text with Gemini. The text goes into the reply box first,
 // so the person can read it and decide to send it.
@@ -226,7 +103,7 @@ export async function transcribeVoice(projectId: string, path: string): Promise<
       await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "transcribe", provider: r.provider, model: r.model, ok: true, usage: r.usage });
       return { text: r.text };
     } catch (e) {
-      await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "transcribe", provider: process.env.GEMINI_API_KEY ? "google" : "kie.ai", model: "gemini", ok: false, error: errText(e) });
+      await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "transcribe", provider: "kie.ai", model: "gemini-3-8-flash", ok: false, error: errText(e) });
       await notify({ workspaceId: me.workspace.id, projectId, kind: "ai_failed", title: "A voice note could not be turned into text", body: errText(e) });
       return { error: t.project.voiceFailed };
     }
@@ -235,36 +112,10 @@ export async function transcribeVoice(projectId: string, path: string): Promise<
   }
 }
 
-// A brief message with optional files (logo, product photos, references, a PDF brief) and,
-// when it came from a voice note, that recording.
-export async function sendBriefMessage(
-  projectId: string,
-  payload: { text: string; files: { path: string; name: string; mime: string }[]; voice?: { path: string; seconds: number } },
-): Promise<Result> {
-  const clean = payload.text.trim().slice(0, 8000);
-  const list = (payload.files ?? []).slice(0, 5);
-  if (!clean && !list.length) return {};
+// A brief message without live steps (the chat uses /p/[id]/brief, which reports each step).
+export async function sendBriefMessage(projectId: string, payload: BriefPayload): Promise<Result> {
   try {
-    const { me } = await loadProject(projectId);
-    const admin = createAdminClient();
-    const files: Attachment[] = [];
-    for (const f of list) {
-      if (!ownPath(f.path, me.workspace.id, projectId) || !FILE_TYPES.includes(f.mime)) return { error: "File not found." };
-      const { data } = await admin.storage.from("media").download(f.path);
-      if (!data) return { error: "File not found." };
-      files.push({ mime: f.mime, base64: Buffer.from(await data.arrayBuffer()).toString("base64"), name: f.name });
-    }
-    const names = list.map((a) => a.name).join(", ");
-    const content = clean ? (names ? `${clean}\n\nAttached: ${names}` : clean) : `(${names})`;
-    const voice = payload.voice && ownPath(payload.voice.path, me.workspace.id, projectId) ? payload.voice : undefined;
-    await runBriefTurn(projectId, {
-      content,
-      kind: voice ? "voice" : "text",
-      audio_path: voice?.path,
-      audio_seconds: voice ? Math.round(voice.seconds) : null,
-      files,
-      attachments: list.map((f) => ({ path: f.path, name: f.name.slice(0, 200), mime: f.mime })),
-    });
+    await runBriefMessage(projectId, payload, () => {});
   } catch (e) {
     revalidatePath(`/p/${projectId}`);
     return { error: errText(e) };

@@ -86,3 +86,13 @@ Replaces B4.
 - **Board:** the main line of each card (the idea, the summary's opening, the key message, the reason for the path) is edited on the card. "Open page" opens the full step.
 - **Loading:** a single dot that grows and fades, like Claude and ChatGPT.
 - **Languages:** the interface is translated in small parts, three at a time, each tried twice, so a first switch no longer fails on one long answer.
+
+## B12. OpenAI models, live steps, reliable voice, board canvas (Ibrahim, 5 Nov 2026)
+
+- **Writing models:** Gemini leaves the writing list; OpenAI joins through Kie.ai (`api.kie.ai/codex/v1/responses`). Strongest first: Claude Fable 5, GPT 6 Astra, Claude Opus 5.5 (default), GPT 6.1 Sol, Claude Sonnet 5.5, GPT 6.1 Terra, Claude Haiku 5.5, GPT 6 Luna. Backup: Claude falls back to GPT 6.1 Sol, GPT falls back to Claude Sonnet 5.5. A project still set to a Gemini model uses the default.
+- **Answers that are slightly off** (a list sent as text, a number as words, an empty field left out) are put into shape before they are checked. The retry tells the model what was wrong.
+- **Time limits:** each model call stops after 70 seconds (90 for the stage documents), so a stuck model moves on to the retry and the backup instead of hanging. The page allows 5 minutes in total.
+- **Live steps:** the chat shows what Menab is doing as it happens, like Claude and ChatGPT: reading the message and files, asking the model, retrying, switching to the backup, which brief fields changed, the suggested path, saving. A dropped connection puts the message back in the box; it never breaks the page.
+- **Voice:** Gemini 3.8 Flash through Kie.ai first (paid, a fraction of a cent, reliable), tried twice; Google's free tier is the last backup. The free tier answered "high demand" to every voice note.
+- **Board:** a canvas. Drag empty space to move, scroll to pan, zoom with the buttons or Ctrl and the wheel.
+- **Strategy and deliverables:** tone, length, ratio and platform are dropdowns with "Other…" to type your own; platforms are chips you switch on and off.

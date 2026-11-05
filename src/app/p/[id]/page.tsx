@@ -13,6 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getMemberships } from "@/lib/workspace";
 import { BriefChat } from "./brief-chat";
 import { ChangeBox } from "./editors";
+import { BoardCanvas } from "./board-canvas";
 import { BoardCardText, InlineDoc, InlineIdea } from "./inline-doc";
 import { LanguageMenu } from "@/components/menus";
 import { MenabLoader } from "@/components/menab-loader";
@@ -20,7 +21,7 @@ import { StepModelPicker } from "./side-panels";
 import { PathButtons, RewriteButton, StageFooter } from "./stage-controls";
 
 // AI calls run inside the actions on this page and can take up to a minute.
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 const iso = (x: string) => String.fromCharCode(0x2066) + x + String.fromCharCode(0x2069);
 const money = (n: number) => iso(`$${n < 0.01 && n > 0 ? n.toFixed(3) : n.toFixed(2)}`);
@@ -78,9 +79,7 @@ export default async function ProjectPage({
     rank: i + 1,
     name: m.name,
     note: m.goodFor[locale],
-    price: m.free
-      ? locale === "ar" ? "مجاني، بحد يومي" : "Free, daily limit"
-      : iso(`~$${estimateUsd(m.id, "briefTurn").toFixed(3)}`) + (locale === "ar" ? " للرد" : " a reply"),
+    price: iso(`~$${estimateUsd(m.id, "briefTurn").toFixed(3)}`) + (locale === "ar" ? " للرد" : " a reply"),
   }));
 
   // Which stage the screen shows: the current one, or stage 1 when one of its outputs is opened.
@@ -160,7 +159,7 @@ export default async function ProjectPage({
 
       {board ? (
         <main className="flex-1 min-h-0 px-4 md:px-6 pb-4 flex flex-col md:flex-row gap-4">
-          <div className="relative mn-board flex-1 min-w-0 md:min-h-0 md:overflow-y-auto flex flex-wrap gap-6 content-start">
+          <BoardCanvas labels={{ zoomIn: t.stage.zoomIn, zoomOut: t.stage.zoomOut, reset: t.stage.zoomReset }}>
             {list.map((x) => {
               const st = statusOf(x.number);
               return (
@@ -195,7 +194,7 @@ export default async function ProjectPage({
                 </div>
               );
             })}
-          </div>
+          </BoardCanvas>
           <aside className="relative w-full md:w-[320px] shrink-0 md:min-h-0 md:overflow-y-auto bg-surface border border-line rounded-lg p-4 flex flex-col gap-3 self-start">
             <h2 className="m-0 text-[16px] font-medium">{t.stage.assistant}</h2>
             <div className="flex flex-col gap-1.5">
@@ -246,6 +245,7 @@ export default async function ProjectPage({
                 messages={(messages ?? []) as never}
                 copy={p}
                 models={modelOptions.map((m) => ({ id: m.id, name: m.name, price: m.price }))}
+                paths={t.stage.paths}
                 model={model}
               />
             </div>

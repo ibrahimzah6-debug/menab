@@ -8,6 +8,8 @@ export async function startWavRecorder(): Promise<WavRecorder> {
   const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
   const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   const ctx = new Ctx();
+  // Some browsers start the audio engine paused; without this the recording is silent.
+  if (ctx.state === "suspended") await ctx.resume().catch(() => {});
   const source = ctx.createMediaStreamSource(stream);
   const processor = ctx.createScriptProcessor(4096, 1, 1);
   const chunks: Float32Array[] = [];
@@ -30,6 +32,7 @@ export async function startWavRecorder(): Promise<WavRecorder> {
         all.set(c, offset);
         offset += c.length;
       }
+      if (length < rate * 0.5) throw new Error("The recording was too short. Hold on a moment longer before you stop.");
       const pcm = downsample(all, rate, 16000);
       return { blob: encodeWav(pcm, 16000), seconds: (Date.now() - started) / 1000 };
     },

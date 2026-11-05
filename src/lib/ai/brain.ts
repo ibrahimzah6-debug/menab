@@ -1,8 +1,8 @@
 import "server-only";
 import { z } from "zod";
-import { structured, type Msg } from "./brain-core";
+import { structured, type Msg, type Step } from "./brain-core";
 
-export type { Attachment, Msg, Usage } from "./brain-core";
+export type { Attachment, Msg, Step, Usage } from "./brain-core";
 
 // The "brain": Menab AI reads the brief and decides what follows, so people are not left
 // guessing and nothing is generated before the idea is clear. The calls themselves, with
@@ -80,6 +80,7 @@ export async function briefTurn(
   history: Msg[],
   current: Partial<BriefFields>,
   modelId: string,
+  onStep?: (s: Step) => void,
 ) {
   const r = await structured(
     modelId,
@@ -96,7 +97,7 @@ Required before documents can be written: ${REQUIRED_BRIEF_FIELDS.join(", ")}. A
       },
     ],
     BriefTurn,
-    { effort: "low", maxTokens: 8000 },
+    { effort: "low", maxTokens: 8000, onStep, timeoutMs: 70_000 },
   );
   r.data.questions = r.data.questions.slice(0, 3);
   return { turn: r.data, usage: r.usage, model: r.model, fallbackFrom: r.fallbackFrom, firstError: r.firstError };
@@ -155,6 +156,7 @@ export async function writeStageOne(
   language: string,
   modelId: string,
   revise?: { instruction: string; current: unknown },
+  onStep?: (s: Step) => void,
 ) {
   const ask = revise
     ? `Today is ${today}. Revise these stage 1 documents with this change from the producer: "${revise.instruction}". Apply the change everywhere it matters (summary, strategy, pathway, CPS) and keep everything else. Write in: ${language}.
@@ -174,7 +176,7 @@ Brief: ${JSON.stringify(brief)}`,
       },
     ],
     StageOneDocs,
-    { effort: "medium", maxTokens: 16000 },
+    { effort: "medium", maxTokens: 16000, onStep, timeoutMs: 90_000 },
   );
   return { docs: r.data, usage: r.usage, model: r.model, fallbackFrom: r.fallbackFrom, firstError: r.firstError };
 }

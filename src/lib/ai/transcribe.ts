@@ -1,17 +1,34 @@
 import "server-only";
 import { TRANSCRIBER } from "./catalog";
+import { KIE_USD_PER_CREDIT } from "./kie";
 
-// Voice briefs: Gemini turns a voice note into text, then Claude reads the text.
-// First choice: Google's Gemini API with Menab's own free-tier key (GEMINI_API_KEY in Vercel).
-// Note: on the free tier Google may use the content to improve its models (Ibrahim accepted this).
-// If no Gemini key is set, Gemini through Kie.ai is used instead.
+// Voice notes: Gemini turns the recording into text, which lands in the reply box.
+// First choice: Gemini 3.8 Flash through Kie.ai (paid, a fraction of a cent, reliable).
+// It is tried twice; Google's free tier (GEMINI_API_KEY) is the last backup, since it is often
+// too busy to answer.
 
 const PROMPT =
   "Transcribe this voice note exactly as spoken. It is a video production brief, usually in Saudi Arabic, sometimes mixed with English. Keep the original language and words. Return only the transcript, no notes.";
 
 export async function transcribe(audio: Buffer, mimeType: string) {
-  if (process.env.GEMINI_API_KEY) return transcribeWithGoogle(audio, mimeType);
-  return transcribeWithKie(audio, mimeType);
+  const errors: string[] = [];
+  if (process.env.KIE_API_KEY) {
+    for (let i = 0; i < 2; i++) {
+      try {
+        return await transcribeWithKie(audio, mimeType);
+      } catch (e) {
+        errors.push(e instanceof Error ? e.message : String(e));
+      }
+    }
+  }
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      return await transcribeWithGoogle(audio, mimeType);
+    } catch (e) {
+      errors.push(e instanceof Error ? e.message : String(e));
+    }
+  }
+  throw new Error(errors.join(" | ") || "No voice model is set up (KIE_API_KEY)");
 }
 
 async function transcribeWithGoogle(audio: Buffer, mimeType: string) {
@@ -21,6 +38,7 @@ async function transcribeWithGoogle(audio: Buffer, mimeType: string) {
     method: "POST",
     headers: { "x-goog-api-key": process.env.GEMINI_API_KEY!, "Content-Type": "application/json" },
     cache: "no-store",
+    signal: AbortSignal.timeout(60_000),
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ inline_data: { mime_type: mimeType, data: audio.toString("base64") } }, { text: PROMPT }] }],
     }),
@@ -58,6 +76,7 @@ async function transcribeWithKie(audio: Buffer, mimeType: string) {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     cache: "no-store",
+    signal: AbortSignal.timeout(60_000),
     body: JSON.stringify({
       stream: false,
       contents: [
@@ -109,7 +128,10 @@ async function transcribeWithKie(audio: Buffer, mimeType: string) {
   const usage = [...chunks].reverse().find((c) => c?.usageMetadata)?.usageMetadata;
   const inputTokens = usage?.promptTokenCount ?? 0;
   const outputTokens = usage?.candidatesTokenCount ?? 0;
-  const costUsd = Math.round(((inputTokens + outputTokens) * TRANSCRIBER.usdPerMillion) / 1_000_000 * 10000) / 10000;
+  const credits = [...chunks].reverse().find((c) => typeof (c as { credits_consumed?: number })?.credits_consumed === "number") as { credits_consumed?: number } | undefined;
+  const costUsd = credits?.credits_consumed != null
+    ? Math.round(credits.credits_consumed * KIE_USD_PER_CREDIT * 10000) / 10000
+    : Math.round(((inputTokens + outputTokens) * TRANSCRIBER.usdPerMillion) / 1_000_000 * 10000) / 10000;
   return {
     text,
     provider: "kie.ai",
