@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 
 export type Role = "admin" | "producer" | "coordinator" | "viewer";
@@ -12,31 +13,43 @@ export type CurrentMember = {
   workspace: { id: string; name: string };
 };
 
-// The logged-in user and their workspace. One workspace per company in v1.
-export const getCurrentMember = cache(async (): Promise<CurrentMember | null> => {
+export const WORKSPACE_COOKIE = "menab-ws";
+
+// Every workspace the logged-in person belongs to. One workspace per company;
+// a person who works with several companies can switch between them.
+export const getMemberships = cache(async (): Promise<CurrentMember[]> => {
   const supabase = await createClient();
   const { data: claims } = await supabase.auth.getClaims();
   const userId = claims?.claims?.sub;
-  if (!userId) return null;
+  if (!userId) return [];
 
   const { data } = await supabase
     .from("members")
     .select("id, user_id, email, full_name, role, workspace:workspaces(id, name)")
     .eq("user_id", userId)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+    .order("created_at", { ascending: true });
 
-  if (!data || !data.workspace) return null;
-  const ws = Array.isArray(data.workspace) ? data.workspace[0] : data.workspace;
-  return {
-    id: data.id,
-    userId: data.user_id,
-    email: data.email,
-    fullName: data.full_name,
-    role: data.role as Role,
-    workspace: { id: ws.id, name: ws.name },
-  };
+  return (data ?? [])
+    .filter((m) => m.workspace)
+    .map((m) => {
+      const ws = Array.isArray(m.workspace) ? m.workspace[0] : m.workspace;
+      return {
+        id: m.id,
+        userId: m.user_id,
+        email: m.email,
+        fullName: m.full_name,
+        role: m.role as Role,
+        workspace: { id: ws.id, name: ws.name },
+      };
+    });
+});
+
+// The workspace the person is working in now: the one they picked, else their first.
+export const getCurrentMember = cache(async (): Promise<CurrentMember | null> => {
+  const all = await getMemberships();
+  if (!all.length) return null;
+  const picked = (await cookies()).get(WORKSPACE_COOKIE)?.value;
+  return all.find((m) => m.workspace.id === picked) ?? all[0];
 });
 
 export const getUserEmail = cache(async () => {

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { getI18n } from "@/lib/i18n/server";
 // Fonts ship with the app, so builds never depend on downloading them.
 import "@fontsource-variable/rubik";
@@ -13,8 +14,11 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const { locale, dir } = await getI18n();
+  const saved = (await cookies()).get("menab-theme")?.value;
+  // Light is the default; each person can pick dark or follow their system in Settings.
+  const theme = saved === "dark" || saved === "system" ? saved : "light";
   return (
-    <html lang={locale} dir={dir} data-theme="light">
+    <html lang={locale} dir={dir} data-theme={theme}>
       <body>{children}</body>
     </html>
   );

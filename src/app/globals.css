@@ -55,3 +55,43 @@ html[lang="ar"] .mn-label:not([lang="en"]) { font-family: var(--font-sans); lett
   background: var(--surface); color: var(--ink); font: 400 13px/20px var(--font-sans);
 }
 .mn-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Theme: light (default), dark, or follow the system. */
+@media (prefers-color-scheme: dark) {
+  [data-theme="system"] {
+    --ground: #1f1f1f;
+    --ground-deep: #1a1a1a;
+    --surface: #212121;
+    --surface-raised: #282828;
+    --tint-1: rgba(255,255,255,0.03);
+    --tint-2: rgba(255,255,255,0.05);
+    --tint-3: rgba(255,255,255,0.14);
+    --line: rgba(255,255,255,0.08);
+    --line-strong: rgba(255,255,255,0.2);
+    --line-control: rgba(255,255,255,0.4);
+    --ink: #ffffff;
+    --ink-muted: rgba(255,255,255,0.7);
+    --ink-faint: rgba(255,255,255,0.55);
+    --primary: #faf9f6;
+    --on-primary: #000000;
+    --focus: #faf9f6;
+    --shadow-card: 0 1px 2px rgba(0,0,0,0.4);
+    --shadow-float: 0 8px 24px rgba(0,0,0,0.5);
+  }
+}
+
+/* Logo: ink on light grounds, light on dark grounds. */
+.logo-light { display: none; }
+[data-theme="dark"] .logo-ink { display: none; }
+[data-theme="dark"] .logo-light { display: inline; }
+@media (prefers-color-scheme: dark) {
+  [data-theme="system"] .logo-ink { display: none; }
+  [data-theme="system"] .logo-light { display: inline; }
+}
+
+/* Menab AI writing: a soft blinking caret, still for reduced motion. */
+.mn-dots::after { content: "…"; display: inline-block; width: 1.2em; text-align: start; animation: mn-blink 1.2s steps(2) infinite; }
+@media (prefers-reduced-motion: reduce) { .mn-dots::after { animation: none; } }
+
+.mn-nav-item { transition: background-color .15s ease, color .15s ease; }
+::selection { background: var(--tint-3); }

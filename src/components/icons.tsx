@@ -42,3 +42,27 @@ export const IconMic = ({ size, className }: P) => (
 export const IconCheck = ({ className }: P) => (
   <svg className={className ?? "mn-chip__icon"} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M2.5 6.2l2.3 2.3 4.7-5" /></svg>
 );
+export const IconSidebar = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M9 4v16" /></svg>
+);
+export const IconSelector = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}><path d="M8 9l4-4 4 4" /><path d="M16 15l-4 4-4-4" /></svg>
+);
+export const IconCheckSmall = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}><path d="M5 12l5 5L20 7" /></svg>
+);
+export const IconLogout = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}><path d="M14 8V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-2" /><path d="M9 12h12l-3-3M18 15l3-3" /></svg>
+);
+export const IconLanguage = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}><path d="M4 5h7M9 3v2c0 4.4-2.2 8-5 8M5 9c0 2.1 2.9 4 6.4 4" /><path d="M12 20l4-9 4 9M19.1 18h-6.2" /></svg>
+);
+export const IconLayoutPage = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M4 9h16M9 9v11" /></svg>
+);
+export const IconLayoutBoard = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}><rect x="3" y="4" width="7" height="6" rx="1" /><rect x="14" y="4" width="7" height="9" rx="1" /><rect x="3" y="14" width="7" height="6" rx="1" /><rect x="14" y="16" width="7" height="4" rx="1" /></svg>
+);
+export const IconGlobe = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}><circle cx="12" cy="12" r="9" /><path d="M3.6 9h16.8M3.6 15h16.8" /><path d="M11.5 3a17 17 0 0 0 0 18M12.5 3a17 17 0 0 1 0 18" /></svg>
+);
