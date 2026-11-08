@@ -168,8 +168,7 @@ async function post(url: string, payload: unknown, opts: Opts, name: string) {
 // The answer comes back through one "submit" tool, checked against the schema.
 async function kieClaude<S extends z.ZodType>(m: TextModel, system: string, messages: Msg[], schema: S, opts: Opts) {
   const started = Date.now();
-  const res = await post(
-    "https://api.kie.ai/claude/v1/messages",
+  const payload =
     {
       model: m.id,
       max_tokens: opts.maxTokens,
@@ -192,11 +191,21 @@ async function kieClaude<S extends z.ZodType>(m: TextModel, system: string, mess
             ]
           : x.content,
       })),
-    },
-    opts,
-    m.name,
-  );
-  const body = await readClaude(res, opts);
+    };
+  // Kie.ai's Claude often answers "Internal error" or "Resources are tight" within a second
+  // when it is busy (measured 8 Nov: about 1 in 8 calls got through). Those quick refusals cost
+  // nothing, so a few quick tries run before Menab counts it as a failure.
+  let res: Response;
+  let body: ClaudeBody | null;
+  for (let quick = 0; ; quick++) {
+    const t0 = Date.now();
+    res = await post("https://api.kie.ai/claude/v1/messages", payload, opts, m.name);
+    body = await readClaude(res, opts);
+    const message = body?.msg ?? body?.error?.message ?? "";
+    const busy = /internal error|resources are tight|overloaded|try again later/i.test(message) && Date.now() - t0 < 6000;
+    if (!busy || quick >= 3 || opts.signal?.aborted) break;
+    await wait(500 + quick * 700);
+  }
   if (!res.ok || !body || (typeof body.code === "number" && body.code !== 200) || body.error) {
     throw new Error(`${m.name}: ${body?.msg ?? body?.error?.message ?? `HTTP ${res.status}`}`);
   }

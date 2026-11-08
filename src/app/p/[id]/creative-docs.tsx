@@ -185,7 +185,7 @@ export function MeetingView({
               <span className="mn-btn__cost">{cost}</span>
             </button>
           )}
-          <RunLine events={r.events} busy={r.busy} c={run} />
+          <RunLine events={r.events} busy={r.busy} c={run} startedAt={r.startedAt} />
         </div>
       )}
       {(error || r.error) && <p className="small m-0 px-3 py-2 rounded-md bg-tint-2" role="alert">{error ?? r.error}</p>}

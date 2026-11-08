@@ -184,6 +184,7 @@ export async function writeStageOne(
   onStep?: (s: Step) => void,
   memory?: string[],
   rules?: string[],
+  signal?: AbortSignal,
 ) {
   const ask = revise
     ? `Today is ${today}. Revise these stage 1 documents with this change from the producer: "${revise.instruction}". Apply the change everywhere it matters (summary, strategy, pathway, CPS) and keep everything else. Write in: ${language}.
@@ -203,7 +204,7 @@ Brief: ${JSON.stringify(brief)}`,
       },
     ],
     StageOneDocs,
-    { effort: "medium", maxTokens: 16000, onStep, timeoutMs: 90_000 },
+    { effort: "medium", maxTokens: 16000, onStep, signal, timeoutMs: 150_000 },
   );
   return { docs: r.data, usage: r.usage, model: r.model, fallbackFrom: r.fallbackFrom, firstError: r.firstError };
 }
