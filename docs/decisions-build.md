@@ -133,3 +133,26 @@ Replaces B4.
 - **Approval:** output 12 lists the five outputs with their status; one Approve opens stage 3 (built in M4). Approved work is read only.
 - **Fewer brief questions** (Ibrahim): the brief chat asks only for missing required fields, at most two at a time, never twice, and fills sensible defaults it states in one line. Story, feeling and style move to the Creative stage, where the person picks a direction instead of answering questions.
 - **Microphone where speaking is quicker:** the change box, the meeting notes, memory and ideas, alongside the brief chat (`/api/voice`, Google's free Gemini 3.5 Transcribe).
+
+## B17. Full check of the site (6 Nov 2026)
+
+- **Checked:** Supabase security and performance advisors; every server action and endpoint for who may call it; every page in English and Arabic on a computer and in English on a phone (errors, broken pages, text cut off, raw placeholders); signed-out access; how each stage leads to the next.
+- **Fixed:**
+  - The brief chat, "Write the brief documents", the idea editor and the path could still be changed on the server after stage 1 was approved; they are now locked with the stage.
+  - Pressing a write button twice ran the AI twice and charged twice (seen on 5 Nov). Outputs are now claimed while they are written; a second press is refused for 6 minutes.
+  - In a Creative run, once the backup answers, the remaining pieces go straight to it.
+  - The director's treatment gets 150 seconds before it is stopped (one took 106).
+  - Home's "Waiting for your approval" was fixed text; it now lists real projects: approve the brief, choose a path, pick a direction, approve the creative.
+  - Dates are shown in Riyadh time everywhere, and the list separator in the steps no longer differs between server and browser (a source of a page error).
+  - Signed-out calls to the AI endpoints get a plain 401 instead of the login page.
+- **Left as is, on purpose:** four tables with row security and no policies (only the server reads them); young indexes not used yet.
+- **For Ibrahim (optional):** turn on leaked password protection in Supabase, Authentication, Passwords.
+
+## B18. Live board, panel tabs, drafts, try again, delete (Ibrahim, 8 Nov 2026)
+
+- **Live board** (information-architecture.md, Board view; screens/StageBoard.png): every stage up to the current one is on the canvas, earlier ones read only; waiting cards are dashed and say what they wait for; the card being written shows a shimmer and the labelled Menab AI cursor glides to it and moves while it writes; a finished card pops in and its text types in; the top bar says what Menab AI is writing. The brief chat is on the board too, in the right panel. Reduced motion shows the result without animation. Dragging cards stays for later (mvp-definition.md).
+- **Right panel tabs:** Brief and Assistant (and Chat on the board) as tabs at the top; only the open tab scrolls. The brief is readable from every stage.
+- **Drafts:** the unsent message, its files and voice note are kept per project in the browser, so switching to the board or another page never loses them.
+- **Try again:** a Creative output that failed, or never got written, shows "Try again" with its price; it writes that output from scratch (the script also writes a missing treatment and mood). A piece stuck "Generating" for over 6 minutes shows as failed.
+- **Faster treatment:** a new director's treatment is written in two halves at the same time (the film; the production), each a shorter call. On 8 Nov one took longer than the time limit.
+- **Delete project:** Admins and Producers, from the ⋯ menu in the project bar, after a confirmation. Chat, documents, versions and files are removed; the AI costs stay in Credits.

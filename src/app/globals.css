@@ -113,3 +113,14 @@ html[lang="ar"] .mn-label:not([lang="en"]) { font-family: var(--font-sans); lett
   [data-menu="open"] .stage-steps { width: 168px; }
   [data-menu="open"] .stage-side { width: 248px; }
 }
+
+/* Board: the Menab AI cursor glides between cards and moves a little while it writes; new
+   cards pop in. Off for reduced motion. */
+.mn-board-cursor { transition: left .9s cubic-bezier(.22,.8,.3,1), top .9s cubic-bezier(.22,.8,.3,1), opacity .4s ease; }
+.mn-board-cursor .mn-cursor__arrow { animation: mn-draw 1.6s ease-in-out infinite; }
+@keyframes mn-draw { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(6px, 3px); } 50% { transform: translate(2px, 7px); } 75% { transform: translate(-4px, 2px); } }
+.mn-card-pop { animation: mn-pop .5s cubic-bezier(.2,.9,.3,1.2) both; }
+@keyframes mn-pop { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+.mn-skeleton { background: linear-gradient(90deg, var(--tint-2) 0%, var(--tint-1) 50%, var(--tint-2) 100%); background-size: 200% 100%; animation: mn-shimmer 1.4s linear infinite; border-radius: var(--radius-sm); }
+@keyframes mn-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .mn-board-cursor { transition: none; } .mn-board-cursor .mn-cursor__arrow, .mn-card-pop, .mn-skeleton { animation: none; } }

@@ -64,3 +64,25 @@ export function AutoRefresh({ active, every = 4000 }: { active: boolean; every?:
   }, [active, every, router]);
   return null;
 }
+
+// Shown on a Creative output that failed or was never written: one press writes it again.
+export function TryAgain({ projectId, n, failed, cost, run, c }: { projectId: string; n: number; failed: boolean; cost: string; run: RunCopy; c: { failed: string; missing: string; tryAgain: string; write: string } }) {
+  const r = useCreativeRun(projectId, run);
+  return (
+    <div className="flex flex-col gap-3 items-start">
+      <p className="body text-ink-muted m-0">{failed ? c.failed : c.missing}</p>
+      <div className="flex flex-wrap items-center gap-3">
+        {r.busy ? (
+          <button type="button" className="mn-btn mn-btn--secondary" onClick={r.stop}>{run.steps.stop}</button>
+        ) : (
+          <button type="button" className="mn-btn mn-btn--primary" onClick={() => r.run({ kind: "redo", n })}>
+            {failed ? c.tryAgain : c.write}
+            <span className="mn-btn__cost">{cost}</span>
+          </button>
+        )}
+        <RunLine events={r.events} busy={r.busy} c={run} />
+      </div>
+      {r.error && <p className="small m-0 px-3 py-2 rounded-md bg-tint-2" role="alert">{r.error}</p>}
+    </div>
+  );
+}

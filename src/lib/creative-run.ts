@@ -7,7 +7,7 @@ import { isFailing } from "@/lib/ai/health";
 import { loadProject, noticeFallback } from "@/lib/brief-turn";
 import { activeRules } from "@/lib/dev";
 import { getI18n } from "@/lib/i18n/server";
-import { logAiJob, notify, saveVersion } from "@/lib/projects";
+import { claimForWriting, logAiJob, notify, saveVersion } from "@/lib/projects";
 
 // Runs the Creative stage's AI work and reports each step as it happens (one JSON per line).
 //  directions: writes output 7 (three directions).
@@ -30,7 +30,7 @@ type Out = { id: string; workspace_id: string; number: number; status: string; c
 
 export async function runCreative(
   projectId: string,
-  action: { kind: "directions" } | { kind: "build" } | { kind: "revise"; n: number; instruction: string },
+  action: { kind: "directions" } | { kind: "build" } | { kind: "revise"; n: number; instruction: string } | { kind: "redo"; n: number },
   emit: (e: CreativeEvent) => void,
   signal?: AbortSignal,
 ) {
@@ -76,19 +76,27 @@ export async function runCreative(
     signal,
   };
 
+  const claimed = new Set<number>();
   // One AI piece: mark it as being written, run it, save it as a new version, log the cost.
   const piece = async <T>(n: number, task: string, run: () => Promise<{ data: T; usage: { inputTokens: number; outputTokens: number; costUsd: number; seconds: number }; model: string; fallbackFrom?: string; firstError?: string }>, shape?: (d: T) => unknown) => {
     const o = out(n);
     if (!o) throw new Error("Step not found.");
     const before = o.status;
     emit({ t: "writing", n });
-    await supabase.from("outputs").update({ status: "generating" }).eq("id", o.id);
+    if (!claimed.has(n)) {
+      if (!(await claimForWriting(supabase, projectId, [n]))) throw new Error(t.project.alreadyWriting);
+      claimed.add(n);
+    }
     try {
       const r = await run();
       if (signal?.aborted) throw new StoppedError();
       await saveVersion(supabase, o, shape ? shape(r.data) : r.data, "ai", me.userId, r.model);
       await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task, provider: textModel(r.model).provider, model: r.model, ok: true, usage: r.usage, fallbackFrom: r.fallbackFrom });
-      if (r.fallbackFrom) await noticeFallback(me.workspace.id, projectId, r.fallbackFrom, r.model, r.firstError);
+      if (r.fallbackFrom) {
+        await noticeFallback(me.workspace.id, projectId, r.fallbackFrom, r.model, r.firstError);
+        // The next pieces of this run go straight to the model that answered.
+        ctx.modelId = r.model;
+      }
       emit({ t: "saved", n });
       return r.data;
     } catch (e) {
@@ -117,7 +125,8 @@ export async function runCreative(
   if (action.kind === "build") {
     if (!direction) throw new Error(t.creative.pickFirst);
     const extra = { direction, notes: meeting.notes ?? "" };
-    await supabase.from("outputs").update({ status: "generating" }).eq("project_id", projectId).in("number", [9, 10, 11]);
+    if (!(await claimForWriting(supabase, projectId, [9, 10, 11]))) throw new Error(t.project.alreadyWriting);
+    [9, 10, 11].forEach((n) => claimed.add(n));
     const script = await piece(9, "creative-script", () => writeScript({ ...ctx, ...extra, seconds }), (d: Script) => fitScript(d, seconds));
     const fitted = fitScript(script as Script, seconds);
     // The treatment and the visual mood are written side by side while the script is read.
@@ -128,6 +137,39 @@ export async function runCreative(
     await markPackage();
     const failed = results.find((r) => r.status === "rejected") as PromiseRejectedResult | undefined;
     if (failed) throw failed.reason;
+    return;
+  }
+
+  // Try again: writes one output from scratch (after a failure, or to get a fresh take).
+  // Redoing the script also writes the treatment and mood if they were never written.
+  if (action.kind === "redo") {
+    const n = action.n;
+    if (n === 7) {
+      await piece(7, "creative-directions", () => writeDirections(ctx));
+      return;
+    }
+    if (!direction) throw new Error(t.creative.pickFirst);
+    const extra = { direction, notes: meeting.notes ?? "" };
+    if (n === 9) {
+      const script = fitScript((await piece(9, "creative-script", () => writeScript({ ...ctx, ...extra, seconds }), (d: Script) => fitScript(d, seconds))) as Script, seconds);
+      const missing = [10, 11].filter((x) => !content(x));
+      const results = await Promise.allSettled(
+        missing.map((x) =>
+          x === 10
+            ? piece(10, "creative-treatment", () => writeTreatment({ ...ctx, ...extra, script }))
+            : piece(11, "creative-mood", () => writeMood({ ...ctx, ...extra, script })),
+        ),
+      );
+      await markPackage();
+      const failed = results.find((r) => r.status === "rejected") as PromiseRejectedResult | undefined;
+      if (failed) throw failed.reason;
+      return;
+    }
+    if (!content(9)) throw new Error(t.project.docs.notWritten);
+    if (n === 10) await piece(10, "creative-treatment", () => writeTreatment({ ...ctx, ...extra, script: content(9) }));
+    else if (n === 11) await piece(11, "creative-mood", () => writeMood({ ...ctx, ...extra, script: content(9) }));
+    else throw new Error("This step can't be written again here.");
+    await markPackage();
     return;
   }
 

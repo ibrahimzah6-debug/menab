@@ -74,7 +74,7 @@ export function BoardCanvas({ children, labels }: { children: React.ReactNode; l
         className="absolute top-0 left-0 p-6 select-text"
         style={{ width: "100%", transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: "0 0" }}
       >
-        <div className="flex flex-wrap gap-6 content-start" dir={rtl ? "rtl" : "ltr"}>{children}</div>
+        <div className="relative flex flex-col gap-8" dir={rtl ? "rtl" : "ltr"}>{children}</div>
       </div>
       <div className="absolute bottom-3 end-3 flex items-center gap-0.5 bg-surface border border-line rounded-lg p-1" style={{ boxShadow: "var(--shadow-float)" }}>
         <button type="button" className={btn} aria-label={labels.zoomOut} title={labels.zoomOut} onClick={() => zoomTo(zoom - 0.1)}>−</button>

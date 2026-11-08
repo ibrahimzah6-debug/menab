@@ -24,6 +24,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           kind === "directions" ? ({ kind } as const)
           : kind === "build" ? ({ kind } as const)
           : kind === "revise" && body?.n && body.instruction?.trim() ? ({ kind, n: Number(body.n), instruction: body.instruction.trim().slice(0, 2000) } as const)
+          : kind === "redo" && body?.n ? ({ kind, n: Number(body.n) } as const)
           : null;
         if (!action) throw new Error("Nothing to do.");
         await runCreative(id, action, emit, req.signal);

@@ -37,7 +37,7 @@ export async function ProjectList({ limit }: { limit?: number }) {
             <span className="small text-ink-muted">{[p.client, names[idx]].filter(Boolean).join(" · ")}</span>
             <span className="small text-ink-faint">
               {fill(t.projects.updated, {
-                date: new Date(p.updated_at).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-GB", { day: "numeric", month: "short" }),
+                date: new Date(p.updated_at).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-GB", { day: "numeric", month: "short", timeZone: "Asia/Riyadh" }),
               })}
             </span>
           </Link>

@@ -112,17 +112,53 @@ export async function writeScript(c: Ctx & { direction: unknown; notes: string; 
   );
 }
 
+// The treatment is the biggest document, so a fresh one is written in two halves at the same
+// time (the film: idea, tone, references and shot by shot; the production: cast, wardrobe,
+// locations and art), each a shorter call that finishes well within the time limit.
+const TreatmentFilm = Treatment.pick({ idea: true, tone: true, references: true, frames: true });
+const TreatmentProduction = Treatment.pick({ cast: true, wardrobe: true, locations: true, art: true });
+
 export async function writeTreatment(c: Ctx & { direction: unknown; notes: string; script: unknown }, instruction?: string, current?: unknown) {
-  const ask = instruction
-    ? `Revise this director's treatment with this change from the producer: "${instruction}". Keep the rest.\nCurrent: ${JSON.stringify(current)}`
-    : "Write the director's treatment: the idea, tone and references, then shot by shot frames that follow the script (shot size, what we see, the VO), cast with a Plan A and Plan B for each role, wardrobe per character, location options, and art direction per space. Never include national ID or iqama numbers.";
-  return structured(
-    c.modelId,
-    system(c),
-    [{ role: "user", content: `${ask}\n\nChosen direction: ${JSON.stringify(c.direction)}\nMeeting notes: ${c.notes || "none"}\nScript: ${JSON.stringify(c.script)}\n\n${base(c)}` }],
-    Treatment,
-    { effort: "medium", maxTokens: 8000, onStep: c.onStep, signal: c.signal, timeoutMs: 120_000 },
-  );
+  const context = `Chosen direction: ${JSON.stringify(c.direction)}\nMeeting notes: ${c.notes || "none"}\nScript: ${JSON.stringify(c.script)}\n\n${base(c)}`;
+  const opts = { effort: "low" as const, onStep: c.onStep, signal: c.signal, timeoutMs: 150_000 };
+  if (instruction) {
+    return structured(
+      c.modelId,
+      system(c),
+      [{ role: "user", content: `Revise this director's treatment with this change from the producer: "${instruction}". Keep the rest.\nCurrent: ${JSON.stringify(current)}\n\n${context}` }],
+      Treatment,
+      { ...opts, maxTokens: 8000 },
+    );
+  }
+  const [film, production] = await Promise.all([
+    structured(
+      c.modelId,
+      system(c),
+      [{ role: "user", content: `Write the first half of the director's treatment: the idea, tone and references, then shot by shot frames that follow the script (shot size, what we see, the VO).\n\n${context}` }],
+      TreatmentFilm,
+      { ...opts, maxTokens: 5000 },
+    ),
+    structured(
+      c.modelId,
+      system(c),
+      [{ role: "user", content: `Write the production half of the director's treatment: cast with a Plan A and Plan B for each role, wardrobe per character, location options, and art direction per space. Never include national ID or iqama numbers.\n\n${context}` }],
+      TreatmentProduction,
+      { ...opts, maxTokens: 4000 },
+    ),
+  ]);
+  const add = (a: number, b: number) => Math.round((a + b) * 10000) / 10000;
+  return {
+    data: { ...film.data, ...production.data } as Treatment,
+    usage: {
+      inputTokens: film.usage.inputTokens + production.usage.inputTokens,
+      outputTokens: film.usage.outputTokens + production.usage.outputTokens,
+      costUsd: add(film.usage.costUsd, production.usage.costUsd),
+      seconds: Math.max(film.usage.seconds, production.usage.seconds),
+    },
+    model: film.model,
+    fallbackFrom: film.fallbackFrom ?? production.fallbackFrom,
+    firstError: film.firstError ?? production.firstError,
+  };
 }
 
 export async function writeMood(c: Ctx & { direction: unknown; notes: string; script: unknown }, instruction?: string, current?: unknown) {

@@ -20,7 +20,10 @@ import { MenabLoader } from "@/components/menab-loader";
 import { StepModelPicker } from "./side-panels";
 import { PathButtons, RewriteButton, StageFooter } from "./stage-controls";
 import { DirectionsView, MeetingView, MoodView, ScriptView, TreatmentView, Versions } from "./creative-docs";
-import { AutoRefresh, CreativeAssistant, CreativeStart } from "./creative-panels";
+import { AutoRefresh, CreativeAssistant, CreativeStart, TryAgain } from "./creative-panels";
+import { ProjectMenu } from "./project-menu";
+import { PanelTabs } from "./panel-tabs";
+import { BoardCursor, TypeIn } from "./board-live";
 
 // AI calls run inside the actions on this page and can take up to a minute.
 export const maxDuration = 300;
@@ -56,12 +59,17 @@ export default async function ProjectPage({
   if (!me) redirect("/");
 
   const [{ data: outputs }, { data: messages }, { data: jobs }, { data: setting }] = await Promise.all([
-    supabase.from("outputs").select("id, number, stage, status, current_version").eq("project_id", id).order("number"),
+    supabase.from("outputs").select("id, number, stage, status, current_version, updated_at").eq("project_id", id).order("number"),
     supabase.from("messages").select("id, role, kind, content, audio_seconds, attachments, steps").eq("project_id", id).order("created_at"),
     supabase.from("ai_jobs").select("cost_usd").eq("project_id", id),
     supabase.from("model_settings").select("model_id").eq("workspace_id", project.workspace_id).eq("task", "text").maybeSingle(),
   ]);
-  const outs = (outputs ?? []) as Output[];
+  // A piece still marked as being written after 6 minutes died with its run: show it as failed,
+  // so "Try again" appears instead of a spinner that never ends.
+  const staleBefore = Date.now() - 6 * 60_000;
+  const outs = ((outputs ?? []) as (Output & { updated_at: string })[]).map((x) =>
+    x.status === "generating" && new Date(x.updated_at).getTime() < staleBefore ? { ...x, status: "failed" as const } : x,
+  );
   const spent = (jobs ?? []).reduce((s, j) => s + Number(j.cost_usd ?? 0), 0);
 
   const path = project.path as Path | null;
@@ -130,6 +138,18 @@ export default async function ProjectPage({
   const seconds = Number(brief.length_seconds) || 30;
   const meeting = (content[8] ?? {}) as { chosen?: number; notes?: string };
 
+  // The board shows every stage up to the current one.
+  const boardStages = order
+    .filter((n) => order.indexOf(n) <= currentIndex)
+    .map((n) => ({
+      stage: n,
+      index: order.indexOf(n),
+      name: names[order.indexOf(n)] ?? "",
+      approved: outs.filter((x) => x.stage === n).length > 0 && outs.filter((x) => x.stage === n).every((x) => x.status === "approved"),
+      outs: outs.filter((x) => x.stage === n && x.number !== 2),
+    }));
+  const busyOut = outs.find((x) => x.status === "generating");
+
   const statusOf = (n: number) => (outs.find((x) => x.number === n)?.status ?? "waiting") as OutputStatus | "failed";
   const href = (q: Record<string, string | number | undefined>) => {
     const sp = new URLSearchParams();
@@ -166,6 +186,7 @@ export default async function ProjectPage({
         <span className="grow" />
         <span className="mn-label h-9 px-3 rounded-md border border-line grid place-items-center">{fill(p.spent, { spent: money(spent) })}</span>
         <LanguageMenu locale={uiLocale} label={t.settings.language} soon={t.frame.preparing} compact={false} placement="down" />
+        {["admin", "producer"].includes(me.role) && <ProjectMenu projectId={id} name={project.name} c={t.stage.projectMenu} />}
       </header>
 
       {/* Stages, and Page or Board */}
@@ -177,6 +198,13 @@ export default async function ProjectPage({
           viewing={order.indexOf(showing)}
           links={order.map((n, i) => (i > currentIndex ? null : i === currentIndex ? href({}) : n === 1 ? href({ o: 1 }) : n === 2 ? href({ o: 7 }) : null))}
         />
+        <span className="grow" />
+        {busyOut && (
+          <span className="h-8 px-3 rounded-full border border-line-control bg-surface flex items-center gap-2 small" role="status">
+            <span className="mn-pulse" aria-hidden="true" style={{ width: 8, height: 8 }} />
+            {fill(t.stage.writingNow, { name: t.outputs[busyOut.number] ?? "" })}
+          </span>
+        )}
         <div className="mn-stagebar" role="group" aria-label={t.stage.viewLabel}>
           <Link href={href({ o: open || undefined })} aria-current={!board ? "true" : undefined} className={`mn-stage ${!board ? "mn-stage--current" : ""}`}>
             <IconLayoutPage size={14} />
@@ -192,52 +220,122 @@ export default async function ProjectPage({
       {board ? (
         <main className="flex-1 min-h-0 px-4 md:px-6 pb-4 flex flex-col md:flex-row gap-4">
           <BoardCanvas labels={{ zoomIn: t.stage.zoomIn, zoomOut: t.stage.zoomOut, reset: t.stage.zoomReset }}>
-            {list.map((x) => {
-              const st = statusOf(x.number);
-              return (
-                <div key={x.id} className={`mn-card ${st === "generating" ? "mn-card--ai" : ""}`} style={{ width: 260, maxWidth: "100%" }}>
-                  <div className="mn-card__head">
-                    <span className="mn-label" lang="en">{String(x.number).padStart(2, "0")}</span>
-                    <StatusChip status={st as OutputStatus} label={statusLabel(t, st)} />
-                  </div>
-                  <p className="mn-card__title">{t.outputs[x.number]}</p>
-                  <div className={`mn-card__text ${st === "generating" ? "mn-typing" : ""}`}>
-                    {showing === 1 ? (
-                      <BoardCardText
-                        projectId={id}
-                        n={x.number}
-                        content={content[x.number]}
-                        logline={brief.logline ?? ""}
-                        story={brief.story ?? []}
-                        fallback={excerpt(x.number, content[x.number], brief, p)}
-                        editable={editableHere && st !== "generating"}
-                        label={t.outputs[x.number]}
-                      />
-                    ) : showing === 2 ? (
-                      <span dir="auto">{creativeExcerpt(x.number, content, meeting, t)}</span>
-                    ) : (
-                      fill(p.later, { m: MILESTONE[showing] ?? "" })
-                    )}
-                  </div>
-                  <div className="mn-card__meta">
-                    <span>{x.current_version > 0 ? `${textModel(model).name} · v${x.current_version}` : ""}</span>
-                    {(showing === 1 || showing === 2) && (
-                      <Link href={href({ o: x.number })} className="underline hover:text-ink">{p.openPage}</Link>
-                    )}
-                  </div>
+            {/* Every stage up to the current one: earlier stages stay on the canvas, read only. */}
+            {boardStages.map((g) => (
+              <section key={g.stage} className="flex flex-col gap-3" aria-label={g.name}>
+                <div className="flex items-center gap-2">
+                  <span className="mn-label" lang="en">{String(g.index + 1).padStart(2, "0")}</span>
+                  <span className="small font-medium">{g.name}</span>
+                  {g.approved && <span className="mn-chip mn-chip--approved">{t.status.approved}</span>}
                 </div>
-              );
-            })}
+                <div className="flex flex-wrap gap-6 items-start">
+                  {g.outs.map((x) => {
+                    const st = statusOf(x.number);
+                    const live = g.stage === stage && !g.approved;
+                    const fresh = ["ready", "edited"].includes(st) && Date.now() - new Date(x.updated_at).getTime() < 25_000;
+                    const text = g.stage === 1 ? excerpt(x.number, content[x.number], brief, p) : g.stage === 2 ? creativeExcerpt(x.number, content, meeting, t) : "";
+                    if (st === "waiting" || (st === "failed" && !x.current_version)) {
+                      return (
+                        <article key={x.id} className="rounded-[10px] border border-dashed border-line-control bg-tint-1 p-4 flex flex-col gap-2" style={{ width: 240 }}>
+                          <div className="flex justify-between items-center gap-2">
+                            <span className="mn-label">{String(x.number).padStart(2, "0")} {t.outputs[x.number]}</span>
+                            <StatusChip status={st as OutputStatus} label={statusLabel(t, st)} />
+                          </div>
+                          <p className="m-0 text-[13px] leading-5 text-ink-faint">{st === "failed" ? t.creative.redo.failed : g.stage <= 2 ? startsWhen(x.number, t) : fill(p.later, { m: MILESTONE[g.stage] ?? "" })}</p>
+                          {(g.stage === 1 || g.stage === 2) && <Link href={href({ o: x.number })} className="text-[12px] underline text-ink-muted self-start">{p.openPage}</Link>}
+                        </article>
+                      );
+                    }
+                    return (
+                      <article
+                        key={x.id}
+                        data-ai-busy={st === "generating" ? "" : undefined}
+                        className={`mn-card ${st === "generating" ? "mn-card--ai" : ""} ${fresh ? "mn-card-pop" : ""}`}
+                        style={{ width: 260, maxWidth: "100%", opacity: live || g.stage === showing ? 1 : 0.85 }}
+                      >
+                        <div className="mn-card__head">
+                          <span className="mn-label" lang="en">{String(x.number).padStart(2, "0")}</span>
+                          <StatusChip status={st as OutputStatus} label={statusLabel(t, st)} />
+                        </div>
+                        {st === "generating" && <div data-ai-spot className="mn-skeleton h-[72px] mb-2" />}
+                        <p className="mn-card__title">{t.outputs[x.number]}</p>
+                        <div className={`mn-card__text ${st === "generating" ? "mn-typing" : ""}`}>
+                          {g.stage === 1 && live ? (
+                            <BoardCardText
+                              projectId={id}
+                              n={x.number}
+                              content={content[x.number]}
+                              logline={brief.logline ?? ""}
+                              story={brief.story ?? []}
+                              fallback={text}
+                              editable={editableHere && st !== "generating"}
+                              label={t.outputs[x.number]}
+                            />
+                          ) : st === "generating" ? (
+                            ""
+                          ) : (
+                            <TypeIn text={text} fresh={fresh} />
+                          )}
+                        </div>
+                        <div className="mn-card__meta">
+                          <span>{x.current_version > 0 ? `v${x.current_version}` : ""}</span>
+                          {(g.stage === 1 || g.stage === 2) && <Link href={href({ o: x.number })} className="underline hover:text-ink">{p.openPage}</Link>}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
+            <BoardCursor label={t.stage.menabAi} />
           </BoardCanvas>
-          <aside className="stage-side relative w-full md:w-[320px] shrink-0 md:min-h-0 md:overflow-y-auto bg-surface border border-line rounded-lg p-4 flex flex-col gap-3 self-start">
-            <h2 className="m-0 text-[16px] font-medium">{t.stage.assistant}</h2>
-            <div className="flex flex-col gap-1.5">
-              <span className="mn-label">{p.model}</span>
-              <StepModelPicker projectId={id} label={p.model} options={modelOptions} value={model} defaultLabel={model === workspaceDefault ? p.defaultTag : ""} disabled={!canEdit} />
-            </div>
-            {showing === 1 && docsReady && editableHere && (
-              <ChangeBox projectId={id} copy={p.change} cost={approx(estimateUsd(model, "stageOne"))} />
-            )}
+          <aside className="stage-side relative w-full md:w-[340px] shrink-0 md:min-h-0 flex flex-col">
+            <PanelTabs
+              storageKey={`menab-board-panel-${id}-${stage}`}
+              initial={stage === 1 ? "chat" : "assistant"}
+              tabs={[
+                ...(stage === 1
+                  ? [
+                      {
+                        key: "chat",
+                        label: p.chat,
+                        node: (
+                          <div className="flex-1 min-h-[420px] md:min-h-0 flex">
+                            <BriefChat
+                              projectId={id}
+                              canEdit={canEdit && !stageOneApproved}
+                              cost={approx(estimateUsd(model, "briefTurn"))}
+                              messages={(messages ?? []) as never}
+                              copy={p}
+                              models={modelOptions.map((m) => ({ id: m.id, name: m.name, price: m.price }))}
+                              paths={t.stage.paths}
+                              model={model}
+                            />
+                          </div>
+                        ),
+                      },
+                    ]
+                  : []),
+                {
+                  key: "assistant",
+                  label: t.stage.assistant,
+                  node: (
+                    <section className="bg-surface border border-line rounded-lg p-4 flex flex-col gap-3">
+                      <div className="flex flex-col gap-1.5">
+                        <span className="mn-label">{p.model}</span>
+                        <StepModelPicker projectId={id} label={p.model} options={modelOptions} value={model} defaultLabel={model === workspaceDefault ? p.defaultTag : ""} disabled={!canEdit} />
+                      </div>
+                      {stage === 1 && docsReady && editableHere && <ChangeBox projectId={id} copy={p.change} cost={approx(estimateUsd(model, "stageOne"))} mic={t.mic} />}
+                    </section>
+                  ),
+                },
+                {
+                  key: "brief",
+                  label: p.brief,
+                  node: <BriefPanel brief={brief} p={p} missing={missing} projectId={id} editable={false} />,
+                },
+              ]}
+            />
           </aside>
         </main>
       ) : (
@@ -299,6 +397,15 @@ export default async function ProjectPage({
                   ) : (
                     <MoodView projectId={id} content={content[11] as never} editable={editableHere && statusOf(11) !== "generating"} c={t.creative} />
                   )
+                ) : editableHere && (open === 7 ? statusOf(7) === "failed" : open === 9 ? isReady(8) : Boolean(content[9])) ? (
+                  <TryAgain
+                    projectId={id}
+                    n={open}
+                    failed={statusOf(open) === "failed"}
+                    cost={approx(estimateUsd(model, open === 7 ? "directions" : open === 9 && !content[10] ? "creativeBuild" : "revise"))}
+                    run={runCopy}
+                    c={t.creative.redo}
+                  />
                 ) : (
                   <p className="body text-ink-muted m-0">{open === 7 ? t.creative.footer.start : isReady(8) ? p.docs.notWritten : t.creative.footer.pick}</p>
                 )}
@@ -356,68 +463,81 @@ export default async function ProjectPage({
             </section>
           )}
 
-          {/* Right panel: the brief while talking, the assistant on documents */}
-          <aside className="stage-side relative w-full md:w-[320px] lg:w-[340px] shrink-0 md:min-h-0 md:overflow-y-auto flex flex-col gap-4">
-            {showing === 1 && open === 1 ? (
-              <>
-                <BriefPanel brief={brief} p={p} missing={missing} projectId={id} editable={editableHere} />
-                <section className="bg-surface border border-line rounded-lg p-4 flex flex-col gap-3">
-                  <span className="mn-label">{p.suggestedPath}</span>
-                  {project.path_suggested ? (
+          {/* Right panel: Brief and Assistant as two tabs; the brief first while talking. */}
+          <aside className="stage-side relative w-full md:w-[320px] lg:w-[340px] shrink-0 md:min-h-0 flex flex-col">
+            <PanelTabs
+              storageKey={`menab-panel-${id}-${showing}-${open === 1 ? "chat" : "doc"}`}
+              initial={showing === 1 && open === 1 ? "brief" : "assistant"}
+              tabs={[
+                {
+                  key: "brief",
+                  label: p.brief,
+                  node: (
                     <>
-                      <h2 className="h3 m-0">{t.stage.paths[project.path_suggested as Path]}</h2>
-                      {project.path_reason && <p className="small text-ink-muted m-0" dir="auto">{project.path_reason}</p>}
+                      <BriefPanel brief={brief} p={p} missing={missing} projectId={id} editable={editableHere && showing === 1} />
+                      <section className="bg-surface border border-line rounded-lg p-4 flex flex-col gap-3">
+                        <span className="mn-label">{p.suggestedPath}</span>
+                        {project.path_suggested ? (
+                          <>
+                            <h2 className="h3 m-0">{t.stage.paths[project.path_suggested as Path]}</h2>
+                            {project.path_reason && <p className="small text-ink-muted m-0" dir="auto">{project.path_reason}</p>}
+                          </>
+                        ) : (
+                          <p className="small text-ink-muted m-0">{p.pathNone}</p>
+                        )}
+                        <PathButtons
+                          projectId={id}
+                          current={path}
+                          chosenLabel={p.chosen}
+                          disabled={!editableHere || showing !== 1}
+                          options={[
+                            { path: "ai", label: p.useAi },
+                            { path: "production", label: p.useProduction },
+                            { path: "hybrid", label: p.useHybrid },
+                          ]}
+                        />
+                      </section>
                     </>
-                  ) : (
-                    <p className="small text-ink-muted m-0">{p.pathNone}</p>
-                  )}
-                  <PathButtons
-                    projectId={id}
-                    current={path}
-                    chosenLabel={p.chosen}
-                    disabled={!editableHere}
-                    options={[
-                      { path: "ai", label: p.useAi },
-                      { path: "production", label: p.useProduction },
-                      { path: "hybrid", label: p.useHybrid },
-                    ]}
-                  />
-                </section>
-              </>
-            ) : null}
-            <section className="bg-surface border border-line rounded-lg p-4 flex flex-col gap-3">
-              <div className="flex justify-between items-center">
-                <h2 className="m-0 text-[16px] font-medium">{t.stage.assistant}</h2>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <span className="mn-label">{p.model}</span>
-                <StepModelPicker
-                  projectId={id}
-                  label={p.model}
-                  options={modelOptions}
-                  value={model}
-                  defaultLabel={model === workspaceDefault ? p.defaultTag : ""}
-                  disabled={!canEdit}
-                />
-              </div>
-              {showing === 2 && editableHere && [7, 9, 10, 11].includes(open) && Boolean(content[open]) && (
-                <CreativeAssistant
-                  key={open}
-                  projectId={id}
-                  n={open}
-                  copy={p.change}
-                  cost={approx(estimateUsd(model, open === 7 ? "directions" : "revise"))}
-                  mic={t.mic}
-                  run={runCopy}
-                />
-              )}
-              {showing === 1 && open !== 1 && docsReady && editableHere && (
-                <>
-                  <ChangeBox projectId={id} copy={p.change} cost={approx(estimateUsd(model, "stageOne"))} mic={t.mic} />
-                  <RewriteButton projectId={id} label={p.rewrite} cost={approx(estimateUsd(model, "stageOne"))} />
-                </>
-              )}
-            </section>
+                  ),
+                },
+                {
+                  key: "assistant",
+                  label: t.stage.assistant,
+                  node: (
+                    <section className="bg-surface border border-line rounded-lg p-4 flex flex-col gap-3">
+                      <div className="flex flex-col gap-1.5">
+                        <span className="mn-label">{p.model}</span>
+                        <StepModelPicker
+                          projectId={id}
+                          label={p.model}
+                          options={modelOptions}
+                          value={model}
+                          defaultLabel={model === workspaceDefault ? p.defaultTag : ""}
+                          disabled={!canEdit}
+                        />
+                      </div>
+                      {showing === 2 && editableHere && [7, 9, 10, 11].includes(open) && Boolean(content[open]) && (
+                        <CreativeAssistant
+                          key={open}
+                          projectId={id}
+                          n={open}
+                          copy={p.change}
+                          cost={approx(estimateUsd(model, open === 7 ? "directions" : "revise"))}
+                          mic={t.mic}
+                          run={runCopy}
+                        />
+                      )}
+                      {showing === 1 && open !== 1 && docsReady && editableHere && (
+                        <>
+                          <ChangeBox projectId={id} copy={p.change} cost={approx(estimateUsd(model, "stageOne"))} mic={t.mic} />
+                          <RewriteButton projectId={id} label={p.rewrite} cost={approx(estimateUsd(model, "stageOne"))} />
+                        </>
+                      )}
+                    </section>
+                  ),
+                },
+              ]}
+            />
           </aside>
         </main>
       )}
@@ -480,6 +600,19 @@ function excerpt(n: number, c: unknown, brief: Partial<BriefFields>, p: Dictiona
     const m = (c as { cps: StageOneDocs["cps"] }).cps?.milestones ?? [];
     return m.length ? `${m[0].name} ${m[0].start} · ${m[m.length - 1].name} ${m[m.length - 1].end}` : p.docs.notWritten;
   }
+  return "";
+}
+
+// What a waiting card is waiting for.
+function startsWhen(n: number, t: Dictionary): string {
+  const w = t.stage.startsWhen;
+  if (n === 1) return w.talk;
+  if (n >= 3 && n <= 6) return w.brief;
+  if (n === 7) return w.ask;
+  if (n === 8) return w.choose;
+  if (n === 9) return w.direction;
+  if (n === 10 || n === 11) return w.script;
+  if (n === 12) return w.all;
   return "";
 }
 

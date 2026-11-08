@@ -9,7 +9,7 @@ export type RunCopy = {
   steps: { call: string; retry: string; switch: string; skip: string; writing: string; saved: string; stopped: string; lost: string; stop: string };
 };
 type Ev = { t: string; [k: string]: unknown };
-type Action = { kind: "directions" } | { kind: "build" } | { kind: "revise"; n: number; instruction: string };
+type Action = { kind: "directions" } | { kind: "build" } | { kind: "revise"; n: number; instruction: string } | { kind: "redo"; n: number };
 
 const fillIn = (s: string, v: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? ""));
 
