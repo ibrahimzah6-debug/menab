@@ -167,3 +167,9 @@ Replaces B4.
 
 - **No waiting on a model that is not answering:** no quick retries. Claude must start answering within 4 seconds (it streams); a model that is busy, errors or does not start is switched at once to the nearest model of the other family by strength and price (Fable 5 and GPT 6 Astra, Opus 5.5 and GPT 6.1 Sol, Sonnet 5.5 and GPT 6.1 Terra, Haiku 5.5 and GPT 6 Luna). A model that answered but sent something unusable gets one more try. One recent failure skips a model for 15 minutes. Measured: Claude refused, GPT 6.1 Sol took over 4 seconds later.
 - **Default writing model: GPT 6.1 Sol.** Workspaces can still pick another default in Settings, AI models.
+
+## B21. Prices shown before an action match the real cost (8 Nov 2026)
+
+- The estimates on buttons were built on official prices and guessed token counts, so "Write the brief documents" showed about $0.07 while Kie.ai charged about $0.009. They now use the token counts and the per-token prices measured in Menab's own AI log: GPT 6.1 Sol about $0.63 in and $2.60 out per million tokens on Kie.ai.
+- Measured with GPT 6.1 Sol, Kie.ai against the official (and OpenRouter) price: a brief reply $0.005 against $0.016; the brief documents $0.009 against $0.032; the whole Creative stage $0.042 against $0.14.
+- Test data removed (Ibrahim's approval): the test login, the SAMPLE Second Studio workspace with its projects, the SAMPLE Dalla Ramadan ad project, and the sample job and notice. 20 voice files of the deleted sample project remain in storage (the database refuses direct deletes); they can be removed in Supabase, Storage, media.
