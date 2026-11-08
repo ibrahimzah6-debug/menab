@@ -1,11 +1,11 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-// Model health, across all workspaces: a model whose last calls in the past 30 minutes all
-// failed (or were taken over by the backup) is skipped, and the backup answers straight away.
-// After 30 quiet minutes it gets another chance, so a model that recovers comes back by itself.
+// Model health, across all workspaces: a model whose last call in the past 15 minutes failed
+// (or was taken over by the backup) is skipped, and the nearest model answers straight away.
+// After 15 quiet minutes it gets another chance, so a model that recovers comes back by itself.
 
-const WINDOW_MIN = 30;
+const WINDOW_MIN = 15;
 const cache = new Map<string, { at: number; failing: boolean }>();
 
 export async function isFailing(modelId: string): Promise<boolean> {
@@ -23,7 +23,8 @@ export async function isFailing(modelId: string): Promise<boolean> {
       .limit(4);
     const rows = data ?? [];
     const bad = (r: { model: string; fallback_from: string | null; status: string }) => r.fallback_from === modelId || (r.model === modelId && r.status === "failed");
-    failing = rows.length >= 2 && rows.slice(0, 2).every(bad);
+    // One recent failure is enough: the model is skipped until it has been quiet for the window.
+    failing = rows.length >= 1 && bad(rows[0]);
   } catch {
     failing = false;
   }
