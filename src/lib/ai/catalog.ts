@@ -71,13 +71,13 @@ export type TextModel = {
 // Writing models, strongest first. All run through Kie.ai with one key.
 export const TEXT_MODELS: TextModel[] = [
   { id: "claude-fable-5", name: "Claude Fable 5", usdPerMillionIn: 4, usdPerMillionOut: 20, provider: "kie-claude", goodFor: { en: "Strongest thinking, for the hardest briefs", ar: "أقوى تفكير، لأصعب البريفات" } },
-  { id: "gpt-6-astra", name: "GPT 6 Astra", usdPerMillionIn: 10, usdPerMillionOut: 50, provider: "kie-gpt", goodFor: { en: "OpenAI's strongest, a second opinion on big ideas", ar: "أقوى نماذج OpenAI، رأي ثاني للأفكار الكبيرة" } },
+  { id: "gpt-6-astra", name: "GPT 6 Astra", usdPerMillionIn: 2.8, usdPerMillionOut: 14, provider: "kie-gpt", goodFor: { en: "OpenAI's strongest, a second opinion on big ideas", ar: "أقوى نماذج OpenAI، رأي ثاني للأفكار الكبيرة" } },
   { id: "claude-opus-5-5", name: "Claude Opus 5.5", usdPerMillionIn: 1.6, usdPerMillionOut: 8, provider: "kie-claude", goodFor: { en: "Best balance for briefs, scripts and treatments", ar: "أفضل توازن للبريف والسكربت ورؤية المخرج" } },
-  { id: "gpt-6-1-sol", name: "GPT 6.1 Sol", usdPerMillionIn: 2, usdPerMillionOut: 10, provider: "kie-gpt", goodFor: { en: "Strong all-rounder from OpenAI", ar: "نموذج قوي وشامل من OpenAI" } },
+  { id: "gpt-6-1-sol", name: "GPT 6.1 Sol", usdPerMillionIn: 0.63, usdPerMillionOut: 2.6, provider: "kie-gpt", goodFor: { en: "Strong all-rounder from OpenAI", ar: "نموذج قوي وشامل من OpenAI" } },
   { id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5", usdPerMillionIn: 0.8, usdPerMillionOut: 4, provider: "kie-claude", goodFor: { en: "Fast and strong, half the price", ar: "سريع وقوي بنص السعر" } },
-  { id: "gpt-6-1-terra", name: "GPT 6.1 Terra", usdPerMillionIn: 1, usdPerMillionOut: 5, provider: "kie-gpt", goodFor: { en: "Medium: good quality at a lower price", ar: "متوسط: جودة حلوة بسعر أقل" } },
+  { id: "gpt-6-1-terra", name: "GPT 6.1 Terra", usdPerMillionIn: 0.11, usdPerMillionOut: 0.54, provider: "kie-gpt", goodFor: { en: "Medium: good quality at a lower price", ar: "متوسط: جودة حلوة بسعر أقل" } },
   { id: "claude-haiku-5-5", name: "Claude Haiku 5.5", usdPerMillionIn: 0.06, usdPerMillionOut: 0.3, provider: "kie-claude", goodFor: { en: "Quick drafts for very little", ar: "مسودات سريعة بسعر بسيط" } },
-  { id: "gpt-6-luna", name: "GPT 6 Luna", usdPerMillionIn: 0.1, usdPerMillionOut: 0.5, provider: "kie-gpt", goodFor: { en: "Lightest and cheapest", ar: "الأخف والأرخص" } },
+  { id: "gpt-6-luna", name: "GPT 6 Luna", usdPerMillionIn: 0.034, usdPerMillionOut: 0.17, provider: "kie-gpt", goodFor: { en: "Lightest and cheapest", ar: "الأخف والأرخص" } },
 ];
 
 // GPT 6.1 Sol: strong, quick and reliable on Kie.ai (Ibrahim, 8 Nov 2026).
@@ -88,13 +88,16 @@ export function textModel(id: string | null | undefined) {
   return TEXT_MODELS.find((m) => m.id === id) ?? TEXT_MODELS.find((m) => m.id === DEFAULT_TEXT_MODEL)!;
 }
 // Typical token use per action, to show the price before it runs.
+// Typical token use per action, measured from Menab's own AI log (8 Nov 2026), to show the
+// price before it runs. GPT prices above are what Kie.ai actually charged per million tokens
+// in that log; the real cost of every call is still read back from Kie.ai.
 export const TYPICAL_TOKENS = {
-  briefTurn: { in: 4000, out: 1500 },
-  stageOne: { in: 3000, out: 6000 },
-  directions: { in: 4000, out: 3000 },
+  briefTurn: { in: 6100, out: 400 },
+  stageOne: { in: 5600, out: 2100 },
+  directions: { in: 6200, out: 2200 },
   // Script, treatment and visual mood together, written after a direction is chosen.
-  creativeBuild: { in: 15000, out: 9000 },
-  revise: { in: 6000, out: 3000 },
+  creativeBuild: { in: 22600, out: 6200 },
+  revise: { in: 7000, out: 2000 },
 } as const;
 export function estimateUsd(modelId: string, action: keyof typeof TYPICAL_TOKENS) {
   const m = textModel(modelId);
