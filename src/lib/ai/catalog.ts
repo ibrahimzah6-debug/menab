@@ -98,6 +98,10 @@ export const TYPICAL_TOKENS = {
   // Script, treatment and visual mood together, written after a direction is chosen.
   creativeBuild: { in: 22600, out: 6200 },
   revise: { in: 7000, out: 2000 },
+  // Stage 3: characters, locations and the shot list (three calls), and one of them again.
+  // Estimated from the creative stage's calls until the AI log has real ones.
+  look: { in: 30000, out: 11000 },
+  lookPart: { in: 11000, out: 4500 },
 } as const;
 export function estimateUsd(modelId: string, action: keyof typeof TYPICAL_TOKENS) {
   const m = textModel(modelId);
