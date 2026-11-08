@@ -26,7 +26,7 @@ export function CreativeAssistant({
     <div className="flex flex-col gap-2">
       <ChangeBox projectId={projectId} copy={copy} cost={cost} mic={mic} onApply={(text) => r.run({ kind: "revise", n, instruction: text })} />
       <div className="flex items-center gap-3">
-        <RunLine events={r.events} busy={r.busy} c={run} />
+        <RunLine events={r.events} busy={r.busy} c={run} startedAt={r.startedAt} />
         {r.busy && <button type="button" className="mn-btn mn-btn--ghost mn-btn--sm" onClick={r.stop}>{run.steps.stop}</button>}
       </div>
     </div>
@@ -39,7 +39,7 @@ export function CreativeStart({ projectId, label, cost, message, run }: { projec
   return (
     <footer className="shrink-0 sticky bottom-0 bg-surface border-t border-line px-5 py-3 flex flex-wrap gap-3 items-center z-10">
       <div className="grow min-w-0 flex flex-col gap-1">
-        {r.busy || r.events.length ? <RunLine events={r.events} busy={r.busy} c={run} /> : <span className="small text-ink-muted">{r.error ?? message}</span>}
+        {r.busy || r.events.length ? <RunLine events={r.events} busy={r.busy} c={run} startedAt={r.startedAt} /> : <span className="small text-ink-muted">{r.error ?? message}</span>}
         {r.error && (r.busy || r.events.length > 0) && <span className="small" role="alert">{r.error}</span>}
       </div>
       {r.busy ? (
@@ -80,9 +80,62 @@ export function TryAgain({ projectId, n, failed, cost, run, c }: { projectId: st
             <span className="mn-btn__cost">{cost}</span>
           </button>
         )}
-        <RunLine events={r.events} busy={r.busy} c={run} />
+        <RunLine events={r.events} busy={r.busy} c={run} startedAt={r.startedAt} />
       </div>
       {r.error && <p className="small m-0 px-3 py-2 rounded-md bg-tint-2" role="alert">{r.error}</p>}
+    </div>
+  );
+}
+
+// Stage 1: the footer that writes the brief documents, with live steps and seconds.
+export function DocsFooter({ projectId, label, cost, message, disabled, run }: { projectId: string; label: string; cost?: string; message: string; disabled?: boolean; run: RunCopy }) {
+  const r = useCreativeRun(projectId, run);
+  return (
+    <footer className="shrink-0 sticky bottom-0 bg-surface border-t border-line px-5 py-3 flex flex-wrap gap-3 items-center z-10">
+      <div className="grow min-w-0 flex flex-col gap-1">
+        {r.busy || r.events.length ? <RunLine events={r.events} busy={r.busy} c={run} startedAt={r.startedAt} /> : <span className="small text-ink-muted">{message}</span>}
+        {r.error && <span className="small" role="alert">{r.error}</span>}
+      </div>
+      {r.busy ? (
+        <button type="button" className="mn-btn mn-btn--secondary" onClick={r.stop}>{run.steps.stop}</button>
+      ) : (
+        <button type="button" className="mn-btn mn-btn--primary" disabled={disabled} onClick={() => r.run({ kind: "docs" })}>
+          {label}
+          {cost && <span className="mn-btn__cost">{cost}</span>}
+        </button>
+      )}
+    </footer>
+  );
+}
+
+// Stage 1: change the documents with an instruction, or write them again, with live steps.
+export function DocsAssistant({
+  projectId,
+  copy,
+  cost,
+  mic,
+  run,
+  rewriteLabel,
+}: {
+  projectId: string;
+  copy: { label: string; placeholder: string; apply: string; working: string };
+  cost: string;
+  mic: { start: string; stop: string; working: string; blocked: string };
+  run: RunCopy;
+  rewriteLabel: string;
+}) {
+  const r = useCreativeRun(projectId, run);
+  return (
+    <div className="flex flex-col gap-2">
+      <ChangeBox projectId={projectId} copy={copy} cost={cost} mic={mic} disabled={r.busy} onApply={(text) => r.run({ kind: "docs", instruction: text })} />
+      <button type="button" className="mn-btn mn-btn--ghost mn-btn--sm justify-between w-full" disabled={r.busy} onClick={() => r.run({ kind: "docs" })}>
+        <span>{rewriteLabel}</span>
+        <span className="mn-btn__cost">{cost}</span>
+      </button>
+      <div className="flex items-center gap-3">
+        <RunLine events={r.events} busy={r.busy} c={run} startedAt={r.startedAt} />
+        {r.busy && <button type="button" className="mn-btn mn-btn--ghost mn-btn--sm" onClick={r.stop}>{run.steps.stop}</button>}
+      </div>
     </div>
   );
 }

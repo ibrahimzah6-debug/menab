@@ -8,6 +8,7 @@ import { browserClient } from "@/lib/supabase/client";
 import { startWavRecorder, type WavRecorder } from "@/lib/wav-recorder";
 import { chooseTextModel, prepareUpload } from "./actions";
 import { ReplyFeedback } from "./reply-feedback";
+import { useSeconds } from "./creative-run";
 
 type Msg = {
   id: string;
@@ -55,6 +56,7 @@ type Copy = {
     lost: string;
     memory: string;
     skip: string;
+    seconds: string;
     stopped: string;
     summary: string;
     count: string;
@@ -121,29 +123,40 @@ const Chevron = ({ open }: { open: boolean }) => (
 
 // What Menab is doing, on one line whose words change; press it to see every step.
 // After the reply it stays above the answer as a short summary that opens the same list.
-function StepsLine({ events, live, summary, copy, paths }: { events: StepEvent[]; live: boolean; summary?: string; copy: Copy; paths: Record<string, string> }) {
+function StepsLine({ events, live, summary, copy, paths, startedAt }: { events: StepEvent[]; live: boolean; summary?: string; copy: Copy; paths: Record<string, string>; startedAt?: number | null }) {
   const [open, setOpen] = useState(false);
-  const lines = events.map((e) => stepText(e, copy, paths)).filter((x): x is string => Boolean(x));
+  const secs = useSeconds(startedAt ?? null, live);
+  const items = events.map((e) => ({ text: stepText(e, copy, paths), at: typeof e.at === "number" ? e.at : undefined })).filter((x): x is { text: string; at: number | undefined } => Boolean(x.text));
+  const lines = items.map((x) => x.text);
   const head = live ? lines[lines.length - 1] ?? copy.thinking : summary ?? fillIn(copy.steps.count, { n: lines.length });
   return (
     <div className="flex flex-col gap-2" role={live ? "status" : undefined} aria-live={live ? "polite" : undefined}>
       <button type="button" className="self-start flex items-center gap-2.5 small text-start text-ink-muted hover:text-ink" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
         {live ? <span className="mn-pulse shrink-0" aria-hidden="true" /> : <Check />}
         <span className={live ? "text-ink" : ""} dir="auto">{head}</span>
+        {live && <span className="data text-[12px] text-ink-faint">· {fillIn(copy.steps.seconds, { n: secs })}</span>}
         {lines.length > 0 && <Chevron open={open} />}
       </button>
       {open && lines.length > 0 && (
         <ol className="m-0 ms-1.5 ps-4 border-s border-line list-none flex flex-col gap-1.5">
-          {lines.map((x, i) => (
+          {items.map((x, i) => (
             <li key={i} className="flex items-center gap-2 text-[13px] text-ink-muted" dir="auto">
-              {live && i === lines.length - 1 ? <span className="mn-pulse shrink-0" aria-hidden="true" style={{ width: 8, height: 8 }} /> : <Check />}
-              <span>{x}</span>
+              {live && i === items.length - 1 ? <span className="mn-pulse shrink-0" aria-hidden="true" style={{ width: 8, height: 8 }} /> : <Check />}
+              {x.at !== undefined && <span className="data text-[11px] text-ink-faint shrink-0">{fillIn(copy.steps.seconds, { n: Math.round(x.at / 1000) })}</span>}
+              <span>{x.text}</span>
             </li>
           ))}
         </ol>
       )}
     </div>
   );
+}
+
+// "Writing down what you said" with the seconds so far.
+function VoiceWait({ label, unit }: { label: string; unit: string }) {
+  const [since] = useState(() => Date.now());
+  const secs = useSeconds(since, true);
+  return <MenabLoader label={`${label} · ${fillIn(unit, { n: secs })}`} />;
 }
 
 async function* readLines(res: Response) {
@@ -198,6 +211,7 @@ export function BriefChat({
   const [pendingText, setPendingText] = useState<string | null>(null);
   const [busy, setBusy] = useState<"text" | "voice" | null>(null);
   const [steps, setSteps] = useState<StepEvent[]>([]);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
   const stopRef = useRef<AbortController | null>(null);
   const [error, setError] = useState<string | undefined>();
   const [, start] = useTransition();
@@ -276,6 +290,8 @@ export function BriefChat({
     };
     const controller = new AbortController();
     stopRef.current = controller;
+    const sentAt = Date.now();
+    setStartedAt(sentAt);
     const slow = setTimeout(() => setSteps((x) => [...x, { t: "slow" }]), 25_000);
     (async () => {
       let finished = false;
@@ -292,7 +308,7 @@ export function BriefChat({
           else if (e.t === "error") {
             finished = true;
             restore(String(e.message));
-          } else setSteps((x) => [...x.filter((y) => y.t !== "slow"), e]);
+          } else setSteps((x) => [...x.filter((y) => y.t !== "slow"), { ...e, at: Date.now() - sentAt }]);
         }
         if (!finished) restore(copy.steps.lost);
       } catch (e) {
@@ -403,7 +419,7 @@ export function BriefChat({
             <p className="body m-0 whitespace-pre-wrap" dir="auto">{pendingText}</p>
           </div>
         )}
-        {busy === "text" && <StepsLine events={steps} live copy={copy} paths={paths} />}
+        {busy === "text" && <StepsLine events={steps} live copy={copy} paths={paths} startedAt={startedAt} />}
         <div ref={endRef} />
       </div>
 
@@ -433,7 +449,7 @@ export function BriefChat({
               <span className="small text-ink-muted">{copy.recording}</span>
             </div>
           ) : busy === "voice" && !text ? (
-            <div className="px-4 py-4"><MenabLoader label={copy.listening} /></div>
+            <div className="px-4 py-4"><VoiceWait label={copy.listening} unit={copy.steps.seconds} /></div>
           ) : (
             <textarea
               readOnly={busy === "voice"}

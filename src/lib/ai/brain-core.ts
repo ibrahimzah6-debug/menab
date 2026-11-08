@@ -35,7 +35,6 @@ export class StoppedError extends Error {
   }
 }
 
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const secondsSince = (t: number) => Math.round((Date.now() - t) / 100) / 10;
 
@@ -44,9 +43,25 @@ function estimateCost(m: TextModel, input: number, output: number) {
 }
 
 // The backup when a model fails: Claude falls back to GPT, GPT falls back to Claude.
+// The nearest model from the other family, by strength and price.
+const NEAREST: Record<string, string> = {
+  "claude-fable-5": "gpt-6-astra",
+  "claude-opus-5-5": "gpt-6-1-sol",
+  "claude-sonnet-5-5": "gpt-6-1-terra",
+  "claude-haiku-5-5": "gpt-6-luna",
+  "gpt-6-astra": "claude-fable-5",
+  "gpt-6-1-sol": "claude-opus-5-5",
+  "gpt-6-1-terra": "claude-sonnet-5-5",
+  "gpt-6-luna": "claude-haiku-5-5",
+};
 export function backupFor(m: TextModel): string {
-  return m.provider === "kie-claude" ? "gpt-6-1-sol" : "claude-sonnet-5-5";
+  return NEAREST[m.id] ?? (m.provider === "kie-claude" ? "gpt-6-1-sol" : "claude-opus-5-5");
 }
+
+// A model that is not answering at all (busy, internal error, no first reply in time) gets
+// no second try: the nearest model answers at once. A model that answered but sent something
+// unusable gets one more try, since it is working.
+const NOT_ANSWERING = /tight|busy|overload|internal|try again|not answering|could not be reached|took too long|HTTP 5\d\d/i;
 
 // Rules from CLAUDE.md: retry once, then switch to the backup. The caller logs which model answered.
 // The retry tells the model what was wrong with its first answer.
@@ -67,8 +82,7 @@ export async function structured<S extends z.ZodType>(
       if (opts.signal?.aborted) throw new StoppedError();
       firstError = e instanceof Error ? e.message : String(e);
       if (/KIE_API_KEY|insufficient|credits/i.test(firstError)) throw e; // account problems: the backup can't help
-      // A busy provider often answers a moment later.
-      if (attempt === 0 && /tight|busy|overload|internal|try again/i.test(firstError)) await wait(1500);
+      if (NOT_ANSWERING.test(firstError)) break;
     }
   }
   if (opts.signal?.aborted) throw new StoppedError();
@@ -168,8 +182,7 @@ async function post(url: string, payload: unknown, opts: Opts, name: string) {
 // The answer comes back through one "submit" tool, checked against the schema.
 async function kieClaude<S extends z.ZodType>(m: TextModel, system: string, messages: Msg[], schema: S, opts: Opts) {
   const started = Date.now();
-  const res = await post(
-    "https://api.kie.ai/claude/v1/messages",
+  const payload =
     {
       model: m.id,
       max_tokens: opts.maxTokens,
@@ -192,10 +205,20 @@ async function kieClaude<S extends z.ZodType>(m: TextModel, system: string, mess
             ]
           : x.content,
       })),
-    },
-    opts,
-    m.name,
-  );
+    };
+  // Claude streams, so a working model starts answering within a second or two. If nothing
+  // has started after 4 seconds it is counted as not answering and the nearest model takes over.
+  const firstReply = new AbortController();
+  const timer = setTimeout(() => firstReply.abort(), 4000);
+  let res: Response;
+  try {
+    res = await post("https://api.kie.ai/claude/v1/messages", payload, { ...opts, signal: opts.signal ? AbortSignal.any([opts.signal, firstReply.signal]) : firstReply.signal }, m.name);
+  } catch (e) {
+    if (firstReply.signal.aborted && !opts.signal?.aborted) throw new Error(`${m.name} is not answering right now`);
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
   const body = await readClaude(res, opts);
   if (!res.ok || !body || (typeof body.code === "number" && body.code !== 200) || body.error) {
     throw new Error(`${m.name}: ${body?.msg ?? body?.error?.message ?? `HTTP ${res.status}`}`);

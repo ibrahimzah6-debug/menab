@@ -8,19 +8,19 @@ import { DEFAULT_TEXT_MODEL, estimateUsd, TEXT_MODELS, textModel } from "@/lib/a
 import { fill, type Dictionary } from "@/lib/i18n/dictionaries";
 import { getI18n } from "@/lib/i18n/server";
 import { stageNumbersFor, type Path } from "@/lib/projects";
+import { isFailing } from "@/lib/ai/health";
 import { stagesFor } from "@/lib/stages";
 import { createClient } from "@/lib/supabase/server";
 import { getMemberships } from "@/lib/workspace";
 import { BriefChat } from "./brief-chat";
-import { ChangeBox } from "./editors";
 import { BoardCanvas } from "./board-canvas";
 import { BoardCardText, InlineDoc, InlineIdea } from "./inline-doc";
 import { LanguageMenu } from "@/components/menus";
 import { MenabLoader } from "@/components/menab-loader";
 import { StepModelPicker } from "./side-panels";
-import { PathButtons, RewriteButton, StageFooter } from "./stage-controls";
+import { PathButtons, StageFooter } from "./stage-controls";
 import { DirectionsView, MeetingView, MoodView, ScriptView, TreatmentView, Versions } from "./creative-docs";
-import { AutoRefresh, CreativeAssistant, CreativeStart, TryAgain } from "./creative-panels";
+import { AutoRefresh, CreativeAssistant, CreativeStart, DocsAssistant, DocsFooter, TryAgain } from "./creative-panels";
 import { ProjectMenu } from "./project-menu";
 import { PanelTabs } from "./panel-tabs";
 import { BoardCursor, TypeIn } from "./board-live";
@@ -84,12 +84,14 @@ export default async function ProjectPage({
   // Writing model: picked on this project, else the workspace default, else Menab's default.
   const workspaceDefault = setting?.model_id ?? DEFAULT_TEXT_MODEL;
   const model = textModel((project.models as { text?: string } | null)?.text ?? workspaceDefault).id;
+  // Models that keep failing right now are marked, so nobody picks one and waits for nothing.
+  const failing = new Set((await Promise.all(TEXT_MODELS.map(async (m) => ((await isFailing(m.id)) ? m.id : null)))).filter(Boolean));
   const modelOptions = TEXT_MODELS.map((m, i) => ({
     id: m.id,
     rank: i + 1,
     name: m.name,
-    note: m.goodFor[locale],
-    price: iso(`~$${estimateUsd(m.id, "briefTurn").toFixed(3)}`) + (locale === "ar" ? " للرد" : " a reply"),
+    note: failing.has(m.id) ? p.modelBusy : m.goodFor[locale],
+    price: iso(`~$${estimateUsd(m.id, "briefTurn").toFixed(3)}`) + (locale === "ar" ? " للرد" : " a reply") + (failing.has(m.id) ? ` · ${p.modelBusyShort}` : ""),
   }));
 
   // Which stage the screen shows: the current one, or an earlier one when one of its outputs is opened.
@@ -133,7 +135,7 @@ export default async function ProjectPage({
   const runCopy = {
     thinking: p.thinking,
     outputs: t.outputs as unknown as Record<number, string>,
-    steps: { call: p.steps.call, retry: p.steps.retry, switch: p.steps.switch, skip: p.steps.skip, writing: t.creative.steps.writing, saved: t.creative.steps.saved, stopped: p.steps.stopped, lost: p.steps.lost, stop: p.steps.stop },
+    steps: { call: p.steps.call, retry: p.steps.retry, switch: p.steps.switch, skip: p.steps.skip, writing: t.creative.steps.writing, writingDocs: p.steps.writingDocs, saved: t.creative.steps.saved, stopped: p.steps.stopped, lost: p.steps.lost, stop: p.steps.stop, seconds: p.steps.seconds },
   };
   const seconds = Number(brief.length_seconds) || 30;
   const meeting = (content[8] ?? {}) as { chosen?: number; notes?: string };
@@ -325,7 +327,7 @@ export default async function ProjectPage({
                         <span className="mn-label">{p.model}</span>
                         <StepModelPicker projectId={id} label={p.model} options={modelOptions} value={model} defaultLabel={model === workspaceDefault ? p.defaultTag : ""} disabled={!canEdit} />
                       </div>
-                      {stage === 1 && docsReady && editableHere && <ChangeBox projectId={id} copy={p.change} cost={approx(estimateUsd(model, "stageOne"))} mic={t.mic} />}
+                      {stage === 1 && docsReady && editableHere && <DocsAssistant projectId={id} copy={p.change} cost={approx(estimateUsd(model, "stageOne"))} mic={t.mic} run={runCopy} rewriteLabel={p.rewrite} />}
                     </section>
                   ),
                 },
@@ -528,10 +530,7 @@ export default async function ProjectPage({
                         />
                       )}
                       {showing === 1 && open !== 1 && docsReady && editableHere && (
-                        <>
-                          <ChangeBox projectId={id} copy={p.change} cost={approx(estimateUsd(model, "stageOne"))} mic={t.mic} />
-                          <RewriteButton projectId={id} label={p.rewrite} cost={approx(estimateUsd(model, "stageOne"))} />
-                        </>
+                        <DocsAssistant projectId={id} copy={p.change} cost={approx(estimateUsd(model, "stageOne"))} mic={t.mic} run={runCopy} rewriteLabel={p.rewrite} />
                       )}
                     </section>
                   ),
@@ -569,7 +568,10 @@ export default async function ProjectPage({
           label={fill(t.stage.approve, { n: 2 })}
         />
       )}
-      {canEdit && showing === 1 && stage === 1 && (
+      {canEdit && showing === 1 && stage === 1 && footerAction === "write" && (
+        <DocsFooter projectId={id} label={footerLabel} cost={footerCost} message={footerMessage} disabled={missing.length > 0} run={runCopy} />
+      )}
+      {canEdit && showing === 1 && stage === 1 && footerAction !== "write" && (
         <StageFooter
           projectId={id}
           stage={1}
@@ -577,8 +579,6 @@ export default async function ProjectPage({
           action={footerAction}
           label={footerLabel}
           cost={footerCost}
-          busyLabel={footerAction === "write" ? p.writing : undefined}
-          disabled={footerAction === "write" && missing.length > 0}
         />
       )}
     </div>

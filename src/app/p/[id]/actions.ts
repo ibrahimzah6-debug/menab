@@ -2,18 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { missingRequired, writeStageOne, type BriefFields } from "@/lib/ai/brain";
-import { TEXT_MODELS, textModel } from "@/lib/ai/catalog";
-import { backupFor } from "@/lib/ai/brain-core";
-import { isFailing } from "@/lib/ai/health";
-import { activeRules } from "@/lib/dev";
+import { TEXT_MODELS } from "@/lib/ai/catalog";
+import { runStageOne } from "@/lib/stage-one-run";
 import { transcribe } from "@/lib/ai/transcribe";
 import { getI18n } from "@/lib/i18n/server";
-import { claimForWriting, logAiJob, notify, saveVersion, STAGE_OUTPUTS, type Path } from "@/lib/projects";
+import { logAiJob, notify, saveVersion, STAGE_OUTPUTS, type Path } from "@/lib/projects";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember, getMemberships } from "@/lib/workspace";
-import { FILE_TYPES, loadProject, noticeFallback, ownPath, runBriefMessage, type BriefPayload } from "@/lib/brief-turn";
+import { FILE_TYPES, loadProject, ownPath, runBriefMessage, type BriefPayload } from "@/lib/brief-turn";
 
 export type Result = { error?: string };
 
@@ -193,69 +190,10 @@ export async function renameProject(projectId: string, name: string): Promise<Re
 
 // ---------- Stage 1 documents ----------
 
+// The stage 1 documents without live steps (the page uses /p/[id]/documents, which streams them).
 export async function writeBriefDocuments(projectId: string, instruction?: string): Promise<Result> {
-  const { t, locale } = await getI18n();
   try {
-    const loaded = await loadProject(projectId);
-    const { me, supabase, project } = loaded;
-    if (project.current_stage !== 1) return { error: t.project.notCurrentStage };
-    // A model that keeps failing right now is skipped for its backup.
-    const model = (await isFailing(loaded.model)) ? textModel(backupFor(textModel(loaded.model))).id : loaded.model;
-    const brief = project.brief as BriefFields;
-    if (missingRequired(brief).length) return { error: t.project.answerFirst };
-
-    const { data: outs } = await supabase
-      .from("outputs")
-      .select("id, workspace_id, number, current_version")
-      .eq("project_id", projectId)
-      .in("number", [3, 4, 5, 6]);
-    if (!(await claimForWriting(supabase, projectId, [3, 4, 5, 6]))) return { error: t.project.alreadyWriting };
-
-    let result;
-    try {
-      const today = new Date().toISOString().slice(0, 10);
-      const language = brief.language?.toLowerCase().includes("arab") || locale === "ar" ? "Arabic (Saudi), with names of deliverables in English where usual" : "English";
-      // A rewrite with an instruction revises the current documents instead of starting over.
-      let revise: { instruction: string; current: unknown } | undefined;
-      const clean = instruction?.trim().slice(0, 2000);
-      if (clean) {
-        const current: Record<number, unknown> = {};
-        for (const o of outs ?? []) {
-          if (o.current_version < 1) continue;
-          const { data: v } = await supabase.from("versions").select("content").eq("output_id", o.id).eq("version", o.current_version).maybeSingle();
-          current[o.number] = v?.content;
-        }
-        revise = { instruction: clean, current: { summary: current[3], strategy: current[4], pathway: current[5], cps_and_kickoff: current[6] } };
-      }
-      // Workspace memory (Settings, Memory), unless it is turned off.
-      const { data: ws } = await supabase.from("workspaces").select("memory_on").eq("id", project.workspace_id).maybeSingle();
-      const memory = ws?.memory_on === false
-        ? []
-        : ((await supabase.from("memories").select("content").eq("workspace_id", project.workspace_id).order("created_at", { ascending: false }).limit(40)).data ?? []).map((r) => r.content as string);
-      result = await writeStageOne(brief, project.path ?? project.path_suggested, today, language, model, revise, undefined, memory, await activeRules());
-    } catch (e) {
-      await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "stage1-docs", provider: textModel(model).provider, model, ok: false, error: errText(e) });
-      // Keep earlier versions; only steps that never had one are marked failed.
-      for (const o of outs ?? []) {
-        await supabase.from("outputs").update({ status: o.current_version > 0 ? "ready" : "failed" }).eq("id", o.id);
-      }
-      revalidatePath(`/p/${projectId}`);
-      return { error: e instanceof Error && e.message.includes("Gemini") ? e.message : t.project.aiFailed };
-    }
-    const { docs, usage } = result;
-    await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "stage1-docs", provider: textModel(result.model).provider, model: result.model, ok: true, usage, fallbackFrom: result.fallbackFrom });
-    if (result.fallbackFrom) await noticeFallback(me.workspace.id, projectId, result.fallbackFrom, result.model, result.firstError);
-
-    const content: Record<number, unknown> = {
-      3: docs.summary,
-      4: docs.strategy,
-      5: docs.pathway,
-      6: { cps: docs.cps, kickoff_notes: docs.kickoff_notes },
-    };
-    for (const o of outs ?? []) await saveVersion(supabase, o, content[o.number], "ai", me.userId, result.model);
-    if (!project.path) {
-      await supabase.from("projects").update({ path: docs.pathway.path }).eq("id", projectId);
-    }
+    await runStageOne(projectId, instruction, () => {});
   } catch (e) {
     revalidatePath(`/p/${projectId}`);
     return { error: errText(e) };

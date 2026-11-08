@@ -6,10 +6,27 @@ import { useRouter } from "next/navigation";
 export type RunCopy = {
   thinking: string;
   outputs: Record<number, string>;
-  steps: { call: string; retry: string; switch: string; skip: string; writing: string; saved: string; stopped: string; lost: string; stop: string };
+  steps: {
+    call: string;
+    retry: string;
+    switch: string;
+    skip: string;
+    writing: string;
+    writingDocs: string;
+    saved: string;
+    stopped: string;
+    lost: string;
+    stop: string;
+    seconds: string;
+  };
 };
-type Ev = { t: string; [k: string]: unknown };
-type Action = { kind: "directions" } | { kind: "build" } | { kind: "revise"; n: number; instruction: string } | { kind: "redo"; n: number };
+type Ev = { t: string; at?: number; [k: string]: unknown };
+type Action =
+  | { kind: "directions" }
+  | { kind: "build" }
+  | { kind: "revise"; n: number; instruction: string }
+  | { kind: "redo"; n: number }
+  | { kind: "docs"; instruction?: string };
 
 const fillIn = (s: string, v: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? ""));
 
@@ -26,6 +43,8 @@ function lineOf(e: Ev, c: RunCopy) {
       return fillIn(c.steps.skip, { from: String(e.from), to: String(e.to) });
     case "writing":
       return fillIn(c.steps.writing, { name: name(e.n) });
+    case "writingDocs":
+      return c.steps.writingDocs;
     case "saved":
       return fillIn(c.steps.saved, { name: name(e.n) });
     default:
@@ -33,28 +52,33 @@ function lineOf(e: Ev, c: RunCopy) {
   }
 }
 
-// Runs a piece of Creative work through /p/[id]/creative and keeps its steps. Each finished
-// piece refreshes the page, so the person reads it while the rest is written.
+// Runs a piece of AI work through a streaming endpoint (/p/[id]/creative for the Creative
+// stage, /p/[id]/documents for the stage 1 documents) and keeps its steps with their times.
+// Each finished piece refreshes the page, so the person reads it while the rest is written.
 export function useCreativeRun(projectId: string, c: RunCopy) {
   const router = useRouter();
   const [events, setEvents] = useState<Ev[]>([]);
   const [busy, setBusy] = useState(false);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | undefined>();
   const ctrl = useRef<AbortController | null>(null);
 
   const run = async (action: Action): Promise<{ error?: string }> => {
     const controller = new AbortController();
     ctrl.current = controller;
+    const start = Date.now();
     setBusy(true);
+    setStartedAt(start);
     setError(undefined);
     setEvents([]);
     let failure: string | undefined;
     let finished = false;
     try {
-      const res = await fetch(`/p/${projectId}/creative`, {
+      const docs = action.kind === "docs";
+      const res = await fetch(`/p/${projectId}/${docs ? "documents" : "creative"}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(action),
+        body: JSON.stringify(docs ? { instruction: action.instruction } : action),
         signal: controller.signal,
       });
       if (!res.ok || !res.body) throw new Error(c.steps.lost);
@@ -75,7 +99,7 @@ export function useCreativeRun(projectId: string, c: RunCopy) {
             finished = true;
             failure = String(e.message);
           } else {
-            setEvents((x) => [...x, e]);
+            setEvents((x) => [...x, { ...e, at: Date.now() - start }]);
             if (e.t === "saved") router.refresh();
           }
         }
@@ -92,27 +116,43 @@ export function useCreativeRun(projectId: string, c: RunCopy) {
     return { error: failure };
   };
 
-  return { run, busy, events, error, stop: () => ctrl.current?.abort() };
+  return { run, busy, events, error, startedAt, stop: () => ctrl.current?.abort() };
 }
 
-// One line whose words change as Menab works; press it to see every step.
-export function RunLine({ events, busy, c }: { events: Ev[]; busy: boolean; c: RunCopy }) {
-  const [open, setOpen] = useState(false);
-  const lines = events.map((e) => lineOf(e, c)).filter((x): x is string => Boolean(x));
+// Seconds since a moment, ticking every second while active.
+export function useSeconds(since: number | null, active: boolean) {
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (!busy) setOpen(false);
-  }, [busy]);
+    if (!active) return;
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [active]);
+  return since ? Math.max(0, Math.round((now - since) / 1000)) : 0;
+}
+
+// One line whose words change as Menab works, with the seconds so far; press it to see every
+// step and when it happened. It stays after the work is done, with the total time.
+export function RunLine({ events, busy, c, startedAt }: { events: Ev[]; busy: boolean; c: RunCopy; startedAt?: number | null }) {
+  const [open, setOpen] = useState(false);
+  const secs = useSeconds(startedAt ?? null, busy);
+  const lines = events.map((e) => ({ text: lineOf(e, c), at: e.at })).filter((x): x is { text: string; at: number | undefined } => Boolean(x.text));
   if (!busy && !lines.length) return null;
+  const total = busy ? secs : Math.round((events[events.length - 1]?.at ?? 0) / 1000);
   return (
     <div className="flex flex-col gap-1.5" role="status" aria-live="polite">
       <button type="button" className="self-start flex items-center gap-2 small text-start" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
         {busy ? <span className="mn-pulse shrink-0" aria-hidden="true" /> : <span aria-hidden="true" className="text-ink-muted">✓</span>}
-        <span dir="auto" className={busy ? "text-ink" : "text-ink-muted"}>{lines[lines.length - 1] ?? c.thinking}</span>
+        <span dir="auto" className={busy ? "text-ink" : "text-ink-muted"}>{lines[lines.length - 1]?.text ?? c.thinking}</span>
+        <span className="data text-[12px] text-ink-faint">· {fillIn(c.steps.seconds, { n: total })}</span>
       </button>
       {open && (
         <ol className="m-0 ms-1.5 ps-4 border-s border-line list-none flex flex-col gap-1">
           {lines.map((x, i) => (
-            <li key={i} className="text-[12px] text-ink-muted" dir="auto">{x}</li>
+            <li key={i} className="text-[12px] text-ink-muted flex gap-2" dir="auto">
+              <span className="data text-ink-faint shrink-0">{fillIn(c.steps.seconds, { n: Math.round((x.at ?? 0) / 1000) })}</span>
+              <span>{x.text}</span>
+            </li>
           ))}
         </ol>
       )}

@@ -83,7 +83,7 @@ export async function runBriefMessage(projectId: string, payload: BriefPayload, 
   const started = Date.now();
   const events: BriefEvent[] = [];
   const emit = (e: BriefEvent) => {
-    events.push(e);
+    events.push({ ...e, at: Date.now() - started } as unknown as BriefEvent);
     send(e);
   };
   const clean = payload.text.trim().slice(0, 8000);

@@ -80,7 +80,8 @@ export const TEXT_MODELS: TextModel[] = [
   { id: "gpt-6-luna", name: "GPT 6 Luna", usdPerMillionIn: 0.1, usdPerMillionOut: 0.5, provider: "kie-gpt", goodFor: { en: "Lightest and cheapest", ar: "الأخف والأرخص" } },
 ];
 
-export const DEFAULT_TEXT_MODEL = "claude-opus-5-5";
+// GPT 6.1 Sol: strong, quick and reliable on Kie.ai (Ibrahim, 8 Nov 2026).
+export const DEFAULT_TEXT_MODEL = "gpt-6-1-sol";
 
 export function textModel(id: string | null | undefined) {
   // A model that left the list (like the Gemini writing models) falls back to the default.
