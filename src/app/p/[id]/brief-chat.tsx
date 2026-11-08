@@ -208,6 +208,34 @@ export function BriefChat({
   const photoRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // The unsent message, its files and voice note are kept per project in this browser, so
+  // switching to Board or another page and coming back never loses them.
+  const draftKey = `menab-draft-${projectId}`;
+  const restored = useRef(false);
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(draftKey) ?? "null") as { text?: string; uploads?: Upload[]; voice?: { path: string; seconds: number } } | null;
+      if (saved) {
+        if (saved.text) setText(saved.text);
+        if (saved.uploads?.length) setUploads(saved.uploads.filter((u) => u.path));
+        if (saved.voice) setVoice(saved.voice);
+      }
+    } catch {
+      // Storage blocked: start empty.
+    }
+    restored.current = true;
+  }, [draftKey]);
+  useEffect(() => {
+    if (!restored.current) return;
+    try {
+      const ready = uploads.filter((u) => u.path);
+      if (text.trim() || ready.length || voice) localStorage.setItem(draftKey, JSON.stringify({ text, uploads: ready, voice }));
+      else localStorage.removeItem(draftKey);
+    } catch {
+      // Storage blocked: the draft lives only on this page.
+    }
+  }, [draftKey, text, uploads, voice]);
+
   useEffect(() => {
     // Scroll only the messages, never the page around them.
     const list = endRef.current?.parentElement;

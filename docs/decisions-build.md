@@ -147,3 +147,12 @@ Replaces B4.
   - Signed-out calls to the AI endpoints get a plain 401 instead of the login page.
 - **Left as is, on purpose:** four tables with row security and no policies (only the server reads them); young indexes not used yet.
 - **For Ibrahim (optional):** turn on leaked password protection in Supabase, Authentication, Passwords.
+
+## B18. Live board, panel tabs, drafts, try again, delete (Ibrahim, 8 Nov 2026)
+
+- **Live board** (information-architecture.md, Board view; screens/StageBoard.png): every stage up to the current one is on the canvas, earlier ones read only; waiting cards are dashed and say what they wait for; the card being written shows a shimmer and the labelled Menab AI cursor glides to it and moves while it writes; a finished card pops in and its text types in; the top bar says what Menab AI is writing. The brief chat is on the board too, in the right panel. Reduced motion shows the result without animation. Dragging cards stays for later (mvp-definition.md).
+- **Right panel tabs:** Brief and Assistant (and Chat on the board) as tabs at the top; only the open tab scrolls. The brief is readable from every stage.
+- **Drafts:** the unsent message, its files and voice note are kept per project in the browser, so switching to the board or another page never loses them.
+- **Try again:** a Creative output that failed, or never got written, shows "Try again" with its price; it writes that output from scratch (the script also writes a missing treatment and mood). A piece stuck "Generating" for over 6 minutes shows as failed.
+- **Faster treatment:** a new director's treatment is written in two halves at the same time (the film; the production), each a shorter call. On 8 Nov one took longer than the time limit.
+- **Delete project:** Admins and Producers, from the ⋯ menu in the project bar, after a confirmation. Chat, documents, versions and files are removed; the AI costs stay in Credits.

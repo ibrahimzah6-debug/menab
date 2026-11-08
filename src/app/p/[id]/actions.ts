@@ -12,7 +12,7 @@ import { getI18n } from "@/lib/i18n/server";
 import { claimForWriting, logAiJob, notify, saveVersion, STAGE_OUTPUTS, type Path } from "@/lib/projects";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentMember } from "@/lib/workspace";
+import { getCurrentMember, getMemberships } from "@/lib/workspace";
 import { FILE_TYPES, loadProject, noticeFallback, ownPath, runBriefMessage, type BriefPayload } from "@/lib/brief-turn";
 
 export type Result = { error?: string };
@@ -386,4 +386,30 @@ export async function saveBriefIdea(projectId: string, logline: string, story: s
   }
   revalidatePath(`/p/${projectId}`);
   return {};
+}
+
+// Deletes a project for good: its stages, chat, documents, versions and stored files. Its AI
+// costs stay in the log (Credits), with the project link cleared. Admins and Producers only.
+export async function deleteProject(projectId: string): Promise<Result> {
+  try {
+    const supabase = await createClient();
+    const { data: project } = await supabase.from("projects").select("id, workspace_id").eq("id", projectId).maybeSingle();
+    if (!project) return { error: "Project not found." };
+    const me = (await getMemberships()).find((m) => m.workspace.id === project.workspace_id);
+    if (!me || !["admin", "producer"].includes(me.role)) return { error: "Only an Admin or a Producer can delete a project." };
+    const admin = createAdminClient();
+    const base = `${project.workspace_id}/projects/${projectId}`;
+    for (const folder of ["files", "voice"]) {
+      const { data: list } = await admin.storage.from("media").list(`${base}/${folder}`, { limit: 1000 });
+      const paths = (list ?? []).map((f) => `${base}/${folder}/${f.name}`);
+      if (paths.length) await admin.storage.from("media").remove(paths);
+    }
+    const { error } = await admin.from("projects").delete().eq("id", projectId).eq("workspace_id", project.workspace_id);
+    if (error) return { error: "Could not delete the project. Try again." };
+  } catch (e) {
+    return { error: errText(e) };
+  }
+  revalidatePath("/projects");
+  revalidatePath("/");
+  redirect("/projects");
 }
