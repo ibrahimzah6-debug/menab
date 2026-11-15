@@ -1,13 +1,13 @@
 import { revalidatePath } from "next/cache";
 import type { Aspect, Style } from "@/lib/ai/images";
-import { runFrames, type FrameEvent } from "@/lib/frames";
+import { runFrames, runRefs, type FrameEvent } from "@/lib/frames";
 
 // Draws storyboard frames, streamed frame by frame (one JSON per line). Stop ends the work.
 export const maxDuration = 300;
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const body = (await req.json().catch(() => null)) as { frames?: unknown; style?: string; model?: string; aspect?: string } | null;
+  const body = (await req.json().catch(() => null)) as { frames?: unknown; style?: string; model?: string; aspect?: string; refs?: string; names?: unknown } | null;
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
@@ -19,6 +19,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         }
       };
       try {
+        // Reference pictures of characters or locations.
+        if (body?.refs === "character" || body?.refs === "location") {
+          const names = Array.isArray(body.names) ? [...new Set(body.names.map((x) => String(x).slice(0, 200)).filter(Boolean))].slice(0, 30) : [];
+          if (!names.length) throw new Error("Nothing to do.");
+          await runRefs(id, { kind: body.refs, names, model: String(body.model ?? "") }, emit, req.signal);
+          revalidatePath(`/p/${id}`);
+          emit({ t: "done" });
+          controller.close();
+          return;
+        }
         const frames = Array.isArray(body?.frames) ? [...new Set(body.frames.map(Number).filter((n) => Number.isInteger(n) && n > 0 && n <= 200))].slice(0, 60) : [];
         if (!frames.length) throw new Error("Nothing to do.");
         await runFrames(id, { frames, style: (body?.style ?? "sketch") as Style, model: String(body?.model ?? ""), aspect: (body?.aspect ?? "16:9") as Aspect }, emit, req.signal);

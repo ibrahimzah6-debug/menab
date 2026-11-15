@@ -186,3 +186,10 @@ Replaces B4.
 - The brief gets a video type, from the approved list in `video-types.md` (25 types in 7 groups). Menab suggests it from the conversation; the person changes it from a dropdown. The type guides the AI (script shape, length, format, path, shots) and hides the stages and documents that do not apply; nothing written is deleted when the type changes.
 - Clips (needs the Edit stage), Film and Series (need a scene level, after M5) show as coming soon.
 - Next: a recipe per type, then the dropdown and the hiding.
+
+## B24. Choices, reference pictures, drawing from the bottom bar (Ibrahim, 15 Nov 2026)
+
+- **Choices instead of typing:** shot size, angle, camera move, lens, interior or exterior, time of day, and "made as" for characters and locations are picked from standard film words, each with a small drawing, in English and Arabic (`src/lib/film-terms.ts`). "Other, type it" stays for anything unusual. The AI is told to use the same words, and common short forms (CU, MS, WS, Steadicam) are read as the standard ones.
+- **A reference picture per character and location** in stage 3 (photo-real, about $0.04 each on the project's image model). The storyboard frames use them as references so faces and places stay the same, ahead of library photos. M5's reference lock starts from these same pictures.
+- **Draw from the bottom bar:** once the shot list is written, the stage 3 bar offers "Draw N frames" with the price.
+- **Waiting:** saving to Files and Libraries as branded PDFs or decks (Ibrahim's screenshot: a folder button next to the language button at the top) is to be decided; see the reply on 15 Nov.

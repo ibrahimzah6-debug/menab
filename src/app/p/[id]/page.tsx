@@ -5,7 +5,7 @@ import { StageBar } from "@/components/stage/stage-bar";
 import { StatusChip, type OutputStatus } from "@/components/status-chip";
 import { missingRequired, type BriefFields, type StageOneDocs } from "@/lib/ai/brain";
 import { DEFAULT_MODEL, DEFAULT_TEXT_MODEL, estimateUsd, IMAGE_MODELS, TEXT_MODELS, textModel } from "@/lib/ai/catalog";
-import { frameImages } from "@/lib/frames";
+import { frameImages, lookImages } from "@/lib/frames";
 import { fill, type Dictionary } from "@/lib/i18n/dictionaries";
 import { getI18n } from "@/lib/i18n/server";
 import { stageNumbersFor, type Path } from "@/lib/projects";
@@ -140,12 +140,18 @@ export default async function ProjectPage({
   const shotFrames = (content[17] as { frames?: { n: number }[] } | undefined)?.frames ?? [];
   const framesDrawn = shotFrames.filter((f) => (images[f.n]?.version ?? 0) > 0).length;
   const framesDone = shotFrames.length > 0 && framesDrawn === shotFrames.length;
-  const drawing = Object.values(images).some((x) => x.status === "generating");
+  const rawPictures = lookOn && showing === 3 && (open === 13 || open === 15) ? await lookImages(id, project.workspace_id, supabase) : {};
+  const pictures: Record<string, (typeof rawPictures)[string]> = {};
+  for (const [k, x] of Object.entries(rawPictures)) pictures[k] = x.status === "generating" && new Date(x.updatedAt).getTime() < staleBefore ? { ...x, status: "failed" } : x;
+  const drawing = Object.values(images).some((x) => x.status === "generating") || Object.values(pictures).some((x) => x.status === "generating");
   const generating = writing || drawing;
   const { data: imageSetting } = showing === 3 ? await supabase.from("model_settings").select("model_id").eq("workspace_id", project.workspace_id).eq("task", "image").maybeSingle() : { data: null };
   const imageModel = (project.models as { image?: string } | null)?.image ?? imageSetting?.model_id ?? DEFAULT_MODEL.image;
   const imageOptions = IMAGE_MODELS.map((m) => ({ id: m.id, name: m.name, price: m.priceFrom ?? 0, note: m.goodFor[locale] }));
   const lastStyle = Object.values(images).find((x) => x.version > 0)?.style === "photo" ? "photo" : "sketch";
+  const lang: "en" | "ar" = locale === "ar" ? "ar" : "en";
+  const imagePrice = IMAGE_MODELS.find((m) => m.id === imageModel)?.priceFrom ?? 0.04;
+  const missingFrames = shotFrames.filter((f) => !(images[f.n]?.version) && images[f.n]?.status !== "generating").map((f) => f.n);
 
   // Every version of the open output, to restore an earlier one.
   const openOut = outs.find((x) => x.number === open);
@@ -456,11 +462,11 @@ export default async function ProjectPage({
                 <p className="small text-ink-muted m-0 max-w-[760px]">{t.look.intro[open]}</p>
                 {content[open] ? (
                   open === 13 ? (
-                    <CharactersView projectId={id} content={content[13] as never} editable={editableHere && statusOf(13) !== "generating"} c={t.look} />
+                    <CharactersView projectId={id} content={content[13] as never} editable={editableHere && statusOf(13) !== "generating"} c={t.look} d={{ model: imageModel, price: imagePrice, run: runCopy, pictures, lang }} />
                   ) : open === 14 ? (
                     <WardrobeView projectId={id} content={content[14] as never} editable={editableHere && statusOf(14) !== "generating"} c={t.look} />
                   ) : open === 15 ? (
-                    <LocationsView projectId={id} content={content[15] as never} editable={editableHere && statusOf(15) !== "generating"} c={t.look} />
+                    <LocationsView projectId={id} content={content[15] as never} editable={editableHere && statusOf(15) !== "generating"} c={t.look} d={{ model: imageModel, price: imagePrice, run: runCopy, pictures, lang }} />
                   ) : open === 16 ? (
                     <ArtView projectId={id} content={content[16] as never} editable={editableHere && statusOf(16) !== "generating"} c={t.look} />
                   ) : open === 17 ? (
@@ -474,9 +480,10 @@ export default async function ProjectPage({
                       models={imageOptions}
                       model={imageModel}
                       style={lastStyle}
+                      lang={lang}
                     />
                   ) : (
-                    <ShotListView projectId={id} content={content[18] as never} seconds={seconds} editable={editableHere && statusOf(18) !== "generating"} c={t.look} />
+                    <ShotListView projectId={id} content={content[18] as never} seconds={seconds} editable={editableHere && statusOf(18) !== "generating"} c={t.look} lang={lang} />
                   )
                 ) : statusOf(open) === "generating" ? (
                   <MenabLoader size={20} label={p.writing} />
@@ -667,9 +674,10 @@ export default async function ProjectPage({
                 : !content[13] && !content[15]
                   ? t.look.footer.start
                   : !framesDone
-                    ? t.look.footer.draw
+                    ? missingFrames.length && isReady(17) ? t.look.footerDraw : t.look.footer.draw
                     : t.look.footer.review
           }
+          draw={!stageThreeApproved && isReady(17) && missingFrames.length > 0 && !stageThree.some((x) => x.status === "generating") ? { frames: missingFrames, model: imageModel, style: lastStyle, label: missingFrames.length === 1 ? t.look.frames.drawOne : fill(t.look.frames.drawMissing, { n: missingFrames.length }), cost: approx(imagePrice * missingFrames.length) } : null}
           write={!stageThreeApproved && !content[13] && !content[15] && !stageThree.some((x) => x.status === "generating") ? { label: t.look.write, cost: approx(estimateUsd(model, "look")) } : null}
           approve={!stageThreeApproved && [13, 14, 15, 16, 17, 18].every(isReady) && framesDone ? fill(t.stage.approve, { n: 3 }) : null}
         />
