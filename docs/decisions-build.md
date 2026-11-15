@@ -212,3 +212,7 @@ Replaces B4.
 
 - The look is approved in three steps: the stage 3 character and location pictures, the storyboard that follows them, and the M5 reference lock, which is final before any video.
 - Added to M5: digital actors (I29), outfit pictures only when clothes change (I30), and the consent rule for real people (I31).
+
+## B28. Music in M5 (Ibrahim, 15 Nov 2026)
+
+- Music is generated in the Generate stage, next to Voice, as M5's last step (I25, point 2): Menab makes the track with Suno on Kie.ai from the music feeling in the Creative stage, with the price shown first, so short videos (ads, UGC, faceless) come out complete. Suno's commercial-use terms are checked while it is built, and each track is listed in the rights record. Final music licensing and the sound mix stay in the Edit stage (v2). mvp-definition.md is updated to match.
