@@ -1,4 +1,4 @@
-# Video types (draft for Ibrahim's approval, 15 Nov 2026)
+# Video types (approved by Ibrahim, 15 Nov 2026)
 
 Picked in the brief stage. Menab suggests the type from the conversation; the person can change it at any time from a dropdown. The type sets the script shape, length, format, suggested path and shots, and hides the stages and documents that do not apply. Nothing already written is ever deleted when the type changes; it is only hidden.
 
@@ -30,13 +30,20 @@ Stages: 1 Brief, 2 Creative, 3 Look and characters, 4 Pre-production, 5 Generate
 | 16 | Faceless page video | فيديو صفحة بدون وجه | 30 to 60 sec shorts, or 5 to 10 min; 9:16 or 16:9 | AI | Casting, wardrobe, pre-production |
 | 17 | Affiliate and digital product promo | ترويج أفلييت ومنتجات رقمية | 15 to 45 sec, 9:16 | AI | Casting, pre-production |
 | 18 | App or website demo | عرض تطبيق أو موقع | 30 to 90 sec | AI with screen recordings | Characters, locations, pre-production |
-| 19 | Clips from a podcast or long video | مقاطع من بودكاست أو فيديو طويل | 15 to 60 sec, 9:16 | Edit only | Creative, Look and characters, pre-production (needs the Edit stage, v2) |
+| 19 | Clips from a podcast or long video (coming soon) | مقاطع من بودكاست أو فيديو طويل | 15 to 60 sec, 9:16 | Edit only | Creative, Look and characters, pre-production (needs the Edit stage, v2) |
 | **Places** | | | | | |
 | 20 | Real estate and project showcase | عرض عقاري ومشاريع | 60 to 120 sec | Shoot (drone) or hybrid | Casting when no people |
 | 21 | Tourism and destination | سياحة ووجهات | 60 to 120 sec | Shoot or hybrid | Nothing |
 | **Story** | | | | | |
 | 22 | Short documentary or story | وثائقي أو قصة قصيرة | 2 to 10 min | Shoot or hybrid | Nothing |
-| 23 | Other or not sure | أخرى أو مو متأكد | Any | Menab decides | Nothing |
+| 23 | Film (coming soon) | فيلم | 10 min to 2 hours, built scene by scene | AI, shoot or hybrid | Nothing; adds scenes |
+| 24 | Series (coming soon) | مسلسل | Episodes, each built scene by scene | AI, shoot or hybrid | Nothing; adds episodes and scenes |
+| 25 | Other or not sure | أخرى أو مو متأكد | Any | Menab decides | Nothing |
+
+## Coming soon
+
+- **Clips (19)** needs the Edit stage (v2).
+- **Film and Series (23, 24)** need a scene level: the film is split into scenes (and a series into episodes), each with its own script part, shot list and storyboard, approved one by one. Built after M5, once clip generation, the reference lock and real cost numbers exist. Every shot already records its scene, so this is an extension, not a rebuild. Rough cost for 30 minutes of AI film on Kling 3.0: about $126 for one pass of all clips, about $300 to $500 with retries, plus images and voice.
 
 ## Open points
 

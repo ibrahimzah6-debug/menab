@@ -180,3 +180,9 @@ Replaces B4.
 - **Storyboard frames:** the producer picks Sketch or Photo-real, the image model (Nano Banana 2 by default, the one tested) and the frame shape. The price on the button is the number of frames times the model's price per image. Frames are drawn on Kie.ai three at a time; each image is copied to Menab's own storage (Kie's links expire), its real cost is read back from Kie.ai and logged. A failed frame is tried once more, then on the backup model (Nano Banana 2, or Seedream 5 Pro when Nano Banana 2 failed); a frame that still fails costs nothing. A redraw keeps the earlier image as an older version.
 - **Approval:** the stage approves only when every shot has a drawn frame (the M4 done criterion).
 - **GPT answers are now streamed:** Kie.ai's gateway cut silent connections after about 30 seconds (HTTP 502), which the long shot list hit every time. Streaming keeps the connection alive; the last event carries the whole answer and its real cost. Measured: the shot list writes on GPT 6.1 Sol in about 75 seconds with no switch.
+
+## B23. Video types (Ibrahim, 15 Nov 2026)
+
+- The brief gets a video type, from the approved list in `video-types.md` (25 types in 7 groups). Menab suggests it from the conversation; the person changes it from a dropdown. The type guides the AI (script shape, length, format, path, shots) and hides the stages and documents that do not apply; nothing written is deleted when the type changes.
+- Clips (needs the Edit stage), Film and Series (need a scene level, after M5) show as coming soon.
+- Next: a recipe per type, then the dropdown and the hiding.
