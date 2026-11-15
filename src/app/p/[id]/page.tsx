@@ -104,9 +104,10 @@ export default async function ProjectPage({
   const stageThree = outs.filter((x) => x.stage === 3);
   const asked = Number(o);
   const showing = asked >= 1 && asked <= 6 ? 1 : asked >= 7 && asked <= 12 && stageTwo.length ? 2 : asked >= 13 && asked <= 18 && stageThree.length ? 3 : stage;
-  // Steps the video type does not need are hidden (nothing written is deleted).
+  // Steps the video type does not need stay in the list, crossed out as "Not needed", and are
+  // not waited for at approval. Nothing written is deleted.
   const hidden = hiddenOutputs(brief as { video_type?: string; real_people?: string });
-  const list = showing === 1 ? stageOne.filter((x) => x.number !== 2) : outs.filter((x) => x.stage === showing && !hidden.has(x.number));
+  const list = showing === 1 ? stageOne.filter((x) => x.number !== 2) : outs.filter((x) => x.stage === showing);
   const isReady = (n: number) => ["ready", "edited", "approved"].includes(outs.find((x) => x.number === n)?.status ?? "");
   const docsReady = [3, 4, 5, 6].every(isReady);
   const stageOneApproved = stageOne.length > 0 && stageOne.every((x) => x.status === "approved");
@@ -119,7 +120,7 @@ export default async function ProjectPage({
       : showing === 2
         ? asked >= 7 && asked <= 12 ? asked : isReady(12) ? 12 : isReady(8) ? 9 : isReady(7) ? 8 : 7
         : showing === 3
-          ? asked >= 13 && asked <= 18 && !hidden.has(asked) ? asked : isReady(18) && !hidden.has(17) ? 17 : ([13, 15, 16, 17, 18].find((n) => !hidden.has(n)) ?? 18)
+          ? asked >= 13 && asked <= 18 ? asked : isReady(18) && !hidden.has(17) ? 17 : ([13, 15, 16, 17, 18].find((n) => !hidden.has(n)) ?? 18)
           : 0;
   const board = view === "board";
   const editableHere = canEdit && showing === stage && !(showing === 1 && stageOneApproved) && !(showing === 2 && stageTwoApproved) && !(showing === 3 && stageThreeApproved);
@@ -179,7 +180,7 @@ export default async function ProjectPage({
       index: order.indexOf(n),
       name: names[order.indexOf(n)] ?? "",
       approved: outs.filter((x) => x.stage === n).length > 0 && outs.filter((x) => x.stage === n).every((x) => x.status === "approved"),
-      outs: outs.filter((x) => x.stage === n && x.number !== 2 && !hidden.has(x.number)),
+      outs: outs.filter((x) => x.stage === n && x.number !== 2),
     }));
   const busyOut = outs.find((x) => x.status === "generating");
 
@@ -302,7 +303,7 @@ export default async function ProjectPage({
                             ))}
                           </div>
                         )}
-                        <p className="mn-card__title">{t.outputs[x.number]}</p>
+                        <p className={`mn-card__title ${hidden.has(x.number) ? "line-through text-ink-faint" : ""}`}>{t.outputs[x.number]}</p>
                         <div className={`mn-card__text ${st === "generating" ? "mn-typing" : ""}`}>
                           {g.stage === 1 && live ? (
                             <BoardCardText
@@ -392,8 +393,8 @@ export default async function ProjectPage({
               const isOpen = showing <= 3 && open === x.number;
               const inner = (
                 <>
-                  <span className={st === "waiting" ? "text-ink-muted" : ""}>{x.number === 1 ? p.chat : t.outputs[x.number]}</span>
-                  <StatusChip status={st as OutputStatus} label={statusLabel(t, st)} />
+                  <span className={hidden.has(x.number) ? "line-through text-ink-faint" : st === "waiting" ? "text-ink-muted" : ""}>{x.number === 1 ? p.chat : t.outputs[x.number]}</span>
+                  {hidden.has(x.number) ? <span className="mn-chip mn-chip--waiting">{p.videoType.notNeeded}</span> : <StatusChip status={st as OutputStatus} label={statusLabel(t, st)} />}
                 </>
               );
               const cls = `flex justify-between items-center gap-2 p-2.5 rounded-md text-[14px] ${isOpen ? "font-medium bg-surface border border-line" : "border border-transparent hover:bg-tint-2"}`;
@@ -467,6 +468,7 @@ export default async function ProjectPage({
               </div>
               <div className="p-6 flex flex-col gap-4">
                 <p className="small text-ink-muted m-0 max-w-[760px]">{t.look.intro[open]}</p>
+                {hidden.has(open) && <p className="small m-0 px-3 py-2 rounded-md bg-tint-2 max-w-[760px]">{p.videoType.notNeededNote}</p>}
                 {content[open] ? (
                   open === 13 ? (
                     <CharactersView projectId={id} content={content[13] as never} editable={editableHere && statusOf(13) !== "generating"} c={t.look} d={{ model: imageModel, price: imagePrice, run: runCopy, pictures, lang }} />

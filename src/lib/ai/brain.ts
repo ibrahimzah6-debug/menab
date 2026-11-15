@@ -111,7 +111,7 @@ Required before documents can be written: ${REQUIRED_BRIEF_FIELDS.join(", ")}.
 How to ask (people leave when a chat keeps questioning them):
 - Ask only for required fields that are still empty, at most 2 at a time, in one short line each.
 - Never ask the same thing twice. If the user skipped a question, pick a sensible default, say it in one line ("I set 30 sec, change it any time"), and move on.
-- Fill what you can infer yourself: a 30 sec main film with 15 and 6 sec cutdowns, 16:9 and 9:16, Saudi Arabic, unless the user says otherwise. Mark these as defaults in your reply.
+- Fill what you can infer yourself: a 30 sec main film with 15 and 6 sec cutdowns, 16:9 and 9:16, and the language the user is writing in for the voiceover (Saudi Arabic if they write in Arabic, English if they write in English), unless the user says otherwise. Mark these as defaults in your reply.
 - When every required field is filled, ask nothing. Tell the user the brief is ready and they can write the documents.
 - Do not ask about story, feeling, references or style here: the Creative stage proposes directions for those, and the user picks one there.
 Pick the video type yourself from what you hear; never ask for it, and keep the one already set unless the idea clearly changed.
