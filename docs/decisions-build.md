@@ -207,3 +207,8 @@ Replaces B4.
 - **How the PDF is made:** each document is a designed print page, saved from the browser's print window ("Save as PDF"). This keeps Arabic text, fonts and pictures exact and costs nothing to run. A server-made PDF can come later if needed.
 - **Brand:** the company's first brand kit in Libraries gives the logo and accent colour (a colour too light to read is skipped); without one, the neutral Menab style (B25).
 - Steps hidden by the video type are left out of the documents.
+
+## B27. Look approval and the M5 plan for characters (Ibrahim, 15 Nov 2026)
+
+- The look is approved in three steps: the stage 3 character and location pictures, the storyboard that follows them, and the M5 reference lock, which is final before any video.
+- Added to M5: digital actors (I29), outfit pictures only when clothes change (I30), and the consent rule for real people (I31).
