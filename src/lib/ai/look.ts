@@ -3,6 +3,7 @@ import { z } from "zod";
 import { MENAB, lessons, remembered } from "./brain";
 import { structured, type Step } from "./brain-core";
 import { termList } from "@/lib/film-terms";
+import { typeGuide } from "@/lib/video-types";
 
 // Stage 3, Look and characters (workflow-map.md, outputs 13 to 18): characters, wardrobe,
 // locations, art direction, the shot list and the storyboard. Three calls: characters with
@@ -104,7 +105,7 @@ type Ctx = {
 
 const system = (c: Ctx) => `${MENAB}\n${remembered(c.memory)}${lessons(c.rules)}`;
 const base = (c: Ctx) =>
-  `Brief: ${JSON.stringify(c.brief)}\nPath: ${c.path ?? "not chosen"} (production: cast real actors and scout real places; ai: AI characters and places; hybrid: decide per item)\nApproved creative (direction, meeting notes, script, treatment, visual mood): ${JSON.stringify(c.creative)}\nWrite in: ${c.language}. Keep names consistent with the script.`;
+  `Brief: ${JSON.stringify(c.brief)}${typeGuide(c.brief as { video_type?: string })}\nPath: ${c.path ?? "not chosen"} (production: cast real actors and scout real places; ai: AI characters and places; hybrid: decide per item)\nApproved creative (direction, meeting notes, script, treatment, visual mood): ${JSON.stringify(c.creative)}\nWrite in: ${c.language}. Keep names consistent with the script.`;
 
 export function writeCast(c: Ctx, instruction?: string, current?: unknown) {
   const ask = instruction

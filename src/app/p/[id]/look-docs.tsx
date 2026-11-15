@@ -82,7 +82,7 @@ function PictureBar({ names, p, d, c, editable }: { names: string[]; p: ReturnTy
           <button type="button" className="mn-btn mn-btn--secondary" onClick={p.r.stop}>{d.run.steps.stop}</button>
         ) : p.missing.length ? (
           <button type="button" className="mn-btn mn-btn--primary" onClick={() => p.draw(p.missing)}>
-            {fillIn(f.drawMissing, { n: p.missing.length })}
+            {p.missing.length === 1 ? f.drawOnePic : fillIn(f.drawMissing, { n: p.missing.length })}
             <span className="mn-btn__cost">{usd(d.price * p.missing.length)}</span>
           </button>
         ) : (

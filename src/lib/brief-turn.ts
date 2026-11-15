@@ -1,4 +1,5 @@
 import "server-only";
+import { videoType } from "@/lib/video-types";
 import { briefTurn, missingRequired, type Attachment, type BriefFields, type Step } from "@/lib/ai/brain";
 import { backupFor, StoppedError } from "@/lib/ai/brain-core";
 import { isFailing } from "@/lib/ai/health";
@@ -157,6 +158,11 @@ export async function runBriefMessage(projectId: string, payload: BriefPayload, 
   // Stopped while the answer came in: keep nothing.
   if (signal?.aborted) throw new StoppedError();
   const { turn, usage } = result;
+  // The video type: the person's own choice always stays; Menab's suggestion must be a known type.
+  const chosenBy = (before as { video_type_by?: string }).video_type_by;
+  if (chosenBy === "person") turn.brief.video_type = before.video_type ?? null;
+  else if (!videoType(turn.brief.video_type)) turn.brief.video_type = before.video_type ?? null;
+  const typeBy = chosenBy === "person" ? "person" : turn.brief.video_type ? "ai" : null;
   const used = result.model;
   await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "brief", provider: textModel(used).provider, model: used, ok: true, usage, fallbackFrom: result.fallbackFrom });
   if (result.fallbackFrom) await noticeFallback(me.workspace.id, projectId, result.fallbackFrom, used, result.firstError);
@@ -200,7 +206,7 @@ export async function runBriefMessage(projectId: string, payload: BriefPayload, 
   await supabase
     .from("projects")
     .update({
-      brief: turn.brief,
+      brief: { ...turn.brief, video_type_by: typeBy },
       name: keepName ? project.name : (turn.brief.project_name || project.name).slice(0, 160),
       client: turn.brief.client?.slice(0, 160) ?? project.client,
       path_suggested: turn.path.suggested,

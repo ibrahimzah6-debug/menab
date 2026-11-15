@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { typeChoicesForAi, typeGuide } from "@/lib/video-types";
 import { structured, type Msg, type Step } from "./brain-core";
 
 export type { Attachment, Msg, Step, Usage } from "./brain-core";
@@ -43,6 +44,7 @@ export function lessons(rules?: string[]) {
 // production needs, and finally client and timing.
 const BriefFields = z.object({
   project_name: z.string().nullable().describe("Short working title, e.g. 'Dalla Ramadan ad'"),
+  video_type: z.string().nullable().describe(`The kind of video, one id from: ${typeChoicesForAi()}. Pick the closest as soon as you can tell; null only if nothing is known yet.`),
   // The video
   logline: z.string().nullable().describe("The idea of the video in one sentence, as understood so far. Draft it from what was said; mark it as a first draft if the user has not confirmed it."),
   objective: z.string().nullable().describe("What the video must achieve for the client: launch, awareness, sales, recruitment, an occasion"),
@@ -112,6 +114,7 @@ How to ask (people leave when a chat keeps questioning them):
 - Fill what you can infer yourself: a 30 sec main film with 15 and 6 sec cutdowns, 16:9 and 9:16, Saudi Arabic, unless the user says otherwise. Mark these as defaults in your reply.
 - When every required field is filled, ask nothing. Tell the user the brief is ready and they can write the documents.
 - Do not ask about story, feeling, references or style here: the Creative stage proposes directions for those, and the user picks one there.
+Pick the video type yourself from what you hear; never ask for it, and keep the one already set unless the idea clearly changed.
 Budget is optional: never ask for it. Suggest a path as soon as you know whether real products or people must be on camera.`,
     [
       ...history,
@@ -200,7 +203,7 @@ Current documents: ${JSON.stringify(revise.current)}`
         content: `${ask}
 
 Path chosen by the user: ${path ?? "not chosen, suggest one"}
-Brief: ${JSON.stringify(brief)}`,
+Brief: ${JSON.stringify(brief)}${typeGuide(brief)}`,
       },
     ],
     StageOneDocs,
