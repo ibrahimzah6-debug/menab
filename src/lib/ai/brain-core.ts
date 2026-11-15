@@ -252,7 +252,9 @@ async function kieGpt<S extends z.ZodType>(m: TextModel, system: string, message
     "https://api.kie.ai/codex/v1/responses",
     {
       model: m.id,
-      stream: false,
+      // Streamed: Kie.ai's gateway cuts a silent connection after about 30 seconds (HTTP 502),
+      // which long documents like the shot list need.
+      stream: true,
       reasoning: { effort: opts.effort },
       text: { format: { type: "json_schema", name: "answer", strict: false, schema: jsonSchema(schema) } },
       input: [
@@ -275,15 +277,7 @@ async function kieGpt<S extends z.ZodType>(m: TextModel, system: string, message
     opts,
     m.name,
   );
-  const body = (await res.json().catch(() => null)) as {
-    code?: number;
-    msg?: string;
-    error?: { message?: string } | null;
-    status?: string;
-    output?: { type: string; content?: { type: string; text?: string }[] }[];
-    usage?: { input_tokens?: number; output_tokens?: number };
-    credits_consumed?: number;
-  } | null;
+  const body = await readGpt(res, opts);
   if (!res.ok || !body || (typeof body.code === "number" && body.code !== 200) || body.error) {
     throw new Error(`${m.name}: ${body?.msg ?? body?.error?.message ?? `HTTP ${res.status}`}`);
   }
@@ -320,6 +314,69 @@ type ClaudeBody = {
 };
 
 // Reads Claude's answer, streamed (server-sent events) or as one JSON, into one shape.
+type GptBody = {
+  code?: number;
+  msg?: string;
+  error?: { message?: string } | null;
+  status?: string;
+  output?: { type: string; content?: { type: string; text?: string }[] }[];
+  usage?: { input_tokens?: number; output_tokens?: number };
+  credits_consumed?: number;
+};
+
+// Reads a GPT answer, streamed or not. The stream's last event holds the whole response.
+async function readGpt(res: Response, opts: Opts): Promise<GptBody | null> {
+  const type = res.headers.get("content-type") ?? "";
+  if (!type.includes("event-stream") || !res.body) {
+    try {
+      return JSON.parse(await res.text()) as GptBody;
+    } catch {
+      return null;
+    }
+  }
+  let out: GptBody | null = null;
+  let text = "";
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const handle = (data: string) => {
+    let e: Record<string, unknown>;
+    try {
+      e = JSON.parse(data);
+    } catch {
+      return;
+    }
+    if (typeof e.code === "number" && e.code !== 200) out = { code: e.code, msg: String(e.msg ?? "") };
+    else if (e.type === "response.completed" || e.type === "response.incomplete") {
+      out = { ...(e.response as GptBody), credits_consumed: typeof e.credits_consumed === "number" ? e.credits_consumed : undefined };
+    } else if (e.type === "response.failed" || e.type === "error") {
+      const r = e.response as { error?: { message?: string } } | undefined;
+      out = { error: { message: r?.error?.message ?? (e.error as { message?: string } | undefined)?.message ?? (e.message as string | undefined) ?? "failed" } };
+    } else if (e.type === "response.output_text.done" && typeof e.text === "string") {
+      text += e.text;
+    }
+  };
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let i: number;
+      while ((i = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, i).trim();
+        buffer = buffer.slice(i + 1);
+        if (line.startsWith("data:")) handle(line.slice(5).trim());
+      }
+    }
+    if (buffer.trim().startsWith("data:")) handle(buffer.trim().slice(5).trim());
+  } catch (e) {
+    if (opts.signal?.aborted) throw new StoppedError();
+    throw e;
+  }
+  // A stream that ended without its last event: use the text it sent, if any.
+  return out ?? (text ? { status: "completed", output: [{ type: "message", content: [{ type: "output_text", text }] }] } : null);
+}
+
 async function readClaude(res: Response, opts: Opts): Promise<ClaudeBody | null> {
   const type = res.headers.get("content-type") ?? "";
   if (!type.includes("event-stream") || !res.body) {

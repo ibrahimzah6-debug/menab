@@ -218,6 +218,15 @@ export async function approveStage(projectId: string, stage: number): Promise<Re
     const ready = (outs ?? []).filter((o) => ["ready", "edited", "approved"].includes(o.status)).map((o) => o.number);
     if (!needed.every((n) => ready.includes(n))) return { error: t.project.notReady };
     if (stage === 1 && !project.path) return { error: t.project.choosePathFirst };
+    // M4: every shot in the storyboard has a drawn frame.
+    if (stage === 3) {
+      const { data: sb } = await supabase.from("outputs").select("id, current_version").eq("project_id", projectId).eq("number", 17).maybeSingle();
+      const { data: v } = sb ? await supabase.from("versions").select("content").eq("output_id", sb.id).eq("version", sb.current_version).maybeSingle() : { data: null };
+      const frames = ((v?.content as { frames?: { n: number }[] } | null)?.frames ?? []).map((f) => f.n);
+      const { data: drawn } = await supabase.from("frame_images").select("n").eq("project_id", projectId).eq("status", "ready");
+      const have = new Set((drawn ?? []).map((d) => d.n));
+      if (!frames.length || !frames.every((n) => have.has(n))) return { error: t.project.frames.missing };
+    }
 
     const now = new Date().toISOString();
     await supabase.from("outputs").update({ status: "approved", updated_at: now }).eq("project_id", projectId).eq("stage", stage);
@@ -247,7 +256,7 @@ export async function approveStage(projectId: string, stage: number): Promise<Re
 
 // Saves a person's edit as a new version. The earlier version is kept and can be restored.
 // Which outputs a person can edit by hand, per stage (approved stages are read only).
-const EDITABLE: Record<number, number[]> = { 1: [3, 4, 5, 6], 2: [7, 9, 10, 11] };
+const EDITABLE: Record<number, number[]> = { 1: [3, 4, 5, 6], 2: [7, 9, 10, 11], 3: [13, 14, 15, 16, 17, 18] };
 
 export async function saveOutputEdit(projectId: string, number: number, content: unknown): Promise<Result> {
   try {

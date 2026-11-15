@@ -18,6 +18,10 @@ export type RunCopy = {
     lost: string;
     stop: string;
     seconds: string;
+    drawing?: string;
+    drawn?: string;
+    drawFailed?: string;
+    drawBackup?: string;
   };
 };
 type Ev = { t: string; at?: number; [k: string]: unknown };
@@ -26,7 +30,9 @@ type Action =
   | { kind: "build" }
   | { kind: "revise"; n: number; instruction: string }
   | { kind: "redo"; n: number }
-  | { kind: "docs"; instruction?: string };
+  | { kind: "docs"; instruction?: string }
+  | { kind: "look"; action: { kind: "write" } | { kind: "redo"; n: number } | { kind: "revise"; n: number; instruction: string } }
+  | { kind: "frames"; frames: number[]; style: "sketch" | "photo"; model: string; aspect: string };
 
 const fillIn = (s: string, v: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? ""));
 
@@ -45,6 +51,14 @@ function lineOf(e: Ev, c: RunCopy) {
       return fillIn(c.steps.writing, { name: name(e.n) });
     case "writingDocs":
       return c.steps.writingDocs;
+    case "drawing":
+      return fillIn(c.steps.drawing ?? "", { n: Number(e.n), total: Number(e.total), model: String(e.model ?? "") });
+    case "drawn":
+      return fillIn(c.steps.drawn ?? "", { n: Number(e.n) });
+    case "drawFailed":
+      return fillIn(c.steps.drawFailed ?? "", { n: Number(e.n), reason: String(e.reason ?? "") });
+    case "drawBackup":
+      return fillIn(c.steps.drawBackup ?? "", { n: Number(e.n), from: String(e.from ?? ""), to: String(e.to ?? "") });
     case "saved":
       return fillIn(c.steps.saved, { name: name(e.n) });
     default:
@@ -74,11 +88,12 @@ export function useCreativeRun(projectId: string, c: RunCopy) {
     let failure: string | undefined;
     let finished = false;
     try {
-      const docs = action.kind === "docs";
-      const res = await fetch(`/p/${projectId}/${docs ? "documents" : "creative"}`, {
+      const endpoint = action.kind === "docs" ? "documents" : action.kind === "look" ? "look" : action.kind === "frames" ? "frames" : "creative";
+      const payload = action.kind === "docs" ? { instruction: action.instruction } : action.kind === "look" ? action.action : action;
+      const res = await fetch(`/p/${projectId}/${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(docs ? { instruction: action.instruction } : action),
+        body: JSON.stringify(payload),
         signal: controller.signal,
       });
       if (!res.ok || !res.body) throw new Error(c.steps.lost);
@@ -100,7 +115,7 @@ export function useCreativeRun(projectId: string, c: RunCopy) {
             failure = String(e.message);
           } else {
             setEvents((x) => [...x, { ...e, at: Date.now() - start }]);
-            if (e.t === "saved") router.refresh();
+            if (e.t === "saved" || e.t === "drawn") router.refresh();
           }
         }
       }
