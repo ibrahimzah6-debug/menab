@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { MENAB, lessons, remembered } from "./brain";
 import { structured, type Step } from "./brain-core";
+import { termList } from "@/lib/film-terms";
 
 // Stage 3, Look and characters (workflow-map.md, outputs 13 to 18): characters, wardrobe,
 // locations, art direction, the shot list and the storyboard. Three calls: characters with
@@ -67,10 +68,10 @@ export const Shots = z.object({
         scene: z.string(),
         int_ext: z.enum(["INT", "EXT"]),
         day_night: z.enum(["DAY", "NIGHT", "DUSK", "DAWN"]),
-        size: z.string().describe("Wide, Medium, Close-up, Extreme close-up, Insert, Over the shoulder"),
-        angle: z.string().describe("Eye level, Low angle, High angle, Top down, Dutch"),
-        movement: z.string().describe("Static, Push in, Pull out, Pan, Tilt, Handheld, Dolly, Crane, Tracking"),
-        lens: z.string().describe("e.g. 24mm, 35mm, 50mm, 85mm"),
+        size: z.string().describe(`Exactly one of: ${termList("size")}`),
+        angle: z.string().describe(`Exactly one of: ${termList("angle")}`),
+        movement: z.string().describe(`Exactly one of: ${termList("movement")}`),
+        lens: z.string().describe(`Exactly one of: ${termList("lens")}`),
         action: z.string().describe("What happens in this shot"),
         dialogue: z.string().describe("VO or dialogue in this shot, or empty"),
         seconds: z.number(),

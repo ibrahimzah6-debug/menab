@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { ChoiceField } from "@/components/choice-field";
+import { findTerm, type TermKind } from "@/lib/film-terms";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { approveStage, saveOutputEdit } from "./actions";
 import { ChangeBox } from "./editors";
@@ -17,6 +19,10 @@ type Location = { name: string; int_ext: "INT" | "EXT"; description: string; mad
 type Art = { set: string; dressing: string; props: string[] };
 type Shot = { n: number; scene: string; int_ext: string; day_night: string; size: string; angle: string; movement: string; lens: string; action: string; dialogue: string; seconds: number; cast: string[]; props: string[]; set: string };
 type Frame = { n: number; scene: string; size: string; angle: string; movement: string; lens: string; action: string; dialogue: string; seconds: number; cast: string[]; set: string; prompt: string };
+export type LookPicture = { status: string; url: string | null; model: string; cost: number | null; error: string | null; version: number };
+type Draw = { model: string; price: number; run: RunCopy; pictures: Record<string, LookPicture>; lang: "en" | "ar" };
+const key = (name: string) => name.trim().toLowerCase().slice(0, 200);
+const termText = (kind: TermKind, v: string, lang: "en" | "ar") => findTerm(kind, v)?.[lang] ?? v;
 export type FrameImage = { status: string; url: string | null; model: string; style: string; cost: number | null; error: string | null; version: number };
 
 const fillIn = (s: string, v: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? ""));
@@ -55,19 +61,82 @@ function Note({ note }: { note?: string }) {
   return note ? <p className="small m-0" role="alert">{note}</p> : null;
 }
 
+// ---------- Reference pictures (characters and locations) ----------
+
+function usePictures(projectId: string, kind: "character" | "location", names: string[], d: Draw) {
+  const r = useCreativeRun(projectId, d.run);
+  const pic = (name: string) => d.pictures[`${kind}:${key(name)}`];
+  const missing = names.filter((n) => !pic(n)?.url && pic(n)?.status !== "generating");
+  const draw = (ns: string[]) => r.run({ kind: "refs", refs: kind, names: ns, model: d.model });
+  return { r, pic, missing, draw };
+}
+
+function PictureBar({ names, p, d, c, editable }: { names: string[]; p: ReturnType<typeof usePictures>; d: Draw; c: L; editable: boolean }) {
+  if (!editable || !names.length) return null;
+  const f = c.refs;
+  return (
+    <div className="rounded-lg border border-line p-4 flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="small text-ink-muted grow">{f.note}</span>
+        {p.r.busy ? (
+          <button type="button" className="mn-btn mn-btn--secondary" onClick={p.r.stop}>{d.run.steps.stop}</button>
+        ) : p.missing.length ? (
+          <button type="button" className="mn-btn mn-btn--primary" onClick={() => p.draw(p.missing)}>
+            {fillIn(f.drawMissing, { n: p.missing.length })}
+            <span className="mn-btn__cost">{usd(d.price * p.missing.length)}</span>
+          </button>
+        ) : (
+          <button type="button" className="mn-btn mn-btn--secondary" onClick={() => p.draw(names)}>
+            {f.drawAll}
+            <span className="mn-btn__cost">{usd(d.price * names.length)}</span>
+          </button>
+        )}
+      </div>
+      {(p.r.busy || p.r.events.length > 0) && <RunLine events={p.r.events} busy={p.r.busy} c={d.run} startedAt={p.r.startedAt} />}
+      {p.r.error && <p className="small m-0 px-3 py-2 rounded-md bg-tint-2" role="alert">{p.r.error}</p>}
+    </div>
+  );
+}
+
+function PictureBox({ name, p, d, c, editable }: { name: string; p: ReturnType<typeof usePictures>; d: Draw; c: L; editable: boolean }) {
+  const img = p.pic(name);
+  const busy = img?.status === "generating";
+  return (
+    <div className="relative -mx-4 -mt-4 mb-1 rounded-t-lg overflow-hidden bg-ground-deep border-b border-line grid place-items-center" style={{ aspectRatio: "16 / 9" }}>
+      {img?.url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={img.url} alt={name} className="absolute inset-0 w-full h-full object-cover" />
+      ) : busy ? (
+        <div className="mn-skeleton absolute inset-0" />
+      ) : null}
+      {!img?.url && <span className="relative small text-ink-faint px-3 text-center">{busy ? c.refs.drawing : img?.status === "failed" ? c.refs.failed : c.refs.none}</span>}
+      {editable && !busy && !p.r.busy && (
+        <button type="button" className="absolute bottom-2 end-2 mn-btn mn-btn--secondary mn-btn--sm" onClick={() => p.draw([name])}>
+          {img?.url ? c.refs.redraw : c.refs.drawOne}
+          <span className="mn-btn__cost">{usd(d.price)}</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ---------- 13. Characters ----------
 
-export function CharactersView({ projectId, content, editable, c }: { projectId: string; content: { characters: Character[] }; editable: boolean; c: L }) {
+export function CharactersView({ projectId, content, editable, c, d }: { projectId: string; content: { characters: Character[] }; editable: boolean; c: L; d: Draw }) {
   const { save, note } = useSave(projectId, 13);
   const k = c.characters;
+  const names = content.characters.map((x) => x.name).filter((x) => x?.trim());
+  const p = usePictures(projectId, "character", names, d);
   const set = (i: number, patch: Partial<Character>) => save({ ...content, characters: content.characters.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
   return (
     <div className="flex flex-col gap-4 max-w-[980px]">
+      <PictureBar names={names} p={p} d={d} c={c} editable={editable} />
       <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
         {content.characters.map((x, i) => (
-          <article key={i} className="rounded-lg border border-line p-4 flex flex-col gap-2.5">
+          <article key={i} className="rounded-lg border border-line p-4 flex flex-col gap-2.5 overflow-hidden">
+            <PictureBox name={x.name} p={p} d={d} c={c} editable={editable} />
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="mn-chip mn-chip--ready">{x.made_with === "cast" ? k.cast : k.ai}</span>
+              <span className="mn-chip mn-chip--ready"><ChoiceField kind="castMade" value={x.made_with} editable={editable} lang={d.lang} label={k.made} otherLabel={c.choice.other} useLabel={c.choice.use} onCommit={(v) => set(i, { made_with: v as Character["made_with"] })} /></span>
               {x.library_id && <span className="mn-chip mn-chip--approved">{k.library}</span>}
             </div>
             <div className="h3"><InlineText label={k.name} value={x.name} editable={editable} multiline={false} onCommit={(v) => set(i, { name: v })} /></div>
@@ -118,18 +187,22 @@ export function WardrobeView({ projectId, content, editable, c }: { projectId: s
 
 // ---------- 15. Locations ----------
 
-export function LocationsView({ projectId, content, editable, c }: { projectId: string; content: { locations: Location[] }; editable: boolean; c: L }) {
+export function LocationsView({ projectId, content, editable, c, d }: { projectId: string; content: { locations: Location[] }; editable: boolean; c: L; d: Draw }) {
   const { save, note } = useSave(projectId, 15);
   const k = c.locations;
+  const names = content.locations.map((x) => x.name).filter((x) => x?.trim());
+  const p = usePictures(projectId, "location", names, d);
   const set = (i: number, patch: Partial<Location>) => save({ ...content, locations: content.locations.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
   return (
     <div className="flex flex-col gap-4 max-w-[980px]">
+      <PictureBar names={names} p={p} d={d} c={c} editable={editable} />
       <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
         {content.locations.map((x, i) => (
-          <article key={i} className="rounded-lg border border-line p-4 flex flex-col gap-2.5">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="mn-label" lang="en">{x.int_ext}</span>
-              <span className="mn-chip mn-chip--ready">{x.made_with === "real" ? k.real : k.ai}</span>
+          <article key={i} className="rounded-lg border border-line p-4 flex flex-col gap-2.5 overflow-hidden">
+            <PictureBox name={x.name} p={p} d={d} c={c} editable={editable} />
+            <div className="flex items-center gap-3 flex-wrap small">
+              <ChoiceField kind="intExt" value={x.int_ext} editable={editable} lang={d.lang} label={k.intExt} otherLabel={c.choice.other} useLabel={c.choice.use} onCommit={(v) => set(i, { int_ext: v as Location["int_ext"] })} />
+              <span className="mn-chip mn-chip--ready"><ChoiceField kind="placeMade" value={x.made_with} editable={editable} lang={d.lang} label={k.made} otherLabel={c.choice.other} useLabel={c.choice.use} onCommit={(v) => set(i, { made_with: v as Location["made_with"] })} /></span>
               {x.library_id && <span className="mn-chip mn-chip--approved">{k.library}</span>}
             </div>
             <div className="h3"><InlineText label={k.name} value={x.name} editable={editable} multiline={false} onCommit={(v) => set(i, { name: v })} /></div>
@@ -166,11 +239,14 @@ export function ArtView({ projectId, content, editable, c }: { projectId: string
 
 // ---------- 18. Shot list ----------
 
-export function ShotListView({ projectId, content, seconds, editable, c }: { projectId: string; content: { shots: Shot[] }; seconds: number; editable: boolean; c: L }) {
+export function ShotListView({ projectId, content, seconds, editable, c, lang }: { projectId: string; content: { shots: Shot[] }; seconds: number; editable: boolean; c: L; lang: "en" | "ar" }) {
   const { save, note } = useSave(projectId, 18);
   const k = c.shots;
   const set = (i: number, patch: Partial<Shot>) => save({ ...content, shots: content.shots.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
   const total = content.shots.reduce((n, x) => n + (Number(x.seconds) || 0), 0);
+  const pick = (i: number, kind: TermKind, field: keyof Shot, label: string) => (
+    <ChoiceField kind={kind} value={String(content.shots[i][field] ?? "")} editable={editable} lang={lang} label={label} otherLabel={c.choice.other} useLabel={c.choice.use} compact onCommit={(v) => set(i, { [field]: v } as Partial<Shot>)} />
+  );
   const cell = (i: number, key: keyof Shot, label: string, multiline = false) => (
     <InlineText label={label} value={String(content.shots[i][key] ?? "")} editable={editable} multiline={multiline} onCommit={(v) => set(i, { [key]: v } as Partial<Shot>)} />
   );
@@ -178,17 +254,17 @@ export function ShotListView({ projectId, content, seconds, editable, c }: { pro
     <div className="flex flex-col gap-4">
       <p className="small m-0"><span className="data">{fillIn(k.total, { n: total, target: seconds })}</span></p>
       <Table
-        minWidth={1320}
+        minWidth={1500}
         head={[k.n, k.scene, k.intExt, k.dayNight, k.size, k.angle, k.movement, k.lens, k.action, k.dialogue, k.seconds, k.cast, k.props, k.set]}
         rows={content.shots.map((x, i) => [
           <span key="n" className="data">{x.n}</span>,
           cell(i, "scene", k.scene),
-          <span key="ie" lang="en" className="data">{x.int_ext}</span>,
-          <span key="dn" lang="en" className="data">{x.day_night}</span>,
-          cell(i, "size", k.size),
-          cell(i, "angle", k.angle),
-          cell(i, "movement", k.movement),
-          cell(i, "lens", k.lens),
+          pick(i, "intExt", "int_ext", k.intExt),
+          pick(i, "dayNight", "day_night", k.dayNight),
+          pick(i, "size", "size", k.size),
+          pick(i, "angle", "angle", k.angle),
+          pick(i, "movement", "movement", k.movement),
+          pick(i, "lens", "lens", k.lens),
           <div key="a" className="min-w-[260px]">{cell(i, "action", k.action, true)}</div>,
           <div key="d" className="min-w-[200px]">{cell(i, "dialogue", k.dialogue, true)}</div>,
           <InlineText key="sec" label={k.seconds} value={String(x.seconds)} editable={editable} multiline={false} onCommit={(v) => set(i, { seconds: Math.max(0.5, Number(v) || x.seconds) })} />,
@@ -216,6 +292,7 @@ export function StoryboardView({
   models,
   model: initialModel,
   style: initialStyle,
+  lang,
 }: {
   projectId: string;
   content: { frames: Frame[] };
@@ -226,6 +303,7 @@ export function StoryboardView({
   models: ModelOption[];
   model: string;
   style: "sketch" | "photo";
+  lang: "en" | "ar";
 }) {
   const { save, note } = useSave(projectId, 17);
   const r = useCreativeRun(projectId, run);
@@ -342,7 +420,7 @@ export function StoryboardView({
               <div className="p-3 flex flex-col gap-2">
                 <div className="flex items-center gap-2">
                   <span className="mn-label" lang="en">{String(x.n).padStart(2, "0")}</span>
-                  <span className="text-[12px] text-ink-muted grow truncate" dir="auto">{[x.size, x.angle, x.movement, x.lens].filter(Boolean).join(" · ")}</span>
+                  <span className="text-[12px] text-ink-muted grow truncate" dir="auto">{[termText("size", x.size, lang), termText("angle", x.angle, lang), termText("movement", x.movement, lang), x.lens].filter(Boolean).join(" · ")}</span>
                   <span className="data text-[12px]">{x.seconds}s</span>
                 </div>
                 <div className="small" dir="auto">{x.action}</div>
@@ -384,12 +462,14 @@ export function LookFooter({
   message,
   write,
   approve,
+  draw,
   run,
 }: {
   projectId: string;
   message: string;
   write: { label: string; cost: string } | null;
   approve: string | null;
+  draw?: { frames: number[]; model: string; style: "sketch" | "photo"; label: string; cost: string } | null;
   run: RunCopy;
 }) {
   const r = useCreativeRun(projectId, run);
@@ -411,6 +491,23 @@ export function LookFooter({
       </div>
       {r.busy ? (
         <button type="button" className="mn-btn mn-btn--secondary" onClick={r.stop}>{run.steps.stop}</button>
+      ) : draw ? (
+        <button
+          type="button"
+          className="mn-btn mn-btn--primary"
+          onClick={() => {
+            let aspect = "16:9";
+            try {
+              aspect = localStorage.getItem("menab-frame-aspect") || "16:9";
+            } catch {
+              // No storage: 16:9.
+            }
+            r.run({ kind: "frames", frames: draw.frames, style: draw.style, model: draw.model, aspect });
+          }}
+        >
+          {draw.label}
+          <span className="mn-btn__cost">{draw.cost}</span>
+        </button>
       ) : approve ? (
         <button type="button" className="mn-btn mn-btn--primary" disabled={pending} onClick={doApprove}>{approve}</button>
       ) : write ? (
