@@ -216,3 +216,14 @@ Replaces B4.
 ## B28. Music in M5 (Ibrahim, 15 Nov 2026)
 
 - Music is generated in the Generate stage, next to Voice, as M5's last step (I25, point 2): Menab makes the track with Suno on Kie.ai from the music feeling in the Creative stage, with the price shown first, so short videos (ads, UGC, faceless) come out complete. Suno's commercial-use terms are checked while it is built, and each track is listed in the rights record. Final music licensing and the sound mix stay in the Edit stage (v2). mvp-definition.md is updated to match.
+
+## B29. M5, first part: the Generate stage (15 Nov 2026)
+
+- **One table for everything made in M5** (`gen_assets`): digital actor sheets, outfit pictures, keyframes, clips, voice lines and the music track. Each job's Kie.ai task id is saved the moment it starts, so a clip that takes longer than one request is collected the next time the page loads (or while it refreshes), never lost and never paid twice.
+- **34 Reference lock:** each AI character gets a digital actor sheet (front, side and four expressions) made from its stage 3 picture, outfit pictures only when clothes change between scenes, a voice, plus a narrator voice and the frame shape. "Lock the references" is required before keyframes; real people's photos (library characters) need the consent box ticked first.
+- **35 Keyframes:** one final picture per shot on Nano Banana Pro, from the locked sheets, outfits and location pictures.
+- **36 Video shots:** one clip per shot from its keyframe; Kling 3.0 by default (std, 3 to 15 sec, no sound), Seedance 2.5 as the backup, Veo 3.1 Fast as an option; the prompt of each clip can be edited before making it again.
+- **37 Voice and music:** the voiceover lines from the script in the narrator's voice (ElevenLabs Multilingual v2, 13 chosen voices), and an instrumental Suno V6 track from the music feeling (B28).
+- **38 Shot review:** approve each clip or reopen it; the stage approves when the references are locked and every shot has an approved clip.
+- Prices shown first: Nano Banana Pro about $0.09 a picture, Kling 3.0 $0.07 a second, ElevenLabs $0.03 per 1,000 characters, Suno about $0.06 a track; the real cost is read back from Kie.ai.
+- **Still to come in M5:** talking avatars (lip-sync with Kling AI Avatar Pro or Infinitalk) for characters who speak to camera, character voices for dialogue lines, saving digital actors to Libraries, and the stage 5 board cards.

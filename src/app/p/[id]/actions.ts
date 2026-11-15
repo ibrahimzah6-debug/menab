@@ -11,6 +11,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember, getMemberships } from "@/lib/workspace";
 import { hiddenOutputs, videoType } from "@/lib/video-types";
+import { stageFive, syncOutputs } from "@/lib/generate";
 import { FILE_TYPES, loadProject, ownPath, runBriefMessage, type BriefPayload } from "@/lib/brief-turn";
 
 export type Result = { error?: string };
@@ -222,6 +223,14 @@ export async function approveStage(projectId: string, stage: number): Promise<Re
     if (!needed.every((n) => ready.includes(n))) return { error: t.project.notReady };
     if (stage === 1 && !project.path) return { error: t.project.choosePathFirst };
     // M4: every shot in the storyboard has a drawn frame.
+    // M5: the references are locked and every shot's clip is approved.
+    if (stage === 5) {
+      const doc = await stageFive(supabase, projectId);
+      if (!doc.lock.locked) return { error: t.generate.lockFirst };
+      const { data: clips } = await supabase.from("gen_assets").select("key").eq("project_id", projectId).eq("kind", "clip").eq("status", "ready").eq("approved", true);
+      const ok = new Set((clips ?? []).map((c) => c.key));
+      if (!doc.shots.length || !doc.shots.every((s) => ok.has(String(s.n)))) return { error: t.project.notReady };
+    }
     if (stage === 3 && !hidden.has(17)) {
       const { data: sb } = await supabase.from("outputs").select("id, current_version").eq("project_id", projectId).eq("number", 17).maybeSingle();
       const { data: v } = sb ? await supabase.from("versions").select("content").eq("output_id", sb.id).eq("version", sb.current_version).maybeSingle() : { data: null };
@@ -371,6 +380,55 @@ export async function chooseVideoType(projectId: string, typeId: string): Promis
     const { supabase, project } = await loadProject(projectId);
     const brief = { ...((project.brief ?? {}) as Record<string, unknown>), video_type: typeId, video_type_by: "person" };
     await supabase.from("projects").update({ brief, updated_at: new Date().toISOString() }).eq("id", projectId);
+  } catch (e) {
+    return { error: errText(e) };
+  }
+  revalidatePath(`/p/${projectId}`);
+  return {};
+}
+
+// ---------- Stage 5, Generate ----------
+
+// The reference lock (output 34): voices, frame shape, consent, and the lock itself. Once
+// locked, every keyframe and clip follows these references.
+export async function saveReferenceLock(projectId: string, patch: { narrator?: string; voices?: Record<string, string>; aspect?: string; consent?: boolean; locked?: boolean }): Promise<Result> {
+  const { t } = await getI18n();
+  try {
+    const { me, supabase, project } = await loadProject(projectId);
+    if (project.current_stage !== 5) return { error: t.project.notCurrentStage };
+    const { data: o } = await supabase.from("outputs").select("id, workspace_id, current_version").eq("project_id", projectId).eq("number", 34).maybeSingle();
+    if (!o) return { error: "Step not found." };
+    const { data: v } = o.current_version ? await supabase.from("versions").select("content").eq("output_id", o.id).eq("version", o.current_version).maybeSingle() : { data: null };
+    const current = (v?.content ?? {}) as Record<string, unknown>;
+    if (current.locked && patch.locked !== false && patch.locked !== true) return { error: t.generate.lockedNote };
+    const next = { ...current, ...patch, voices: { ...((current.voices as object) ?? {}), ...(patch.voices ?? {}) } };
+    if (patch.locked) {
+      // Real people's photos need their written consent first (B27).
+      const doc = await stageFive(supabase, projectId);
+      if (doc.characters.some((c) => c.library_id) && !next.consent) return { error: t.generate.consentFirst };
+    }
+    await saveVersion(supabase, o, next, "edit", me.userId, null, next.locked ? "ready" : "edited");
+    // The step is done only when locked.
+    if (!next.locked) await supabase.from("outputs").update({ status: "waiting" }).eq("id", o.id);
+  } catch (e) {
+    return { error: errText(e) };
+  }
+  revalidatePath(`/p/${projectId}`);
+  return {};
+}
+
+// Shot review (output 38): approve or reopen the newest clip of a shot.
+export async function approveClip(projectId: string, n: number, approved: boolean): Promise<Result> {
+  const { t } = await getI18n();
+  try {
+    const { supabase, project } = await loadProject(projectId);
+    if (project.current_stage !== 5) return { error: t.project.notCurrentStage };
+    const { data: rows } = await supabase.from("gen_assets").select("id").eq("project_id", projectId).eq("kind", "clip").eq("key", String(n)).eq("status", "ready").order("version", { ascending: false }).limit(1);
+    if (!rows?.length) return { error: t.generate.noClip };
+    const admin = createAdminClient();
+    await admin.from("gen_assets").update({ approved: false }).eq("project_id", projectId).eq("kind", "clip").eq("key", String(n));
+    if (approved) await admin.from("gen_assets").update({ approved: true, updated_at: new Date().toISOString() }).eq("id", rows[0].id);
+    await syncOutputs(admin, projectId);
   } catch (e) {
     return { error: errText(e) };
   }

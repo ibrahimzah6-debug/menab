@@ -27,6 +27,10 @@ import { PanelTabs } from "./panel-tabs";
 import { BoardCursor, TypeIn } from "./board-live";
 import { VideoTypePicker } from "./video-type-picker";
 import { hiddenOutputs } from "@/lib/video-types";
+import { genAssets, settlePending, stageFive } from "@/lib/generate";
+import { CLIP_MODELS, MUSIC_PRICE, VOICES, voicePreview, voicePrice } from "@/lib/ai/media";
+import { lookKey } from "@/lib/frames";
+import { ClipsView, KeyframesView, ReferenceLockView, ReviewView, SoundView, type GenData } from "./generate-docs";
 import { ArtView, CharactersView, LocationsView, LookAssistant, LookFooter, LookTryAgain, ShotListView, StoryboardView, WardrobeView, type FrameImage } from "./look-docs";
 
 // AI calls run inside the actions on this page and can take up to a minute.
@@ -103,7 +107,7 @@ export default async function ProjectPage({
   const stageTwo = outs.filter((x) => x.stage === 2);
   const stageThree = outs.filter((x) => x.stage === 3);
   const asked = Number(o);
-  const showing = asked >= 1 && asked <= 6 ? 1 : asked >= 7 && asked <= 12 && stageTwo.length ? 2 : asked >= 13 && asked <= 18 && stageThree.length ? 3 : stage;
+  const showing = asked >= 1 && asked <= 6 ? 1 : asked >= 7 && asked <= 12 && stageTwo.length ? 2 : asked >= 13 && asked <= 18 && stageThree.length ? 3 : asked >= 34 && asked <= 38 && outs.some((x) => x.stage === 5) ? 5 : stage;
   // Steps the video type does not need stay in the list, crossed out as "Not needed", and are
   // not waited for at approval. Nothing written is deleted.
   const hidden = hiddenOutputs(brief as { video_type?: string; real_people?: string });
@@ -121,7 +125,9 @@ export default async function ProjectPage({
         ? asked >= 7 && asked <= 12 ? asked : isReady(12) ? 12 : isReady(8) ? 9 : isReady(7) ? 8 : 7
         : showing === 3
           ? asked >= 13 && asked <= 18 ? asked : isReady(18) && !hidden.has(17) ? 17 : ([13, 15, 16, 17, 18].find((n) => !hidden.has(n)) ?? 18)
-          : 0;
+          : showing === 5
+            ? asked >= 34 && asked <= 38 ? asked : !isReady(34) ? 34 : !isReady(35) ? 35 : !isReady(36) ? 36 : 38
+            : 0;
   const board = view === "board";
   const editableHere = canEdit && showing === stage && !(showing === 1 && stageOneApproved) && !(showing === 2 && stageTwoApproved) && !(showing === 3 && stageThreeApproved);
   const writing = outs.some((x) => x.status === "generating");
@@ -149,13 +155,45 @@ export default async function ProjectPage({
   const pictures: Record<string, (typeof rawPictures)[string]> = {};
   for (const [k, x] of Object.entries(rawPictures)) pictures[k] = x.status === "generating" && new Date(x.updatedAt).getTime() < staleBefore ? { ...x, status: "failed" } : x;
   const drawing = Object.values(images).some((x) => x.status === "generating") || Object.values(pictures).some((x) => x.status === "generating");
-  const generating = writing || drawing;
+  // Stage 5: collect jobs that finished on Kie.ai since the last look, then load everything made.
+  const genOn = (showing === 5 || board) && outs.some((x) => x.stage === 5) && path !== "production";
+  if (genOn && stage === 5) await settlePending(id);
+  const gen = genOn ? await genAssets(supabase, id, project.workspace_id) : {};
+  const genBusy = Object.values(gen).some((x) => x.status === "generating");
+  const generating = writing || drawing || genBusy;
   const { data: imageSetting } = showing === 3 ? await supabase.from("model_settings").select("model_id").eq("workspace_id", project.workspace_id).eq("task", "image").maybeSingle() : { data: null };
   const imageModel = (project.models as { image?: string } | null)?.image ?? imageSetting?.model_id ?? DEFAULT_MODEL.image;
   const imageOptions = IMAGE_MODELS.map((m) => ({ id: m.id, name: m.name, price: m.priceFrom ?? 0, note: m.goodFor[locale] }));
   const lastStyle = Object.values(images).find((x) => x.version > 0)?.style === "photo" ? "photo" : "sketch";
   const lang: "en" | "ar" = locale === "ar" ? "ar" : "en";
   const imagePrice = IMAGE_MODELS.find((m) => m.id === imageModel)?.priceFrom ?? 0.04;
+
+  // Stage 5 screen data.
+  let genData: GenData | null = null;
+  if (genOn && showing === 5) {
+    const doc = await stageFive(supabase, id);
+    const pics = await lookImages(id, project.workspace_id, supabase);
+    const frameMap = await frameImages(id, project.workspace_id, supabase);
+    const arabic = (brief.language ?? "").toLowerCase().includes("arab");
+    const lines = doc.script
+      .map((row, i) => ({ key: `vo-${i + 1}`, text: ((arabic ? row.vo_ar || row.vo_en : row.vo_en || row.vo_ar) ?? "").replace(/^\s*(VO|V\.O\.)\s*:\s*/i, "").trim() }))
+      .filter((l) => l.text);
+    genData = {
+      projectId: id,
+      editable: canEdit && stage === 5,
+      lang,
+      assets: gen,
+      characters: doc.characters.map((c) => ({ name: c.name, role: c.role, made_with: c.made_with, picture: pics[`character:${lookKey(c.name)}`]?.url ?? null, library: Boolean(c.library_id) })),
+      locations: doc.locations.map((l) => ({ name: l.name, picture: pics[`location:${lookKey(l.name)}`]?.url ?? null })),
+      outfits: doc.outfits.map((o) => ({ key: `${lookKey(o.character)}|${lookKey(o.outfit)}`.slice(0, 200), character: o.character, outfit: o.outfit })),
+      shots: doc.shots.map((f) => ({ n: f.n, action: f.action, size: f.size, movement: f.movement, seconds: f.seconds, dialogue: f.dialogue, frame: frameMap[f.n]?.url ?? null })),
+      lines,
+      lock: doc.lock,
+      voices: VOICES.map((v) => ({ ...v, preview: voicePreview(v.id) })),
+      clipModels: CLIP_MODELS.map((m) => ({ id: m.id, name: m.name, perSecond: m.perSecond, fixedSeconds: m.fixedSeconds, note: m.note[locale] })),
+      prices: { image: IMAGE_MODELS.find((m) => m.id === "nano-banana-pro")?.priceFrom ?? 0.09, voiceLine: lines.map((l) => voicePrice(l.text)), music: MUSIC_PRICE },
+    };
+  }
   const missingFrames = shotFrames.filter((f) => !(images[f.n]?.version) && images[f.n]?.status !== "generating").map((f) => f.n);
 
   // Every version of the open output, to restore an earlier one.
@@ -167,7 +205,7 @@ export default async function ProjectPage({
   const runCopy = {
     thinking: p.thinking,
     outputs: t.outputs as unknown as Record<number, string>,
-    steps: { call: p.steps.callWrite, retry: p.steps.retry, switch: p.steps.switch, skip: p.steps.skip, writing: t.creative.steps.writing, writingDocs: p.steps.writingDocs, saved: t.creative.steps.saved, stopped: p.steps.stopped, lost: p.steps.lost, stop: p.steps.stop, seconds: p.steps.seconds, ...t.look.steps },
+    steps: { call: p.steps.callWrite, retry: p.steps.retry, switch: p.steps.switch, skip: p.steps.skip, writing: t.creative.steps.writing, writingDocs: p.steps.writingDocs, saved: t.creative.steps.saved, stopped: p.steps.stopped, lost: p.steps.lost, stop: p.steps.stop, seconds: p.steps.seconds, ...t.look.steps, ...t.generate.steps },
   };
   const seconds = Number(brief.length_seconds) || 30;
   const meeting = (content[8] ?? {}) as { chosen?: number; notes?: string };
@@ -233,7 +271,7 @@ export default async function ProjectPage({
           current={currentIndex}
           label={t.stage.stagesLabel}
           viewing={order.indexOf(showing)}
-          links={order.map((n, i) => (i > currentIndex ? null : i === currentIndex ? href({}) : n === 1 ? href({ o: 1 }) : n === 2 ? href({ o: 7 }) : n === 3 ? href({ o: 13 }) : null))}
+          links={order.map((n, i) => (i > currentIndex ? null : i === currentIndex ? href({}) : n === 1 ? href({ o: 1 }) : n === 2 ? href({ o: 7 }) : n === 3 ? href({ o: 13 }) : n === 5 ? href({ o: 34 }) : null))}
         />
         <span className="grow" />
         {busyOut && (
@@ -247,7 +285,7 @@ export default async function ProjectPage({
             <IconLayoutPage size={14} />
             {t.stage.page}
           </Link>
-          <Link href={href({ o: showing === 1 ? 1 : showing === 2 ? 7 : showing === 3 ? 13 : undefined, view: "board" })} aria-current={board ? "true" : undefined} className={`mn-stage ${board ? "mn-stage--current" : ""}`}>
+          <Link href={href({ o: showing === 1 ? 1 : showing === 2 ? 7 : showing === 3 ? 13 : showing === 5 ? 34 : undefined, view: "board" })} aria-current={board ? "true" : undefined} className={`mn-stage ${board ? "mn-stage--current" : ""}`}>
             <IconLayoutBoard size={14} />
             {t.stage.board}
           </Link>
@@ -390,7 +428,7 @@ export default async function ProjectPage({
             <span className="mn-label p-2">{fill(t.stage.outputsCount, { n: order.indexOf(showing) + 1, count: list.length })}</span>
             {list.map((x) => {
               const st = statusOf(x.number);
-              const isOpen = showing <= 3 && open === x.number;
+              const isOpen = (showing <= 3 || showing === 5) && open === x.number;
               const inner = (
                 <>
                   <span className={hidden.has(x.number) ? "line-through text-ink-faint" : st === "waiting" ? "text-ink-muted" : ""}>{x.number === 1 ? p.chat : t.outputs[x.number]}</span>
@@ -398,7 +436,7 @@ export default async function ProjectPage({
                 </>
               );
               const cls = `flex justify-between items-center gap-2 p-2.5 rounded-md text-[14px] ${isOpen ? "font-medium bg-surface border border-line" : "border border-transparent hover:bg-tint-2"}`;
-              return showing <= 3 ? (
+              return showing <= 3 || showing === 5 ? (
                 <Link key={x.id} href={href({ o: x.number })} aria-current={isOpen ? "page" : undefined} className={cls}>{inner}</Link>
               ) : (
                 <div key={x.id} className={cls}>{inner}</div>
@@ -500,6 +538,30 @@ export default async function ProjectPage({
                   <LookTryAgain projectId={id} n={open} failed={statusOf(open) === "failed"} cost={approx(estimateUsd(model, "lookPart"))} run={runCopy} c={t.creative.redo} />
                 ) : (
                   <p className="body text-ink-muted m-0">{open >= 17 && (content[13] || content[15]) ? t.look.startsWhen.shots : t.look.footer.start}</p>
+                )}
+              </div>
+            </section>
+          ) : showing === 5 && genData ? (
+            <section className="relative flex-1 min-w-0 md:min-h-0 md:overflow-y-auto bg-surface border border-line rounded-lg">
+              <div className="px-6 py-5 border-b border-line flex flex-wrap items-center gap-3">
+                <div className="grow flex flex-col gap-1">
+                  <span className="mn-label" lang="en">{String(open).padStart(2, "0")}</span>
+                  <h1 className="h2 m-0">{t.outputs[open]}</h1>
+                </div>
+                <StatusChip status={statusOf(open) as OutputStatus} label={statusLabel(t, statusOf(open))} />
+              </div>
+              <div className="p-6 flex flex-col gap-4">
+                <p className="small text-ink-muted m-0 max-w-[760px]">{t.generate.intro[open]}</p>
+                {open === 34 ? (
+                  <ReferenceLockView d={genData} g={t.generate} run={runCopy} />
+                ) : open === 35 ? (
+                  <KeyframesView d={genData} g={t.generate} run={runCopy} />
+                ) : open === 36 ? (
+                  <ClipsView d={genData} g={t.generate} run={runCopy} />
+                ) : open === 37 ? (
+                  <SoundView d={genData} g={t.generate} run={runCopy} />
+                ) : (
+                  <ReviewView d={genData} g={t.generate} />
                 )}
               </div>
             </section>
@@ -669,6 +731,15 @@ export default async function ProjectPage({
           }
           action={!stageTwoApproved && isReady(12) && stage === 2 ? "approve" : null}
           label={fill(t.stage.approve, { n: 2 })}
+        />
+      )}
+      {canEdit && showing === 5 && stage === 5 && genData && (
+        <StageFooter
+          projectId={id}
+          stage={5}
+          message={!genData.lock.locked ? t.generate.footer.lock : !isReady(36) ? t.generate.footer.make : !isReady(38) ? t.generate.footer.review : t.generate.footer.ready}
+          action={genData.lock.locked && [34, 35, 36, 37, 38].every(isReady) ? "approve" : null}
+          label={fill(t.stage.approve, { n: order.indexOf(5) + 1 })}
         />
       )}
       {canEdit && showing === 3 && stage === 3 && (
