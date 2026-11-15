@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { IconLayoutBoard, IconLayoutPage } from "@/components/icons";
+import { IconFolder, IconLayoutBoard, IconLayoutPage } from "@/components/icons";
 import { StageBar } from "@/components/stage/stage-bar";
 import { StatusChip, type OutputStatus } from "@/components/status-chip";
 import { missingRequired, type BriefFields, type StageOneDocs } from "@/lib/ai/brain";
@@ -218,6 +218,9 @@ export default async function ProjectPage({
         <span className="mn-chip mn-chip--ready">{path ? t.stage.paths[path] : t.stage.paths.none}</span>
         <span className="grow" />
         <span className="mn-label h-9 px-3 rounded-md border border-line grid place-items-center">{fill(p.spent, { spent: money(spent) })}</span>
+        <Link href={`/p/${id}/files`} aria-label={t.files.button} title={t.files.button} className="h-9 px-3 rounded-md border border-line grid place-items-center text-ink-muted hover:text-ink hover:bg-tint-2">
+          <IconFolder size={16} />
+        </Link>
         <LanguageMenu locale={uiLocale} label={t.settings.language} soon={t.frame.preparing} compact={false} placement="down" />
         {["admin", "producer"].includes(me.role) && <ProjectMenu projectId={id} name={project.name} c={t.stage.projectMenu} />}
       </header>

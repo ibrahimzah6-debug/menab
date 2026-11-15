@@ -199,3 +199,11 @@ Replaces B4.
 - **Video types:** the brief has a "Video type" dropdown at the top of the brief panel. Menab picks the type from the conversation (tested: a phone-to-camera skincare ad was picked as a UGC ad) and shows "Suggested by Menab"; the person's own choice shows "Your choice" and Menab never changes it. Each type's recipe (`src/lib/video-types.ts`) goes into the AI's instructions for the brief documents, the Creative stage and stage 3. Steps a type does not need are hidden, and the stage approves without them; nothing written is deleted. Film, Series and Clips show as coming soon.
 - **Default brand kit:** when a company has no brand kit, documents use a neutral Menab kit, not ZAH's, so other companies stay comfortable using Menab.
 - **Order:** video types, then Files (the folder button at the top) with the first two branded documents (characters book and storyboard), then M5.
+
+## B26. Files and the first branded documents (15 Nov 2026)
+
+- **Files:** a folder button in the project bar, next to the language button (Ibrahim's screenshot), opens the project's Files: the branded documents, and every picture drawn so far with a download link. Treatment, CPS, PPM booklet and call sheets are listed as coming in M6.
+- **Two documents:** "Characters and locations" (a cover, then one page per character with its picture, look, personality, wardrobe and plans A and B, then one page per location with its picture, description, dressing and props) and "Storyboard" (six frames to a page with size, angle, move, lens, timing, action and dialogue). 16:9 pages, English or Arabic.
+- **How the PDF is made:** each document is a designed print page, saved from the browser's print window ("Save as PDF"). This keeps Arabic text, fonts and pictures exact and costs nothing to run. A server-made PDF can come later if needed.
+- **Brand:** the company's first brand kit in Libraries gives the logo and accent colour (a colour too light to read is skipped); without one, the neutral Menab style (B25).
+- Steps hidden by the video type are left out of the documents.
