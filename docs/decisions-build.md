@@ -193,3 +193,9 @@ Replaces B4.
 - **A reference picture per character and location** in stage 3 (photo-real, about $0.04 each on the project's image model). The storyboard frames use them as references so faces and places stay the same, ahead of library photos. M5's reference lock starts from these same pictures.
 - **Draw from the bottom bar:** once the shot list is written, the stage 3 bar offers "Draw N frames" with the price.
 - **Waiting:** saving to Files and Libraries as branded PDFs or decks (Ibrahim's screenshot: a folder button next to the language button at the top) is to be decided; see the reply on 15 Nov.
+
+## B25. Video types built; neutral default kit; order of work (Ibrahim, 15 Nov 2026)
+
+- **Video types:** the brief has a "Video type" dropdown at the top of the brief panel. Menab picks the type from the conversation (tested: a phone-to-camera skincare ad was picked as a UGC ad) and shows "Suggested by Menab"; the person's own choice shows "Your choice" and Menab never changes it. Each type's recipe (`src/lib/video-types.ts`) goes into the AI's instructions for the brief documents, the Creative stage and stage 3. Steps a type does not need are hidden, and the stage approves without them; nothing written is deleted. Film, Series and Clips show as coming soon.
+- **Default brand kit:** when a company has no brand kit, documents use a neutral Menab kit, not ZAH's, so other companies stay comfortable using Menab.
+- **Order:** video types, then Files (the folder button at the top) with the first two branded documents (characters book and storyboard), then M5.

@@ -25,6 +25,8 @@ import { AutoRefresh, CreativeAssistant, CreativeStart, DocsAssistant, DocsFoote
 import { ProjectMenu } from "./project-menu";
 import { PanelTabs } from "./panel-tabs";
 import { BoardCursor, TypeIn } from "./board-live";
+import { VideoTypePicker } from "./video-type-picker";
+import { hiddenOutputs } from "@/lib/video-types";
 import { ArtView, CharactersView, LocationsView, LookAssistant, LookFooter, LookTryAgain, ShotListView, StoryboardView, WardrobeView, type FrameImage } from "./look-docs";
 
 // AI calls run inside the actions on this page and can take up to a minute.
@@ -102,7 +104,9 @@ export default async function ProjectPage({
   const stageThree = outs.filter((x) => x.stage === 3);
   const asked = Number(o);
   const showing = asked >= 1 && asked <= 6 ? 1 : asked >= 7 && asked <= 12 && stageTwo.length ? 2 : asked >= 13 && asked <= 18 && stageThree.length ? 3 : stage;
-  const list = showing === 1 ? stageOne.filter((x) => x.number !== 2) : outs.filter((x) => x.stage === showing);
+  // Steps the video type does not need are hidden (nothing written is deleted).
+  const hidden = hiddenOutputs(brief as { video_type?: string; real_people?: string });
+  const list = showing === 1 ? stageOne.filter((x) => x.number !== 2) : outs.filter((x) => x.stage === showing && !hidden.has(x.number));
   const isReady = (n: number) => ["ready", "edited", "approved"].includes(outs.find((x) => x.number === n)?.status ?? "");
   const docsReady = [3, 4, 5, 6].every(isReady);
   const stageOneApproved = stageOne.length > 0 && stageOne.every((x) => x.status === "approved");
@@ -115,7 +119,7 @@ export default async function ProjectPage({
       : showing === 2
         ? asked >= 7 && asked <= 12 ? asked : isReady(12) ? 12 : isReady(8) ? 9 : isReady(7) ? 8 : 7
         : showing === 3
-          ? asked >= 13 && asked <= 18 ? asked : isReady(18) ? 17 : 13
+          ? asked >= 13 && asked <= 18 && !hidden.has(asked) ? asked : isReady(18) && !hidden.has(17) ? 17 : ([13, 15, 16, 17, 18].find((n) => !hidden.has(n)) ?? 18)
           : 0;
   const board = view === "board";
   const editableHere = canEdit && showing === stage && !(showing === 1 && stageOneApproved) && !(showing === 2 && stageTwoApproved) && !(showing === 3 && stageThreeApproved);
@@ -139,7 +143,7 @@ export default async function ProjectPage({
   for (const [n, x] of Object.entries(rawImages)) images[Number(n)] = x.status === "generating" && new Date(x.updatedAt).getTime() < staleBefore ? { ...x, status: "failed" } : x;
   const shotFrames = (content[17] as { frames?: { n: number }[] } | undefined)?.frames ?? [];
   const framesDrawn = shotFrames.filter((f) => (images[f.n]?.version ?? 0) > 0).length;
-  const framesDone = shotFrames.length > 0 && framesDrawn === shotFrames.length;
+  const framesDone = hidden.has(17) || (shotFrames.length > 0 && framesDrawn === shotFrames.length);
   const rawPictures = lookOn && showing === 3 && (open === 13 || open === 15) ? await lookImages(id, project.workspace_id, supabase) : {};
   const pictures: Record<string, (typeof rawPictures)[string]> = {};
   for (const [k, x] of Object.entries(rawPictures)) pictures[k] = x.status === "generating" && new Date(x.updatedAt).getTime() < staleBefore ? { ...x, status: "failed" } : x;
@@ -175,7 +179,7 @@ export default async function ProjectPage({
       index: order.indexOf(n),
       name: names[order.indexOf(n)] ?? "",
       approved: outs.filter((x) => x.stage === n).length > 0 && outs.filter((x) => x.stage === n).every((x) => x.status === "approved"),
-      outs: outs.filter((x) => x.stage === n && x.number !== 2),
+      outs: outs.filter((x) => x.stage === n && x.number !== 2 && !hidden.has(x.number)),
     }));
   const busyOut = outs.find((x) => x.status === "generating");
 
@@ -369,7 +373,7 @@ export default async function ProjectPage({
                 {
                   key: "brief",
                   label: p.brief,
-                  node: <BriefPanel brief={brief} p={p} missing={missing} projectId={id} editable={false} />,
+                  node: <BriefPanel brief={brief} p={p} missing={missing} projectId={id} editable={false} typeEditable={canEdit} lang={locale === "ar" ? "ar" : "en"} />,
                 },
               ]}
             />
@@ -558,7 +562,7 @@ export default async function ProjectPage({
                   label: p.brief,
                   node: (
                     <>
-                      <BriefPanel brief={brief} p={p} missing={missing} projectId={id} editable={editableHere && showing === 1} />
+                      <BriefPanel brief={brief} p={p} missing={missing} projectId={id} editable={editableHere && showing === 1} typeEditable={canEdit} lang={locale === "ar" ? "ar" : "en"} />
                       <section className="bg-surface border border-line rounded-lg p-4 flex flex-col gap-3">
                         <span className="mn-label">{p.suggestedPath}</span>
                         {project.path_suggested ? (
@@ -677,9 +681,9 @@ export default async function ProjectPage({
                     ? missingFrames.length && isReady(17) ? t.look.footerDraw : t.look.footer.draw
                     : t.look.footer.review
           }
-          draw={!stageThreeApproved && isReady(17) && missingFrames.length > 0 && !stageThree.some((x) => x.status === "generating") ? { frames: missingFrames, model: imageModel, style: lastStyle, label: missingFrames.length === 1 ? t.look.frames.drawOne : fill(t.look.frames.drawMissing, { n: missingFrames.length }), cost: approx(imagePrice * missingFrames.length) } : null}
+          draw={!stageThreeApproved && !hidden.has(17) && isReady(17) && missingFrames.length > 0 && !stageThree.some((x) => x.status === "generating") ? { frames: missingFrames, model: imageModel, style: lastStyle, label: missingFrames.length === 1 ? t.look.frames.drawOne : fill(t.look.frames.drawMissing, { n: missingFrames.length }), cost: approx(imagePrice * missingFrames.length) } : null}
           write={!stageThreeApproved && !content[13] && !content[15] && !stageThree.some((x) => x.status === "generating") ? { label: t.look.write, cost: approx(estimateUsd(model, "look")) } : null}
-          approve={!stageThreeApproved && [13, 14, 15, 16, 17, 18].every(isReady) && framesDone ? fill(t.stage.approve, { n: 3 }) : null}
+          approve={!stageThreeApproved && [13, 14, 15, 16, 17, 18].filter((n) => !hidden.has(n)).every(isReady) && framesDone ? fill(t.stage.approve, { n: 3 }) : null}
         />
       )}
       {canEdit && showing === 1 && stage === 1 && footerAction === "write" && (
@@ -810,7 +814,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 // The brief panel starts from the video itself, then delivery, production, and client and timing.
-function BriefPanel({ brief, p, missing, projectId, editable }: { brief: Partial<BriefFields>; p: Dictionary["project"]; missing: string[]; projectId: string; editable: boolean }) {
+function BriefPanel({ brief, p, missing, projectId, editable, typeEditable, lang }: { brief: Partial<BriefFields>; p: Dictionary["project"]; missing: string[]; projectId: string; editable: boolean; typeEditable: boolean; lang: "en" | "ar" }) {
   type K = Exclude<keyof BriefFields, "project_name">;
   const show = (k: K) => {
     const v = brief[k];
@@ -832,6 +836,9 @@ function BriefPanel({ brief, p, missing, projectId, editable }: { brief: Partial
       <div className="flex items-center justify-between mb-1">
         <h2 className="h3 m-0">{p.brief}</h2>
         <span className="mn-label">{p.updates}</span>
+      </div>
+      <div className="mt-2">
+        <VideoTypePicker projectId={projectId} value={brief.video_type ?? null} by={(brief as { video_type_by?: string }).video_type_by ?? null} editable={typeEditable} lang={lang} c={p.videoType} />
       </div>
       {/* What Menab understands about the video */}
       <div className="mt-2 rounded-md bg-ground-deep border border-line p-3 flex flex-col gap-2">

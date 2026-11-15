@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { typeGuide } from "@/lib/video-types";
 import { MENAB, lessons, remembered } from "./brain";
 import { structured, type Step } from "./brain-core";
 
@@ -90,7 +91,7 @@ type Ctx = {
 };
 
 const system = (c: Ctx) => `${MENAB}\n${remembered(c.memory)}${lessons(c.rules)}`;
-const base = (c: Ctx) => `Brief: ${JSON.stringify(c.brief)}\nPath: ${c.path ?? "not chosen"}\nStage 1 documents (summary, strategy, pathway): ${JSON.stringify(c.stageOne ?? {})}\nWrite in: ${c.language}.`;
+const base = (c: Ctx) => `Brief: ${JSON.stringify(c.brief)}${typeGuide(c.brief as { video_type?: string })}\nPath: ${c.path ?? "not chosen"}\nStage 1 documents (summary, strategy, pathway): ${JSON.stringify(c.stageOne ?? {})}\nWrite in: ${c.language}.`;
 
 export async function writeDirections(c: Ctx, instruction?: string, current?: unknown) {
   const ask = instruction

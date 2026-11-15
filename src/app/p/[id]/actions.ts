@@ -10,6 +10,7 @@ import { logAiJob, notify, saveVersion, STAGE_OUTPUTS, type Path } from "@/lib/p
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember, getMemberships } from "@/lib/workspace";
+import { hiddenOutputs, videoType } from "@/lib/video-types";
 import { FILE_TYPES, loadProject, ownPath, runBriefMessage, type BriefPayload } from "@/lib/brief-turn";
 
 export type Result = { error?: string };
@@ -214,12 +215,14 @@ export async function approveStage(projectId: string, stage: number): Promise<Re
       .select("number, status")
       .eq("project_id", projectId)
       .eq("stage", stage);
-    const needed = stage === 1 ? [3, 4, 5, 6] : (outs ?? []).map((o) => o.number);
+    // Steps the video type does not need are not waited for.
+    const hidden = hiddenOutputs(project.brief as { video_type?: string; real_people?: string });
+    const needed = stage === 1 ? [3, 4, 5, 6] : (outs ?? []).map((o) => o.number).filter((n) => !hidden.has(n));
     const ready = (outs ?? []).filter((o) => ["ready", "edited", "approved"].includes(o.status)).map((o) => o.number);
     if (!needed.every((n) => ready.includes(n))) return { error: t.project.notReady };
     if (stage === 1 && !project.path) return { error: t.project.choosePathFirst };
     // M4: every shot in the storyboard has a drawn frame.
-    if (stage === 3) {
+    if (stage === 3 && !hidden.has(17)) {
       const { data: sb } = await supabase.from("outputs").select("id, current_version").eq("project_id", projectId).eq("number", 17).maybeSingle();
       const { data: v } = sb ? await supabase.from("versions").select("content").eq("output_id", sb.id).eq("version", sb.current_version).maybeSingle() : { data: null };
       const frames = ((v?.content as { frames?: { n: number }[] } | null)?.frames ?? []).map((f) => f.n);
@@ -359,4 +362,18 @@ export async function deleteProject(projectId: string): Promise<Result> {
   revalidatePath("/projects");
   revalidatePath("/");
   redirect("/projects");
+}
+
+// The video type, picked by the person. Menab keeps this choice from then on.
+export async function chooseVideoType(projectId: string, typeId: string): Promise<Result> {
+  if (!videoType(typeId) || videoType(typeId)?.soon) return { error: "Unknown video type" };
+  try {
+    const { supabase, project } = await loadProject(projectId);
+    const brief = { ...((project.brief ?? {}) as Record<string, unknown>), video_type: typeId, video_type_by: "person" };
+    await supabase.from("projects").update({ brief, updated_at: new Date().toISOString() }).eq("id", projectId);
+  } catch (e) {
+    return { error: errText(e) };
+  }
+  revalidatePath(`/p/${projectId}`);
+  return {};
 }
