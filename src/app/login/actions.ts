@@ -11,5 +11,7 @@ export async function login(_: LoginState, formData: FormData): Promise<LoginSta
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { error: "wrong" };
-  redirect("/");
+  // Back to where the person was going, if it is a page of ours.
+  const next = String(formData.get("next") ?? "");
+  redirect(/^\/[a-z][a-z0-9/-]*$/i.test(next) ? next : "/");
 }

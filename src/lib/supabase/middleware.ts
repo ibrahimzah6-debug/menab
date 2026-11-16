@@ -41,7 +41,7 @@ export async function updateSession(request: NextRequest) {
     if (isEndpoint) return NextResponse.json({ error: "Log in again." }, { status: 401 });
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    url.search = "";
+    url.search = path === "/start" ? "?next=/start" : "";
     const redirect = NextResponse.redirect(url);
     response.cookies.getAll().forEach((c) => redirect.cookies.set(c));
     return redirect;

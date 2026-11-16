@@ -5,10 +5,11 @@ import { login, type LoginState } from "./actions";
 
 type Copy = { email: string; password: string; submit: string; wrong: string };
 
-export function LoginForm({ copy }: { copy: Copy }) {
+export function LoginForm({ copy, next }: { copy: Copy; next?: string }) {
   const [state, action, pending] = useActionState<LoginState, FormData>(login, undefined);
   return (
     <form action={action} className="flex flex-col gap-4">
+      {next && <input type="hidden" name="next" value={next} />}
       <label className="flex flex-col gap-1.5">
         <span className="small text-ink-muted">{copy.email}</span>
         <input className="mn-input" type="email" name="email" autoComplete="email" required dir="ltr" />

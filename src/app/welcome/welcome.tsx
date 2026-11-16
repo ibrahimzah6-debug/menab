@@ -17,6 +17,8 @@ export function Welcome({ c, locale }: { c: C; locale: "en" | "ar" }) {
   const [active, setActive] = useState(0);
   const [playing, setPlaying] = useState<number | null>(null);
   const refs = useRef<(HTMLElement | null)[]>([]);
+  // After a press, the smooth scroll passes other stages; the observer waits until it settles.
+  const settle = useRef(0);
   const router = useRouter();
   const [pending, start] = useTransition();
 
@@ -27,7 +29,7 @@ export function Welcome({ c, locale }: { c: C; locale: "en" | "ar" }) {
     const io = new IntersectionObserver(
       (entries) => {
         const hit = entries.filter((e) => e.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (hit) setActive(Number((hit.target as HTMLElement).dataset.i));
+        if (hit && Date.now() > settle.current) setActive(Number((hit.target as HTMLElement).dataset.i));
       },
       { rootMargin: "-40% 0px -40% 0px", threshold: [0, 0.25, 0.5, 1] },
     );
@@ -63,7 +65,7 @@ export function Welcome({ c, locale }: { c: C; locale: "en" | "ar" }) {
           <h1 className="display m-0" style={{ fontSize: "clamp(36px, 5vw, 60px)", lineHeight: 1.06 }} dir="auto">{c.hero}</h1>
           <p className={`${locale === "ar" ? "body-ar" : "body"} m-0`} style={{ color: "var(--ink-muted)", maxWidth: 560 }}>{c.sub}</p>
           <div className="flex flex-wrap gap-3 mt-2">
-            <a href="/login" className="mn-btn" style={{ background: "var(--accent)", color: "var(--on-accent)", borderColor: "transparent" }}>{c.start}</a>
+            <a href="/login?next=/start" className="mn-btn" style={{ background: "var(--accent)", color: "var(--on-accent)", borderColor: "transparent" }}>{c.start}</a>
             <a href="#how" className="mn-btn mn-btn--secondary">{c.howTitle}</a>
           </div>
         </div>
@@ -77,8 +79,8 @@ export function Welcome({ c, locale }: { c: C; locale: "en" | "ar" }) {
           <h2 className="h1 m-0">{c.howTitle}</h2>
           <p className="body m-0" style={{ color: "var(--ink-muted)" }}>{c.howSub}</p>
         </div>
-        <div className="grid gap-12 md:grid-cols-[1fr_1fr] items-start">
-          <div className="md:sticky md:top-10 flex flex-col gap-6">
+        <div className="grid gap-12 md:grid-cols-[1fr_1fr]">
+          <div className="md:sticky md:top-8 md:self-start flex flex-col gap-5 md:max-w-[460px]">
             <div className="site-art" style={{ aspectRatio: "13 / 10" }}>
               <Isometric scene={active + 1} />
             </div>
@@ -94,10 +96,10 @@ export function Welcome({ c, locale }: { c: C; locale: "en" | "ar" }) {
               </div>
             </div>
           </div>
-          <ol className="m-0 p-0 list-none flex flex-col">
+          <ol className="m-0 p-0 list-none flex flex-col md:pb-48">
             {c.stages.map((s, i) => (
               <li key={i} ref={(el) => { refs.current[i] = el; }} data-i={i} className={`site-stage ${active === i ? "site-stage--on" : ""}`}>
-                <button type="button" className="site-stage__btn" onClick={() => { setActive(i); setPlaying(i); refs.current[i]?.scrollIntoView({ behavior: "smooth", block: "center" }); }}>
+                <button type="button" className="site-stage__btn" onClick={() => { settle.current = Date.now() + 1200; setActive(i); setPlaying(i); refs.current[i]?.scrollIntoView({ behavior: "smooth", block: "center" }); }}>
                   <span className="mn-label site-stage__n" lang="en">{String(i + 1).padStart(2, "0")}</span>
                   <span className="flex flex-col gap-2 min-w-0">
                     <span className="h2" dir="auto">{s.name}</span>
