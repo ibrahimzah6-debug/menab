@@ -4,17 +4,20 @@
 
 import type { Aspect } from "./images";
 
-export type ClipModel = { id: string; name: string; perSecond: number; fixedSeconds?: number; note: { en: string; ar: string } };
+// "talking" models move the lips to a voice line (lip-sync); they need the shot's dialogue audio.
+export type ClipModel = { id: string; name: string; perSecond: number; fixedSeconds?: number; talking?: boolean; note: { en: string; ar: string } };
 
 // Video models Menab can drive from a keyframe today. Kling 3.0 was tested in M1.
 export const CLIP_MODELS: ClipModel[] = [
   { id: "kling-3-0", name: "Kling 3.0", perSecond: 0.07, note: { en: "Reliable default, 3 to 15 sec", ar: "الافتراضي الثابت، من ٣ إلى ١٥ ثانية" } },
   { id: "seedance-2-5", name: "Seedance 2.5", perSecond: 0.085, note: { en: "Strong motion, references", ar: "حركة قوية ومراجع" } },
   { id: "veo-3-1-fast", name: "Veo 3.1 Fast", perSecond: 0.325 / 8, fixedSeconds: 8, note: { en: "Veo look, 8 sec clips", ar: "شكل Veo، مقاطع ٨ ثواني" } },
+  { id: "kling-avatar", name: "Kling AI Avatar Pro", perSecond: 0.04, talking: true, note: { en: "Talking to camera, lip-sync", ar: "يتكلم للكاميرا، مزامنة الشفايف" } },
+  { id: "infinitalk", name: "Infinitalk", perSecond: 0.015, talking: true, note: { en: "Cheaper lip-sync, 480p", ar: "مزامنة شفايف أرخص، 480p" } },
 ];
 export const DEFAULT_CLIP_MODEL = "kling-3-0";
 export const clipModel = (id: string) => CLIP_MODELS.find((m) => m.id === id) ?? CLIP_MODELS[0];
-export const clipBackup = (id: string) => (id === "kling-3-0" ? "seedance-2-5" : "kling-3-0");
+export const clipBackup = (id: string) => (id === "kling-avatar" ? "infinitalk" : id === "infinitalk" ? "kling-avatar" : id === "kling-3-0" ? "seedance-2-5" : "kling-3-0");
 
 export const clipSeconds = (modelId: string, seconds: number) => {
   const m = clipModel(modelId);
@@ -25,9 +28,13 @@ export const clipSeconds = (modelId: string, seconds: number) => {
 };
 export const clipPrice = (modelId: string, seconds: number) => clipSeconds(modelId, seconds) * clipModel(modelId).perSecond;
 
-export function clipRequest(modelId: string, prompt: string, keyframe: string, seconds: number, aspect: Aspect): { kieModel: string; input: Record<string, unknown> } {
+export function clipRequest(modelId: string, prompt: string, keyframe: string, seconds: number, aspect: Aspect, audio?: string | null): { kieModel: string; input: Record<string, unknown> } | null {
   const d = clipSeconds(modelId, seconds);
   switch (modelId) {
+    case "kling-avatar":
+      return audio ? { kieModel: "kling/ai-avatar-pro", input: { image_url: keyframe, audio_url: audio, prompt } } : null;
+    case "infinitalk":
+      return audio ? { kieModel: "infinitalk/from-audio", input: { image_url: keyframe, audio_url: audio, prompt, resolution: "480p", seed: Math.floor(Math.random() * 1_000_000) } } : null;
     case "seedance-2-5":
       // Kie.ai: a task that starts from a first frame only accepts "adaptive".
       return { kieModel: "bytedance/seedance-2-5", input: { prompt, first_frame_url: keyframe, generate_audio: false, resolution: "720p", aspect_ratio: "adaptive", duration: d } };

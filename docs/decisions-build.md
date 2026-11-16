@@ -227,3 +227,10 @@ Replaces B4.
 - **38 Shot review:** approve each clip or reopen it; the stage approves when the references are locked and every shot has an approved clip.
 - Prices shown first: Nano Banana Pro about $0.09 a picture, Kling 3.0 $0.07 a second, ElevenLabs $0.03 per 1,000 characters, Suno about $0.06 a track; the real cost is read back from Kie.ai.
 - **Still to come in M5:** talking avatars (lip-sync with Kling AI Avatar Pro or Infinitalk) for characters who speak to camera, character voices for dialogue lines, saving digital actors to Libraries, and the stage 5 board cards.
+
+## B30. M5, second part (16 Nov 2026)
+
+- **Dialogue in the speaker's voice:** a line a character says on screen (a shot's dialogue that is not voiceover) is made in that character's own voice from the reference lock, listed under Dialogue in Voice (37).
+- **Talking avatars (lip-sync):** in Video shots (36), Kling AI Avatar Pro (about $0.04 a second) or Infinitalk (about $0.015 a second, 480p) make the person in the keyframe say the shot's dialogue line; each is the other's backup. They need the dialogue line first.
+- **Save to Libraries:** each character with a picture can be saved to the company's Libraries: its digital actor sheet, stage 3 picture and outfit pictures are copied there, with its look, outfits and voice, so the same face can return in the client's next project. A character already saved under the same name is updated.
+- **Board and Files:** the Generate stage shows on the board with counts and keyframe thumbnails; the Files page lists actor sheets, keyframes, clips, voice lines and the music track to download.

@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember, getMemberships } from "@/lib/workspace";
 import { hiddenOutputs, videoType } from "@/lib/video-types";
 import { stageFive, syncOutputs } from "@/lib/generate";
+import { VOICES } from "@/lib/ai/media";
 import { FILE_TYPES, loadProject, ownPath, runBriefMessage, type BriefPayload } from "@/lib/brief-turn";
 
 export type Result = { error?: string };
@@ -433,5 +434,48 @@ export async function approveClip(projectId: string, n: number, approved: boolea
     return { error: errText(e) };
   }
   revalidatePath(`/p/${projectId}`);
+  return {};
+}
+
+// Saves a digital actor (its sheet, stage 3 picture, outfit pictures, look and voice) to the
+// company's Libraries, so the same face can come back in the client's next project (I29).
+export async function saveActorToLibrary(projectId: string, name: string): Promise<Result> {
+  const { t } = await getI18n();
+  try {
+    const { supabase, project } = await loadProject(projectId);
+    const doc = await stageFive(supabase, projectId);
+    const c = doc.characters.find((x) => x.name.trim().toLowerCase() === name.trim().toLowerCase());
+    if (!c) return { error: "Character not found." };
+    const key = c.name.trim().toLowerCase().slice(0, 200);
+    const [{ data: gen }, { data: look }] = await Promise.all([
+      supabase.from("gen_assets").select("kind, key, path, version").eq("project_id", projectId).in("kind", ["sheet", "outfit"]).eq("status", "ready").order("version", { ascending: false }),
+      supabase.from("look_images").select("key, path, version").eq("project_id", projectId).eq("kind", "character").eq("key", key).eq("status", "ready").order("version", { ascending: false }).limit(1),
+    ]);
+    const firstOf = new Map<string, string>();
+    for (const r of gen ?? []) if (r.path && !firstOf.has(`${r.kind}:${r.key}`)) firstOf.set(`${r.kind}:${r.key}`, r.path);
+    const sources = [firstOf.get(`sheet:${key}`), look?.[0]?.path, ...[...firstOf.entries()].filter(([k]) => k.startsWith(`outfit:${key}|`)).map(([, p]) => p)].filter((p): p is string => Boolean(p && p.startsWith(`${project.workspace_id}/projects/${projectId}/`) && !p.includes("..")));
+    if (!sources.length) return { error: t.generate.noPicture };
+    const admin = createAdminClient();
+    const paths: string[] = [];
+    for (const [i, from] of sources.slice(0, 12).entries()) {
+      const to = `${project.workspace_id}/library/actor-${Date.now()}-${i}.${from.split(".").pop() ?? "jpg"}`;
+      const { error } = await admin.storage.from("media").copy(from, to);
+      if (!error) paths.push(to);
+    }
+    if (!paths.length) return { error: "Could not copy the pictures." };
+    const voiceId = doc.lock.voices?.[key];
+    const voice = voiceId ? `ElevenLabs ${VOICES.find((v) => v.id === voiceId)?.name ?? ""} (${voiceId})` : null;
+    const outfits = doc.wardrobe.filter((w) => w.character.trim().toLowerCase() === key).map((w) => `${w.scene}: ${w.outfit}`).join("\n");
+    const row = { name: c.name.slice(0, 120), description: (c.role ?? "").slice(0, 4000), age: (c.age ?? "").slice(0, 60), look: (c.look ?? "").slice(0, 4000), wardrobe: outfits.slice(0, 4000), voice, image_paths: paths, updated_at: new Date().toISOString() };
+    const { data: existing } = await supabase.from("characters").select("id").eq("workspace_id", project.workspace_id).eq("name", row.name).limit(1);
+    const res = existing?.length
+      ? await supabase.from("characters").update(row).eq("id", existing[0].id)
+      : await supabase.from("characters").insert({ ...row, workspace_id: project.workspace_id });
+    if (res.error) return { error: res.error.message };
+  } catch (e) {
+    return { error: errText(e) };
+  }
+  revalidatePath(`/p/${projectId}`);
+  revalidatePath("/libraries");
   return {};
 }

@@ -27,7 +27,7 @@ import { PanelTabs } from "./panel-tabs";
 import { BoardCursor, TypeIn } from "./board-live";
 import { VideoTypePicker } from "./video-type-picker";
 import { hiddenOutputs } from "@/lib/video-types";
-import { genAssets, settlePending, stageFive } from "@/lib/generate";
+import { dialogueLines, genAssets, settlePending, stageFive } from "@/lib/generate";
 import { CLIP_MODELS, MUSIC_PRICE, VOICES, voicePreview, voicePrice } from "@/lib/ai/media";
 import { lookKey } from "@/lib/frames";
 import { ClipsView, KeyframesView, ReferenceLockView, ReviewView, SoundView, type GenData } from "./generate-docs";
@@ -188,10 +188,11 @@ export default async function ProjectPage({
       outfits: doc.outfits.map((o) => ({ key: `${lookKey(o.character)}|${lookKey(o.outfit)}`.slice(0, 200), character: o.character, outfit: o.outfit })),
       shots: doc.shots.map((f) => ({ n: f.n, action: f.action, size: f.size, movement: f.movement, seconds: f.seconds, dialogue: f.dialogue, frame: frameMap[f.n]?.url ?? null })),
       lines,
+      dialogue: dialogueLines(doc),
       lock: doc.lock,
       voices: VOICES.map((v) => ({ ...v, preview: voicePreview(v.id) })),
-      clipModels: CLIP_MODELS.map((m) => ({ id: m.id, name: m.name, perSecond: m.perSecond, fixedSeconds: m.fixedSeconds, note: m.note[locale] })),
-      prices: { image: IMAGE_MODELS.find((m) => m.id === "nano-banana-pro")?.priceFrom ?? 0.09, voiceLine: lines.map((l) => voicePrice(l.text)), music: MUSIC_PRICE },
+      clipModels: CLIP_MODELS.map((m) => ({ id: m.id, name: m.name, perSecond: m.perSecond, fixedSeconds: m.fixedSeconds, talking: m.talking, note: m.note[locale] })),
+      prices: { image: IMAGE_MODELS.find((m) => m.id === "nano-banana-pro")?.priceFrom ?? 0.09, voiceLine: lines.map((l) => voicePrice(l.text)), dialogueLine: dialogueLines(doc).map((l) => voicePrice(l.text)), music: MUSIC_PRICE },
     };
   }
   const missingFrames = shotFrames.filter((f) => !(images[f.n]?.version) && images[f.n]?.status !== "generating").map((f) => f.n);
@@ -308,7 +309,7 @@ export default async function ProjectPage({
                     const st = statusOf(x.number);
                     const live = g.stage === stage && !g.approved;
                     const fresh = ["ready", "edited"].includes(st) && Date.now() - new Date(x.updated_at).getTime() < 25_000;
-                    const text = g.stage === 1 ? excerpt(x.number, content[x.number], brief, p) : g.stage === 2 ? creativeExcerpt(x.number, content, meeting, t) : g.stage === 3 ? lookExcerpt(x.number, content, framesDrawn, t) : "";
+                    const text = g.stage === 1 ? excerpt(x.number, content[x.number], brief, p) : g.stage === 2 ? creativeExcerpt(x.number, content, meeting, t) : g.stage === 3 ? lookExcerpt(x.number, content, framesDrawn, t) : g.stage === 5 ? genExcerpt(x.number, gen, shotFrames.length, t) : "";
                     if (st === "waiting" || (st === "failed" && !x.current_version)) {
                       return (
                         <article key={x.id} className="rounded-[10px] border border-dashed border-line-control bg-tint-1 p-4 flex flex-col gap-2" style={{ width: 240 }}>
@@ -316,8 +317,8 @@ export default async function ProjectPage({
                             <span className="mn-label">{String(x.number).padStart(2, "0")} {t.outputs[x.number]}</span>
                             <StatusChip status={st as OutputStatus} label={statusLabel(t, st)} />
                           </div>
-                          <p className="m-0 text-[13px] leading-5 text-ink-faint">{st === "failed" ? t.creative.redo.failed : g.stage <= 3 ? startsWhen(x.number, t) : fill(p.later, { m: MILESTONE[g.stage] ?? "" })}</p>
-                          {g.stage <= 3 && <Link href={href({ o: x.number })} className="text-[12px] underline text-ink-muted self-start">{p.openPage}</Link>}
+                          <p className="m-0 text-[13px] leading-5 text-ink-faint">{st === "failed" ? t.creative.redo.failed : g.stage <= 3 || g.stage === 5 ? startsWhen(x.number, t) : fill(p.later, { m: MILESTONE[g.stage] ?? "" })}</p>
+                          {(g.stage <= 3 || g.stage === 5) && <Link href={href({ o: x.number })} className="text-[12px] underline text-ink-muted self-start">{p.openPage}</Link>}
                         </article>
                       );
                     }
@@ -333,6 +334,14 @@ export default async function ProjectPage({
                           <StatusChip status={st as OutputStatus} label={statusLabel(t, st)} />
                         </div>
                         {st === "generating" && <div data-ai-spot className="mn-skeleton h-[72px] mb-2" />}
+                        {(x.number === 35 || x.number === 36) && Object.entries(gen).some(([k, v]) => k.startsWith("keyframe:") && v.url) && (
+                          <div className="grid grid-cols-3 gap-1 mb-2">
+                            {Object.entries(gen).filter(([k, v]) => k.startsWith("keyframe:") && v.url).slice(0, 6).map(([k, v]) => (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img key={k} src={v.url!} alt="" className="w-full aspect-video object-cover rounded-sm border border-line" />
+                            ))}
+                          </div>
+                        )}
                         {x.number === 17 && st !== "generating" && shotFrames.some((f) => images[f.n]?.url) && (
                           <div className="grid grid-cols-3 gap-1 mb-2">
                             {shotFrames.filter((f) => images[f.n]?.url).slice(0, 6).map((f) => (
@@ -362,7 +371,7 @@ export default async function ProjectPage({
                         </div>
                         <div className="mn-card__meta">
                           <span>{x.current_version > 0 ? `v${x.current_version}` : ""}</span>
-                          {g.stage <= 3 && <Link href={href({ o: x.number })} className="underline hover:text-ink">{p.openPage}</Link>}
+                          {(g.stage <= 3 || g.stage === 5) && <Link href={href({ o: x.number })} className="underline hover:text-ink">{p.openPage}</Link>}
                         </div>
                       </article>
                     );
@@ -807,6 +816,7 @@ function startsWhen(n: number, t: Dictionary): string {
   if (n === 9) return w.direction;
   if (n === 10 || n === 11) return w.script;
   if (n === 12) return w.all;
+  if (n >= 34 && n <= 38) return t.generate.startsWhen[n] ?? "";
   if (n >= 13 && n <= 16) return t.look.startsWhen.write;
   if (n === 18) return t.look.startsWhen.shots;
   if (n === 17) return t.look.startsWhen.frames;
@@ -822,6 +832,17 @@ function creativeExcerpt(n: number, content: Record<number, unknown>, meeting: {
   if (n === 10) return (content[10] as { idea?: string } | undefined)?.idea ?? "";
   if (n === 11) return (content[11] as { look?: string } | undefined)?.look ?? "";
   if (n === 12) return content[12] ? t.creative.approval.ready : "";
+  return "";
+}
+
+// A one-line summary of a Generate output for its board card.
+function genExcerpt(n: number, gen: Record<string, { status: string; url: string | null; approved: boolean }>, shots: number, t: Dictionary): string {
+  const count = (prefix: string, f: (v: { status: string; url: string | null; approved: boolean }) => boolean = (v) => Boolean(v.url)) => Object.entries(gen).filter(([k, v]) => k.startsWith(prefix) && f(v)).length;
+  if (n === 34) return `${count("sheet:")} · ${t.generate.sheet}`;
+  if (n === 35) return `${count("keyframe:")} / ${shots}`;
+  if (n === 36) return `${count("clip:")} / ${shots}`;
+  if (n === 37) return [count("voice:") ? `${count("voice:")} · ${t.outputs[37]}` : "", gen["music:main"]?.url ? t.generate.music : ""].filter(Boolean).join(" · ");
+  if (n === 38) return fill(t.generate.approvedCount, { n: count("clip:", (v) => v.approved), total: shots });
   return "";
 }
 

@@ -93,6 +93,13 @@ export async function genAssets(supabase: SupabaseClient, projectId: string, wor
   return out;
 }
 
+// Lines a character speaks on screen (not voiceover), one per shot, said by the first person in it.
+export function dialogueLines(doc: { shots: Shot[] }) {
+  return doc.shots
+    .map((s) => ({ n: s.n, key: `dl-${s.n}`, speaker: s.cast?.[0] ?? "", text: (s.dialogue ?? "").replace(/^\s*["“”']|["“”']\s*$/g, "").trim() }))
+    .filter((d) => d.speaker && d.text && !/^\s*(VO|V\.O\.|voiceover|تعليق)/i.test(d.text));
+}
+
 // ---------- Saving a finished job ----------
 
 async function store(admin: Admin, row: { id: string; workspace_id: string; project_id: string; kind: string; model: string; created_by: string | null; seconds?: number | null }, url: string, credits: number, fallbackFrom?: string) {
@@ -252,10 +259,16 @@ export async function runGenerate(projectId: string, req: GenRequest, emit: (e: 
         emit({ t: "genFailed", label: fill(g.shot, { n: s.n }), reason: g.keyframeFirst });
         continue;
       }
+      // Talking (lip-sync) models need the shot's dialogue line in the speaker's voice.
+      const audio = clipModel(model).talking ? await sign(await assetPath("voice", `dl-${s.n}`)) : null;
+      if (clipModel(model).talking && !audio) {
+        emit({ t: "genFailed", label: fill(g.shot, { n: s.n }), reason: g.dialogueFirst });
+        continue;
+      }
       const prompt = (req.prompts?.[String(s.n)] ?? assets[`clip:${s.n}`]?.prompt ?? `${s.action}. Camera move: ${s.movement}. Shot size: ${s.size}, lens ${s.lens}. Natural, realistic motion; keep the faces, clothes and place exactly as in the first frame. No text on screen.`).slice(0, 2400);
       jobs.push({
-        key: String(s.n), label: fill(g.shot, { n: s.n }), model, prompt, params: { seconds: s.seconds, aspect }, seconds: clipSeconds(model, s.seconds),
-        build: (m) => clipRequest(m, prompt, kf, s.seconds, aspect), backup: clipBackup, modelName: (id) => clipModel(id).name,
+        key: String(s.n), label: fill(g.shot, { n: s.n }), model, prompt, params: { seconds: s.seconds, aspect, talking: Boolean(audio) }, seconds: clipSeconds(model, s.seconds),
+        build: (m) => clipRequest(m, prompt, kf, s.seconds, aspect, audio), backup: clipBackup, modelName: (id) => clipModel(id).name,
       });
     }
   } else if (req.kind === "voice") {
@@ -267,6 +280,12 @@ export async function runGenerate(projectId: string, req: GenRequest, emit: (e: 
       if (!text || !req.keys.includes(key)) return;
       jobs.push({ key, label: fill(g.line, { n: i + 1 }), model: "elevenlabs-multilingual-v2", prompt: text, params: { voice: narrator }, build: () => voiceRequest(text, narrator), backup: (m) => m, modelName: () => "ElevenLabs" });
     });
+    // Dialogue spoken in a shot, in the speaker's own voice.
+    for (const d of dialogueLines(doc)) {
+      if (!req.keys.includes(d.key)) continue;
+      const voice = doc.lock.voices?.[lookKey(d.speaker)] ?? narrator;
+      jobs.push({ key: d.key, label: fill(g.dialogue, { n: d.n, name: d.speaker }), model: "elevenlabs-multilingual-v2", prompt: d.text, params: { voice, speaker: d.speaker }, build: () => voiceRequest(d.text, voice), backup: (m) => m, modelName: () => "ElevenLabs" });
+    }
   } else if (req.kind === "music") {
     const style = [brief.feeling, doc.mood.look, "cinematic score for a short film, instrumental, clean mix"].filter(Boolean).join("; ");
     jobs.push({ key: "main", label: g.music, model: "suno-v6", prompt: style, params: {}, build: () => musicRequest(style, project.name), backup: (m) => m, modelName: () => "Suno V6" });

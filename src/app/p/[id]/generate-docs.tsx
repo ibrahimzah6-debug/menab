@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
-import { approveClip, saveReferenceLock } from "./actions";
+import { approveClip, saveActorToLibrary, saveReferenceLock } from "./actions";
 import { RunLine, useCreativeRun, type RunCopy } from "./creative-run";
 import { InlineText } from "./inline-doc";
 
@@ -22,10 +22,11 @@ export type GenData = {
   outfits: { key: string; character: string; outfit: string }[];
   shots: { n: number; action: string; size: string; movement: string; seconds: number; dialogue: string; frame: string | null }[];
   lines: { key: string; text: string }[];
+  dialogue: { key: string; n: number; speaker: string; text: string }[];
   lock: { locked?: boolean; consent?: boolean; narrator?: string; voices?: Record<string, string>; aspect?: string };
   voices: { id: string; name: string; gender: string; tone: string; preview: string }[];
-  clipModels: { id: string; name: string; perSecond: number; fixedSeconds?: number; note: string }[];
-  prices: { image: number; voiceLine: number[]; music: number };
+  clipModels: { id: string; name: string; perSecond: number; fixedSeconds?: number; talking?: boolean; note: string }[];
+  prices: { image: number; voiceLine: number[]; dialogueLine: number[]; music: number };
 };
 
 const iso = (x: string) => String.fromCharCode(0x2066) + x + String.fromCharCode(0x2069);
@@ -163,6 +164,16 @@ export function ReferenceLockView({ d, g, run }: { d: GenData; g: G; run: RunCop
                     )}
                   </div>
                   {voiceSelect(d.lock.voices?.[key(c.name)], (v) => save({ voices: { [key(c.name)]: v } }), g.voice)}
+                  {d.editable && (sheet?.url || c.picture) && (
+                    <button
+                      type="button"
+                      className="mn-btn mn-btn--ghost mn-btn--sm self-start"
+                      disabled={pending}
+                      onClick={() => start(async () => { const res = await saveActorToLibrary(d.projectId, c.name); setNote(res.error ?? `${c.name}: ${g.savedLibrary}`); router.refresh(); })}
+                    >
+                      {g.saveLibrary}
+                    </button>
+                  )}
                 </div>
               </article>
             );
@@ -279,7 +290,9 @@ export function ClipsView({ d, g, run }: { d: GenData; g: G; run: RunCopy }) {
   const m = d.clipModels.find((x) => x.id === model) ?? d.clipModels[0];
   const secs = (s: number) => m.fixedSeconds ?? Math.max(3, Math.min(15, Math.round(s || 5)));
   const price = (s: number) => secs(s) * m.perSecond;
-  const ready = d.shots.filter((s) => d.assets[`keyframe:${s.n}`]?.url);
+  const talking = Boolean(m.talking);
+  const hasLine = (n: number) => Boolean(d.assets[`voice:dl-${n}`]?.url);
+  const ready = d.shots.filter((s) => d.assets[`keyframe:${s.n}`]?.url && (!talking || hasLine(s.n)));
   const missing = ready.filter((s) => !d.assets[`clip:${s.n}`]?.url && d.assets[`clip:${s.n}`]?.status !== "generating");
   const ratio = d.lock.aspect === "9:16" ? "9 / 16" : d.lock.aspect === "1:1" ? "1 / 1" : "16 / 9";
   return (
@@ -300,6 +313,7 @@ export function ClipsView({ d, g, run }: { d: GenData; g: G; run: RunCopy }) {
           )}
         </Bar>
       )}
+      {talking && <p className="small m-0 px-3 py-2 rounded-md bg-tint-2">{g.talkingNote}</p>}
       <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${d.lock.aspect === "9:16" ? 200 : 300}px, 1fr))` }}>
         {d.shots.map((s) => {
           const a = d.assets[`clip:${s.n}`];
@@ -320,7 +334,8 @@ export function ClipsView({ d, g, run }: { d: GenData; g: G; run: RunCopy }) {
                     <InlineText label={g.prompt} value={text} editable={d.editable} onCommit={(v) => setPrompts((p) => ({ ...p, [String(s.n)]: v }))} />
                   </div>
                 </details>
-                {d.editable && kf?.url && !r.busy && a?.status !== "generating" && (
+                {talking && kf?.url && !hasLine(s.n) && <span className="text-[12px] text-ink-faint">{g.dialogueFirst}</span>}
+                {d.editable && kf?.url && (!talking || hasLine(s.n)) && !r.busy && a?.status !== "generating" && (
                   <button type="button" className="mn-btn mn-btn--ghost mn-btn--sm self-start" onClick={() => go({ kind: "clip", shots: [s.n], model, prompts: { [String(s.n)]: text } })}>
                     {a?.url ? g.remake : g.makeOne}<span className="mn-btn__cost">{usd(price(s.seconds))}</span>
                   </button>
@@ -341,6 +356,8 @@ export function SoundView({ d, g, run }: { d: GenData; g: G; run: RunCopy }) {
   const { r, go } = useGen(d, run);
   const missing = d.lines.filter((l) => !d.assets[`voice:${l.key}`]?.url && d.assets[`voice:${l.key}`]?.status !== "generating");
   const music = d.assets["music:main"];
+  const missingDialogue = d.dialogue.filter((l) => !d.assets[`voice:${l.key}`]?.url && d.assets[`voice:${l.key}`]?.status !== "generating");
+  const dlPrice = (i: number) => d.prices.dialogueLine[i] ?? 0.001;
   const linePrice = (i: number) => d.prices.voiceLine[i] ?? 0.001;
   return (
     <div className="flex flex-col gap-5">
@@ -349,6 +366,11 @@ export function SoundView({ d, g, run }: { d: GenData; g: G; run: RunCopy }) {
           {missing.length > 0 && (
             <button type="button" className="mn-btn mn-btn--primary" onClick={() => go({ kind: "voice", keys: missing.map((l) => l.key) })}>
               {fillIn(g.makeVoice, { n: missing.length })}<span className="mn-btn__cost">{usd(missing.reduce((n, l) => n + linePrice(d.lines.indexOf(l)), 0))}</span>
+            </button>
+          )}
+          {missingDialogue.length > 0 && (
+            <button type="button" className="mn-btn mn-btn--secondary" onClick={() => go({ kind: "voice", keys: missingDialogue.map((l) => l.key) })}>
+              {fillIn(g.makeDialogue, { n: missingDialogue.length })}<span className="mn-btn__cost">{usd(missingDialogue.reduce((n, l) => n + dlPrice(d.dialogue.indexOf(l)), 0))}</span>
             </button>
           )}
           {music?.status !== "generating" && (
@@ -379,6 +401,29 @@ export function SoundView({ d, g, run }: { d: GenData; g: G; run: RunCopy }) {
           })}
         </ul>
       </section>
+      {d.dialogue.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h3 className="mn-label m-0">{g.dialogueTitle}</h3>
+          <p className="small text-ink-muted m-0">{g.dialogueNote}</p>
+          <ul className="m-0 p-0 list-none flex flex-col border border-line rounded-lg">
+            {d.dialogue.map((l, i) => {
+              const a = d.assets[`voice:${l.key}`];
+              return (
+                <li key={l.key} className={`grid gap-3 items-center px-4 py-3 ${i ? "border-t border-line" : ""}`} style={{ gridTemplateColumns: "120px 1fr 260px auto" }}>
+                  <span className="text-[12px] text-ink-muted" dir="auto">{fillIn(g.dialogue, { n: l.n, name: l.speaker })}</span>
+                  <span className="small" dir="auto">{l.text}</span>
+                  <Media a={a} kind="audio" alt={l.text} g={g} />
+                  {d.editable && !r.busy && a?.status !== "generating" ? (
+                    <button type="button" className="mn-btn mn-btn--ghost mn-btn--sm" onClick={() => go({ kind: "voice", keys: [l.key] })}>
+                      {a?.url ? g.remake : g.makeOne}<span className="mn-btn__cost">{usd(dlPrice(i))}</span>
+                    </button>
+                  ) : <span />}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
       <section className="flex flex-col gap-2">
         <h3 className="mn-label m-0">{g.music}</h3>
         <div className="max-w-[480px]"><Media a={music} kind="audio" alt={g.music} g={g} /></div>
