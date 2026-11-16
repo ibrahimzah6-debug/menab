@@ -243,3 +243,8 @@ Replaces B4.
 - **Branded PDFs** (Files and the stage screens): PPM booklet, CPS as a Sunday to Saturday calendar, one call sheet per day (times, locations with map links, nearest hospital, emergency numbers 911, 997, 998, 999, safety checklist, crew by department, sets), and the permit sheet, where ID numbers are added only at export (full for Admins and Coordinators, masked for others, each export logged).
 - **Budget template:** built from industry budget practice adapted to Saudi production, as mvp-definition.md allows; ZAH's own template can replace it when Ibrahim shares it.
 - Measured on a test project: the three calls finished in about 110 seconds; one call failed on GPT 6.1 Sol and its backup once and wrote in 24 seconds on "Try again".
+
+## B32. The website (16 Nov 2026)
+
+- A visitor who is not signed in sees the website at menab.si; a signed-in person goes to Home. It follows the brand book's dark cinematic face: one isometric line drawing built from the folded Menab "M" as a box, hairlines with dashed hidden edges and one filled face. The hero shows the box; the walkthrough rebuilds the drawing for each of the seven stages as the visitor scrolls or presses a stage, and shows that stage's screen (the designed stills for now; short clips of the real screens can replace them later). The orange accent appears once, on "Start your project". English and Arabic, with the layout mirrored. Reduced motion shows the drawings without animation.
+- Public sign-up stays later (mvp-definition.md): both calls to action lead to the invitation login.

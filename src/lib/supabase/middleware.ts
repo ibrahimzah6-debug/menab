@@ -3,7 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./env";
 
 // /api/cron is called by Vercel's scheduler with its own secret, not a login.
-const PUBLIC_PATHS = ["/login", "/auth", "/api/cron"];
+// /welcome is the public website; a visitor who is not signed in sees it at "/".
+const PUBLIC_PATHS = ["/login", "/auth", "/api/cron", "/welcome"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -27,6 +28,13 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + "/"));
 
+  if (!signedIn && path === "/") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/welcome";
+    const rewrite = NextResponse.rewrite(url);
+    response.cookies.getAll().forEach((c) => rewrite.cookies.set(c));
+    return rewrite;
+  }
   if (!signedIn && !isPublic) {
     // The AI endpoints answer a plain "log in" instead of sending back the login page.
     const isEndpoint = path.startsWith("/api/") || /^\/p\/[^/]+\/(brief|voice|creative|documents|look|frames|generate|preprod)$/.test(path);
