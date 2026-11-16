@@ -31,6 +31,7 @@ import { dialogueLines, genAssets, settlePending, stageFive } from "@/lib/genera
 import { CLIP_MODELS, MUSIC_PRICE, VOICES, voicePreview, voicePrice } from "@/lib/ai/media";
 import { lookKey } from "@/lib/frames";
 import { ClipsView, KeyframesView, ReferenceLockView, ReviewView, SoundView, type GenData } from "./generate-docs";
+import { BudgetView, CallSheetsView, CrewView, EquipmentView, MeetingView as PpmMeetingView, PermitsView, PpmView, PreprodAssistant, PreprodFooter, PreprodTryAgain, ScheduleView, type CrewRow } from "./preprod-docs";
 import { ArtView, CharactersView, LocationsView, LookAssistant, LookFooter, LookTryAgain, ShotListView, StoryboardView, WardrobeView, type FrameImage } from "./look-docs";
 
 // AI calls run inside the actions on this page and can take up to a minute.
@@ -106,8 +107,9 @@ export default async function ProjectPage({
   const stageOne = outs.filter((x) => x.stage === 1);
   const stageTwo = outs.filter((x) => x.stage === 2);
   const stageThree = outs.filter((x) => x.stage === 3);
+  const stageFour = outs.filter((x) => x.stage === 4);
   const asked = Number(o);
-  const showing = asked >= 1 && asked <= 6 ? 1 : asked >= 7 && asked <= 12 && stageTwo.length ? 2 : asked >= 13 && asked <= 18 && stageThree.length ? 3 : asked >= 34 && asked <= 38 && outs.some((x) => x.stage === 5) ? 5 : stage;
+  const showing = asked >= 1 && asked <= 6 ? 1 : asked >= 7 && asked <= 12 && stageTwo.length ? 2 : asked >= 13 && asked <= 18 && stageThree.length ? 3 : asked >= 34 && asked <= 38 && outs.some((x) => x.stage === 5) ? 5 : asked >= 20 && asked <= 33 && stageFour.length ? 4 : stage;
   // Steps the video type does not need stay in the list, crossed out as "Not needed", and are
   // not waited for at approval. Nothing written is deleted.
   const hidden = hiddenOutputs(brief as { video_type?: string; real_people?: string });
@@ -117,6 +119,7 @@ export default async function ProjectPage({
   const stageOneApproved = stageOne.length > 0 && stageOne.every((x) => x.status === "approved");
   const stageTwoApproved = stageTwo.length > 0 && stageTwo.every((x) => x.status === "approved");
   const stageThreeApproved = stageThree.length > 0 && stageThree.every((x) => x.status === "approved");
+  const stageFourApproved = stageFour.length > 0 && stageFour.every((x) => x.status === "approved");
   // The open output: the one asked for, else where the work is.
   const open =
     showing === 1
@@ -127,13 +130,15 @@ export default async function ProjectPage({
           ? asked >= 13 && asked <= 18 ? asked : isReady(18) && !hidden.has(17) ? 17 : ([13, 15, 16, 17, 18].find((n) => !hidden.has(n)) ?? 18)
           : showing === 5
             ? asked >= 34 && asked <= 38 ? asked : !isReady(34) ? 34 : !isReady(35) ? 35 : !isReady(36) ? 36 : 38
-            : 0;
+            : showing === 4
+              ? stageFour.some((x) => x.number === asked) ? asked : !isReady(20) ? 20 : !isReady(28) ? 28 : 20
+              : 0;
   const board = view === "board";
-  const editableHere = canEdit && showing === stage && !(showing === 1 && stageOneApproved) && !(showing === 2 && stageTwoApproved) && !(showing === 3 && stageThreeApproved);
+  const editableHere = canEdit && showing === stage && !(showing === 1 && stageOneApproved) && !(showing === 2 && stageTwoApproved) && !(showing === 3 && stageThreeApproved) && !(showing === 4 && stageFourApproved);
   const writing = outs.some((x) => x.status === "generating");
 
   // Latest content of every stage 1 and stage 2 output, for the page and the board.
-  const withVersions = [...stageOne, ...stageTwo, ...stageThree].filter((x) => x.current_version > 0);
+  const withVersions = [...stageOne, ...stageTwo, ...stageThree, ...stageFour].filter((x) => x.current_version > 0);
   const content: Record<number, unknown> = {};
   if (withVersions.length) {
     const { data: versions } = await supabase
@@ -167,6 +172,10 @@ export default async function ProjectPage({
   const lastStyle = Object.values(images).find((x) => x.version > 0)?.style === "photo" ? "photo" : "sketch";
   const lang: "en" | "ar" = locale === "ar" ? "ar" : "en";
   const imagePrice = IMAGE_MODELS.find((m) => m.id === imageModel)?.priceFrom ?? 0.04;
+
+  // Stage 4: the company's crew, to pick the project's crew from.
+  const crewRows: CrewRow[] = showing === 4 && open === 22 ? (((await supabase.from("crew").select("id, name, role, department, phone, gamr_status, id_last4").eq("workspace_id", project.workspace_id).order("name")).data ?? []) as CrewRow[]) : [];
+  const ppmSections = (t.preprod.ppmSections as string[]).map((label, i) => ({ label, ready: [true, true, isReady(22), Boolean(content[9]), isReady(17), Boolean(content[11]), Boolean(content[10]), isReady(16), Boolean(content[10]), isReady(15), isReady(13), isReady(16), isReady(14)][i] ?? false }));
 
   // Stage 5 screen data.
   let genData: GenData | null = null;
@@ -272,7 +281,7 @@ export default async function ProjectPage({
           current={currentIndex}
           label={t.stage.stagesLabel}
           viewing={order.indexOf(showing)}
-          links={order.map((n, i) => (i > currentIndex ? null : i === currentIndex ? href({}) : n === 1 ? href({ o: 1 }) : n === 2 ? href({ o: 7 }) : n === 3 ? href({ o: 13 }) : n === 5 ? href({ o: 34 }) : null))}
+          links={order.map((n, i) => (i > currentIndex ? null : i === currentIndex ? href({}) : n === 1 ? href({ o: 1 }) : n === 2 ? href({ o: 7 }) : n === 3 ? href({ o: 13 }) : n === 4 ? href({ o: 20 }) : n === 5 ? href({ o: 34 }) : null))}
         />
         <span className="grow" />
         {busyOut && (
@@ -286,7 +295,7 @@ export default async function ProjectPage({
             <IconLayoutPage size={14} />
             {t.stage.page}
           </Link>
-          <Link href={href({ o: showing === 1 ? 1 : showing === 2 ? 7 : showing === 3 ? 13 : showing === 5 ? 34 : undefined, view: "board" })} aria-current={board ? "true" : undefined} className={`mn-stage ${board ? "mn-stage--current" : ""}`}>
+          <Link href={href({ o: showing === 1 ? 1 : showing === 2 ? 7 : showing === 3 ? 13 : showing === 4 ? 20 : showing === 5 ? 34 : undefined, view: "board" })} aria-current={board ? "true" : undefined} className={`mn-stage ${board ? "mn-stage--current" : ""}`}>
             <IconLayoutBoard size={14} />
             {t.stage.board}
           </Link>
@@ -317,8 +326,8 @@ export default async function ProjectPage({
                             <span className="mn-label">{String(x.number).padStart(2, "0")} {t.outputs[x.number]}</span>
                             <StatusChip status={st as OutputStatus} label={statusLabel(t, st)} />
                           </div>
-                          <p className="m-0 text-[13px] leading-5 text-ink-faint">{st === "failed" ? t.creative.redo.failed : g.stage <= 3 || g.stage === 5 ? startsWhen(x.number, t) : fill(p.later, { m: MILESTONE[g.stage] ?? "" })}</p>
-                          {(g.stage <= 3 || g.stage === 5) && <Link href={href({ o: x.number })} className="text-[12px] underline text-ink-muted self-start">{p.openPage}</Link>}
+                          <p className="m-0 text-[13px] leading-5 text-ink-faint">{st === "failed" ? t.creative.redo.failed : g.stage <= 5 ? startsWhen(x.number, t) : fill(p.later, { m: MILESTONE[g.stage] ?? "" })}</p>
+                          {g.stage <= 5 && <Link href={href({ o: x.number })} className="text-[12px] underline text-ink-muted self-start">{p.openPage}</Link>}
                         </article>
                       );
                     }
@@ -371,7 +380,7 @@ export default async function ProjectPage({
                         </div>
                         <div className="mn-card__meta">
                           <span>{x.current_version > 0 ? `v${x.current_version}` : ""}</span>
-                          {(g.stage <= 3 || g.stage === 5) && <Link href={href({ o: x.number })} className="underline hover:text-ink">{p.openPage}</Link>}
+                          {g.stage <= 5 && <Link href={href({ o: x.number })} className="underline hover:text-ink">{p.openPage}</Link>}
                         </div>
                       </article>
                     );
@@ -437,7 +446,7 @@ export default async function ProjectPage({
             <span className="mn-label p-2">{fill(t.stage.outputsCount, { n: order.indexOf(showing) + 1, count: list.length })}</span>
             {list.map((x) => {
               const st = statusOf(x.number);
-              const isOpen = (showing <= 3 || showing === 5) && open === x.number;
+              const isOpen = (showing <= 5) && open === x.number;
               const inner = (
                 <>
                   <span className={hidden.has(x.number) ? "line-through text-ink-faint" : st === "waiting" ? "text-ink-muted" : ""}>{x.number === 1 ? p.chat : t.outputs[x.number]}</span>
@@ -445,7 +454,7 @@ export default async function ProjectPage({
                 </>
               );
               const cls = `flex justify-between items-center gap-2 p-2.5 rounded-md text-[14px] ${isOpen ? "font-medium bg-surface border border-line" : "border border-transparent hover:bg-tint-2"}`;
-              return showing <= 3 || showing === 5 ? (
+              return showing <= 5 ? (
                 <Link key={x.id} href={href({ o: x.number })} aria-current={isOpen ? "page" : undefined} className={cls}>{inner}</Link>
               ) : (
                 <div key={x.id} className={cls}>{inner}</div>
@@ -547,6 +556,45 @@ export default async function ProjectPage({
                   <LookTryAgain projectId={id} n={open} failed={statusOf(open) === "failed"} cost={approx(estimateUsd(model, "lookPart"))} run={runCopy} c={t.creative.redo} />
                 ) : (
                   <p className="body text-ink-muted m-0">{open >= 17 && (content[13] || content[15]) ? t.look.startsWhen.shots : t.look.footer.start}</p>
+                )}
+              </div>
+            </section>
+          ) : showing === 4 && stageFour.length > 0 ? (
+            <section className="relative flex-1 min-w-0 md:min-h-0 md:overflow-y-auto bg-surface border border-line rounded-lg">
+              <div className="px-6 py-5 border-b border-line flex flex-wrap items-center gap-3">
+                <div className="grow flex flex-col gap-1">
+                  <span className="mn-label" lang="en">{String(open).padStart(2, "0")} · v{openOut?.current_version ?? 0}</span>
+                  <h1 className="h2 m-0">{t.outputs[open]}</h1>
+                </div>
+                <Versions projectId={id} n={open} list={versionList ?? []} current={openOut?.current_version ?? 0} editable={editableHere} c={t.creative} />
+                <StatusChip status={statusOf(open) as OutputStatus} label={statusLabel(t, statusOf(open))} />
+              </div>
+              <div className="p-6 flex flex-col gap-4">
+                <p className="small text-ink-muted m-0 max-w-[760px]">{t.preprod.intro[open]}</p>
+                {open === 27 ? (
+                  <PpmView projectId={id} sections={ppmSections} c={t.preprod} />
+                ) : open === 28 ? (
+                  <PpmMeetingView projectId={id} content={content[28] as never} editable={editableHere} c={t.preprod} />
+                ) : content[open] ? (
+                  open === 20 ? (
+                    <BudgetView projectId={id} content={content[20] as never} editable={editableHere && statusOf(20) !== "generating"} c={t.preprod} />
+                  ) : open === 22 ? (
+                    <CrewView projectId={id} content={content[22] as never} editable={editableHere && statusOf(22) !== "generating"} c={t.preprod} crew={crewRows} lang={lang} />
+                  ) : open === 25 ? (
+                    <PermitsView projectId={id} content={content[25] as never} editable={editableHere && statusOf(25) !== "generating"} c={t.preprod} />
+                  ) : open === 26 ? (
+                    <EquipmentView projectId={id} content={content[26] as never} editable={editableHere && statusOf(26) !== "generating"} c={t.preprod} lang={lang} />
+                  ) : open === 31 ? (
+                    <ScheduleView projectId={id} content={content[31] as never} editable={editableHere && statusOf(31) !== "generating"} c={t.preprod} />
+                  ) : (
+                    <CallSheetsView projectId={id} content={content[32] as never} editable={editableHere && statusOf(32) !== "generating"} c={t.preprod} />
+                  )
+                ) : statusOf(open) === "generating" ? (
+                  <MenabLoader size={20} label={p.writing} />
+                ) : editableHere && (statusOf(open) === "failed" || [20, 22, 31].some((n) => content[n])) ? (
+                  <PreprodTryAgain projectId={id} n={open} failed={statusOf(open) === "failed"} cost={approx(estimateUsd(model, "preprodPart"))} run={runCopy} c={t.creative.redo} />
+                ) : (
+                  <p className="body text-ink-muted m-0">{t.preprod.footer.start}</p>
                 )}
               </div>
             </section>
@@ -691,6 +739,9 @@ export default async function ProjectPage({
                           run={runCopy}
                         />
                       )}
+                      {showing === 4 && editableHere && [20, 22, 25, 26, 31, 32].includes(open) && Boolean(content[open]) && (
+                        <PreprodAssistant key={open} projectId={id} n={open} copy={p.change} cost={approx(estimateUsd(model, "preprodPart"))} mic={t.mic} run={runCopy} rewriteLabel={t.preprod.rewrite} />
+                      )}
                       {showing === 3 && editableHere && open >= 13 && open <= 18 && Boolean(content[open]) && (
                         <LookAssistant
                           key={open}
@@ -740,6 +791,26 @@ export default async function ProjectPage({
           }
           action={!stageTwoApproved && isReady(12) && stage === 2 ? "approve" : null}
           label={fill(t.stage.approve, { n: 2 })}
+        />
+      )}
+      {canEdit && showing === 4 && stage === 4 && (
+        <PreprodFooter
+          projectId={id}
+          stageNumber={4}
+          run={runCopy}
+          message={
+            stageFourApproved
+              ? t.preprod.footer.approved
+              : stageFour.some((x) => x.status === "generating")
+                ? t.preprod.footer.writing
+                : ![20, 22, 31].some((n) => content[n])
+                  ? t.preprod.footer.start
+                  : !isReady(28)
+                    ? t.preprod.footer.sign
+                    : t.preprod.footer.review
+          }
+          write={!stageFourApproved && ![20, 22, 31].some((n) => content[n]) && !stageFour.some((x) => x.status === "generating") ? { label: t.preprod.write, cost: approx(estimateUsd(model, "preprod")) } : null}
+          approve={!stageFourApproved && stageFour.filter((x) => !hidden.has(x.number)).every((x) => isReady(x.number)) ? fill(t.stage.approve, { n: order.indexOf(4) + 1 }) : null}
         />
       )}
       {canEdit && showing === 5 && stage === 5 && genData && (
@@ -817,6 +888,7 @@ function startsWhen(n: number, t: Dictionary): string {
   if (n === 10 || n === 11) return w.script;
   if (n === 12) return w.all;
   if (n >= 34 && n <= 38) return t.generate.startsWhen[n] ?? "";
+  if (n >= 20 && n <= 33) return t.preprod.startsWhen[n] ?? t.preprod.startsWhen[20];
   if (n >= 13 && n <= 16) return t.look.startsWhen.write;
   if (n === 18) return t.look.startsWhen.shots;
   if (n === 17) return t.look.startsWhen.frames;

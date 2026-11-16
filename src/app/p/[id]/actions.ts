@@ -269,7 +269,7 @@ export async function approveStage(projectId: string, stage: number): Promise<Re
 
 // Saves a person's edit as a new version. The earlier version is kept and can be restored.
 // Which outputs a person can edit by hand, per stage (approved stages are read only).
-const EDITABLE: Record<number, number[]> = { 1: [3, 4, 5, 6], 2: [7, 9, 10, 11], 3: [13, 14, 15, 16, 17, 18] };
+const EDITABLE: Record<number, number[]> = { 1: [3, 4, 5, 6], 2: [7, 9, 10, 11], 3: [13, 14, 15, 16, 17, 18], 4: [20, 22, 25, 26, 28, 31, 32] };
 
 export async function saveOutputEdit(projectId: string, number: number, content: unknown): Promise<Result> {
   try {
@@ -283,6 +283,8 @@ export async function saveOutputEdit(projectId: string, number: number, content:
       .maybeSingle();
     if (!o) return { error: "Step not found." };
     await saveVersion(supabase, o, content, "edit", me.userId, null);
+    // The PPM meeting is done only when the client signed off.
+    if (number === 28 && !(content as { signed?: boolean } | null)?.signed) await supabase.from("outputs").update({ status: "waiting" }).eq("id", o.id);
   } catch (e) {
     return { error: errText(e) };
   }

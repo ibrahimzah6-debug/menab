@@ -34,7 +34,7 @@ export async function loadDeck(projectId: string) {
   if (!me) return null;
 
   const [{ data: outs }, { data: kits }] = await Promise.all([
-    supabase.from("outputs").select("id, number, status, current_version, updated_at").eq("project_id", projectId).in("number", [13, 14, 15, 16, 17]),
+    supabase.from("outputs").select("id, number, status, current_version, updated_at").eq("project_id", projectId).in("number", [3, 6, 9, 10, 11, 13, 14, 15, 16, 17, 22, 25, 28, 31, 32]),
     supabase.from("brand_kits").select("name, logo_path, colors").eq("workspace_id", project.workspace_id).order("created_at", { ascending: true }).limit(1),
   ]);
   const withV = (outs ?? []).filter((o) => o.current_version > 0);
@@ -80,5 +80,29 @@ export async function loadDeck(projectId: string) {
     : ((content(17)?.frames as Omit<DeckFrame, "picture">[] | undefined) ?? []).map((f) => ({ ...f, picture: frames[f.n]?.url ?? null }));
 
   const updated = (outs ?? []).map((o) => o.updated_at as string).sort().pop() ?? null;
-  return { project, brand, characters, locations, storyboard, updated, hidden };
+
+  // Pre-production (M6): the documents that go into the PPM booklet, call sheets and CPS.
+  // Crew come from the company's directory; ID numbers are never loaded here.
+  const crewDoc = (content(22) ?? {}) as { members?: { crew_id: string; role: string }[]; needs?: { department: string; role: string; count: number }[] };
+  const ids = (crewDoc.members ?? []).map((m) => m.crew_id).filter((x) => /^[0-9a-f-]{36}$/i.test(x));
+  const { data: people } = ids.length ? await supabase.from("crew").select("id, name, role, department, phone").in("id", ids) : { data: [] as { id: string; name: string; role: string | null; department: string | null; phone: string | null }[] };
+  const crew = (crewDoc.members ?? []).map((m) => {
+    const p = people?.find((x) => x.id === m.crew_id);
+    return { crew_id: m.crew_id, name: p?.name ?? "", role: m.role || p?.role || "", department: p?.department ?? "", phone: p?.phone ?? "" };
+  }).filter((x) => x.name);
+  const extra = {
+    summary: content(3) as { title?: string; paragraphs?: string[] } | undefined,
+    cps: (content(6) as { cps?: { milestones?: { name: string; start: string; end: string; phase: string }[]; note?: string } } | undefined)?.cps,
+    script: (content(9) as { rows?: { scene: string; picture: string; sound: string; vo_ar?: string; vo_en?: string; seconds: number }[] } | undefined)?.rows ?? [],
+    treatment: content(10) as { idea?: string; tone?: string } | undefined,
+    mood: content(11) as { look?: string; palette?: { name: string; hex: string }[]; light?: string; camera?: string; grade?: string } | undefined,
+    wardrobe,
+    art,
+    crew,
+    permits: (content(25) as { permits?: { purpose: string; type: string; dates: string; drone: boolean; locations: { region: string; city: string; place: string }[] } } | undefined)?.permits,
+    meeting: content(28) as { client?: string; date?: string; signed?: boolean; changes?: string[] } | undefined,
+    schedule: (content(31) as { schedule?: { day: number; date: string; sets: { time: string; set: string; scene: string; int_ext: string; day_night: string; shots: number[]; cast: string[]; props: string[]; prep_minutes: number }[] }[] } | undefined)?.schedule ?? [],
+    callSheets: (content(32) as { call_sheets?: { day: number; date: string; crew_call: string; client_call: string; first_roll: string; meals: string; wrap: string; sunrise: string; sunset: string; weather: string; locations: { name: string; address: string; map_link: string; parking: string; contact: string }[]; nearest_hospital: string; safety: string[] }[] } | undefined)?.call_sheets ?? [],
+  };
+  return { project, brand, characters, locations, storyboard, updated, hidden, extra };
 }

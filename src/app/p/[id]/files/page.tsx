@@ -41,8 +41,11 @@ export default async function FilesPage({ params }: { params: Promise<{ id: stri
   const docs = [
     { key: "look-book", name: t.deck.lookBook, note: fill(f.lookNote, { c: deck.characters.length, l: deck.locations.length }), ready: deck.characters.length + deck.locations.length > 0, pictures: [...deck.characters, ...deck.locations].filter((x) => x.picture).length, total: deck.characters.length + deck.locations.length },
     { key: "storyboard", name: t.deck.storyboard, note: fill(f.boardNote, { n: deck.storyboard.length }), ready: deck.storyboard.length > 0, pictures: deck.storyboard.filter((x) => x.picture).length, total: deck.storyboard.length },
+    { key: "cps", name: "CPS", note: t.outputs[6], ready: Boolean(deck.extra.cps?.milestones?.length), pictures: 0, total: 0 },
+    { key: "ppm", name: t.outputs[27], note: t.preprod.intro[27], ready: deck.extra.crew.length > 0 || deck.extra.schedule.length > 0 || deck.storyboard.length > 0, pictures: 0, total: 0 },
+    ...deck.extra.callSheets.map((c) => ({ key: `call-sheet-${c.day}`, name: t.preprod.calls.day.replace("{n}", String(c.day)).replace("{total}", String(deck.extra.callSheets.length)), note: c.date, ready: true, pictures: 0, total: 0 })),
   ];
-  const later = [t.outputs[10], t.outputs[6], t.outputs[27], t.outputs[32]];
+  const later = [t.outputs[10]];
   const groups = [
     { key: "characters", label: t.deck.characters },
     { key: "locations", label: t.deck.locations },
