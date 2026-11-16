@@ -25,6 +25,11 @@ export type RunCopy = {
     drawingRef?: string;
     drawnRef?: string;
     drawRefFailed?: string;
+    genStart?: string;
+    genDone?: string;
+    genBackup?: string;
+    genFailed?: string;
+    genLater?: string;
   };
 };
 type Ev = { t: string; at?: number; [k: string]: unknown };
@@ -36,7 +41,9 @@ type Action =
   | { kind: "docs"; instruction?: string }
   | { kind: "look"; action: { kind: "write" } | { kind: "redo"; n: number } | { kind: "revise"; n: number; instruction: string } }
   | { kind: "frames"; frames: number[]; style: "sketch" | "photo"; model: string; aspect: string }
-  | { kind: "refs"; refs: "character" | "location"; names: string[]; model: string };
+  | { kind: "refs"; refs: "character" | "location"; names: string[]; model: string }
+  | { kind: "gen"; body: Record<string, unknown> }
+  | { kind: "preprod"; action: { kind: "write" } | { kind: "redo"; n: number } | { kind: "revise"; n: number; instruction: string } };
 
 const fillIn = (s: string, v: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? ""));
 
@@ -69,6 +76,12 @@ function lineOf(e: Ev, c: RunCopy) {
       return fillIn(c.steps.drawnRef ?? "", { name: String(e.name ?? "") });
     case "drawRefFailed":
       return fillIn(c.steps.drawRefFailed ?? "", { name: String(e.name ?? ""), reason: String(e.reason ?? "") });
+    case "genStart":
+    case "genDone":
+    case "genBackup":
+    case "genFailed":
+    case "genLater":
+      return fillIn(c.steps[e.t] ?? "", { label: String(e.label ?? ""), model: String(e.model ?? ""), from: String(e.from ?? ""), to: String(e.to ?? ""), reason: String(e.reason ?? "") });
     case "saved":
       return fillIn(c.steps.saved, { name: name(e.n) });
     default:
@@ -98,8 +111,8 @@ export function useCreativeRun(projectId: string, c: RunCopy) {
     let failure: string | undefined;
     let finished = false;
     try {
-      const endpoint = action.kind === "docs" ? "documents" : action.kind === "look" ? "look" : action.kind === "frames" || action.kind === "refs" ? "frames" : "creative";
-      const payload = action.kind === "docs" ? { instruction: action.instruction } : action.kind === "look" ? action.action : action.kind === "refs" ? { refs: action.refs, names: action.names, model: action.model } : action;
+      const endpoint = action.kind === "docs" ? "documents" : action.kind === "look" ? "look" : action.kind === "frames" || action.kind === "refs" ? "frames" : action.kind === "gen" ? "generate" : action.kind === "preprod" ? "preprod" : "creative";
+      const payload = action.kind === "docs" ? { instruction: action.instruction } : action.kind === "look" || action.kind === "preprod" ? action.action : action.kind === "refs" ? { refs: action.refs, names: action.names, model: action.model } : action.kind === "gen" ? action.body : action;
       const res = await fetch(`/p/${projectId}/${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -125,7 +138,7 @@ export function useCreativeRun(projectId: string, c: RunCopy) {
             failure = String(e.message);
           } else {
             setEvents((x) => [...x, { ...e, at: Date.now() - start }]);
-            if (e.t === "saved" || e.t === "drawn" || e.t === "drawnRef") router.refresh();
+            if (e.t === "saved" || e.t === "drawn" || e.t === "drawnRef" || e.t === "genDone") router.refresh();
           }
         }
       }

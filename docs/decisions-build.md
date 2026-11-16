@@ -207,3 +207,44 @@ Replaces B4.
 - **How the PDF is made:** each document is a designed print page, saved from the browser's print window ("Save as PDF"). This keeps Arabic text, fonts and pictures exact and costs nothing to run. A server-made PDF can come later if needed.
 - **Brand:** the company's first brand kit in Libraries gives the logo and accent colour (a colour too light to read is skipped); without one, the neutral Menab style (B25).
 - Steps hidden by the video type are left out of the documents.
+
+## B27. Look approval and the M5 plan for characters (Ibrahim, 15 Nov 2026)
+
+- The look is approved in three steps: the stage 3 character and location pictures, the storyboard that follows them, and the M5 reference lock, which is final before any video.
+- Added to M5: digital actors (I29), outfit pictures only when clothes change (I30), and the consent rule for real people (I31).
+
+## B28. Music in M5 (Ibrahim, 15 Nov 2026)
+
+- Music is generated in the Generate stage, next to Voice, as M5's last step (I25, point 2): Menab makes the track with Suno on Kie.ai from the music feeling in the Creative stage, with the price shown first, so short videos (ads, UGC, faceless) come out complete. Suno's commercial-use terms are checked while it is built, and each track is listed in the rights record. Final music licensing and the sound mix stay in the Edit stage (v2). mvp-definition.md is updated to match.
+
+## B29. M5, first part: the Generate stage (15 Nov 2026)
+
+- **One table for everything made in M5** (`gen_assets`): digital actor sheets, outfit pictures, keyframes, clips, voice lines and the music track. Each job's Kie.ai task id is saved the moment it starts, so a clip that takes longer than one request is collected the next time the page loads (or while it refreshes), never lost and never paid twice.
+- **34 Reference lock:** each AI character gets a digital actor sheet (front, side and four expressions) made from its stage 3 picture, outfit pictures only when clothes change between scenes, a voice, plus a narrator voice and the frame shape. "Lock the references" is required before keyframes; real people's photos (library characters) need the consent box ticked first.
+- **35 Keyframes:** one final picture per shot on Nano Banana Pro, from the locked sheets, outfits and location pictures.
+- **36 Video shots:** one clip per shot from its keyframe; Kling 3.0 by default (std, 3 to 15 sec, no sound), Seedance 2.5 as the backup, Veo 3.1 Fast as an option; the prompt of each clip can be edited before making it again.
+- **37 Voice and music:** the voiceover lines from the script in the narrator's voice (ElevenLabs Multilingual v2, 13 chosen voices), and an instrumental Suno V6 track from the music feeling (B28).
+- **38 Shot review:** approve each clip or reopen it; the stage approves when the references are locked and every shot has an approved clip.
+- Prices shown first: Nano Banana Pro about $0.09 a picture, Kling 3.0 $0.07 a second, ElevenLabs $0.03 per 1,000 characters, Suno about $0.06 a track; the real cost is read back from Kie.ai.
+- **Still to come in M5:** talking avatars (lip-sync with Kling AI Avatar Pro or Infinitalk) for characters who speak to camera, character voices for dialogue lines, saving digital actors to Libraries, and the stage 5 board cards.
+
+## B30. M5, second part (16 Nov 2026)
+
+- **Dialogue in the speaker's voice:** a line a character says on screen (a shot's dialogue that is not voiceover) is made in that character's own voice from the reference lock, listed under Dialogue in Voice (37).
+- **Talking avatars (lip-sync):** in Video shots (36), Kling AI Avatar Pro (about $0.04 a second) or Infinitalk (about $0.015 a second, 480p) make the person in the keyframe say the shot's dialogue line; each is the other's backup. They need the dialogue line first.
+- **Save to Libraries:** each character with a picture can be saved to the company's Libraries: its digital actor sheet, stage 3 picture and outfit pictures are copied there, with its look, outfits and voice, so the same face can return in the client's next project. A character already saved under the same name is updated.
+- **Board and Files:** the Generate stage shows on the board with counts and keyframe thumbnails; the Files page lists actor sheets, keyframes, clips, voice lines and the music track to download.
+
+## B31. M6: Pre-production (16 Nov 2026)
+
+- **Crew directory** (Team, Crew): department, role, phone, GAMR registration status and number, and the national ID or iqama number. IDs are encrypted in the database with pgcrypto, the key kept in Supabase Vault (nothing for Ibrahim to set up); the app cannot read the encrypted column; the last 4 digits show to everyone and the full number only to Admins and Coordinators through a logged database function; every set, view, clear and export is in `id_access_log` (Admins can read it). IDs are never part of an AI prompt.
+- **Stage 4 documents written by AI**, three calls side by side: budget and quote (20) with the equipment list (26); crew needs (22) with the GAMR filming permit data (25); the shooting schedule (31) with one call sheet per day (32). Budget totals, contingency, fee and 15% VAT are recomputed by Menab, never trusted from the model. The producer adds the project's crew from the directory; anyone not registered with GAMR is flagged.
+- **PPM booklet (27)** is assembled from the approved work in the Bogshah and NOVA order; **PPM meeting (28)** records the client attendee, date, changes and sign-off; the stage approves only after the sign-off.
+- **Branded PDFs** (Files and the stage screens): PPM booklet, CPS as a Sunday to Saturday calendar, one call sheet per day (times, locations with map links, nearest hospital, emergency numbers 911, 997, 998, 999, safety checklist, crew by department, sets), and the permit sheet, where ID numbers are added only at export (full for Admins and Coordinators, masked for others, each export logged).
+- **Budget template:** built from industry budget practice adapted to Saudi production, as mvp-definition.md allows; ZAH's own template can replace it when Ibrahim shares it.
+- Measured on a test project: the three calls finished in about 110 seconds; one call failed on GPT 6.1 Sol and its backup once and wrote in 24 seconds on "Try again".
+
+## B32. The website (16 Nov 2026)
+
+- A visitor who is not signed in sees the website at menab.si; a signed-in person goes to Home. It follows the brand book's dark cinematic face: one isometric line drawing built from the folded Menab "M" as a box, hairlines with dashed hidden edges and one filled face. The hero shows the folded strip; the walkthrough draws a small production set for each of the seven stages as the visitor scrolls or presses a stage (a laptop with the brief chat and a microphone; the directions board with the Menab AI cursor; a storyboard easel with a lamp; a clapperboard and the shoot calendar; a film camera on a tripod with a light and a film strip; an edit monitor with a timeline; the delivery box with a play button), and shows that stage's screen (the designed stills for now; short clips of the real screens can replace them later). The orange accent appears once, on "Start your project". English and Arabic, with the layout mirrored. Reduced motion shows the drawings without animation.
+- Public sign-up stays later (mvp-definition.md): the calls to action lead to the invitation login. "Start your project" goes on to /start after login, which opens a new project's brief chat at once (Admins and Producers; others land on their projects).

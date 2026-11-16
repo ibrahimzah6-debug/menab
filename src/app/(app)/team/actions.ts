@@ -126,3 +126,70 @@ export async function removeMember(memberId: string): Promise<{ error?: TeamErro
   if (!count) return { error: "failed" };
   return {};
 }
+
+// ---------- Crew directory (M6) ----------
+// ID numbers never pass through these as plain columns: they go to set_crew_id, which encrypts
+// them in the database, and come back only through reveal_crew_id, which logs every view.
+
+type CrewResult = { error?: string; value?: string | null };
+const CREW_FIELDS = ["name", "role", "department", "phone", "email", "gamr_status", "gamr_number", "notes"] as const;
+const GAMR = ["registered", "pending", "not_registered", "unknown"];
+
+export async function addCrew(input: { name: string; role?: string; department?: string; phone?: string; gamr_status?: string }): Promise<CrewResult> {
+  const me = await getCurrentMember();
+  if (!me || !["admin", "producer", "coordinator"].includes(me.role)) return { error: "Only editors can change the crew." };
+  const name = input.name?.trim().slice(0, 120);
+  if (!name) return { error: "Add a name." };
+  const supabase = await createClient();
+  const { error } = await supabase.from("crew").insert({
+    workspace_id: me.workspace.id,
+    name,
+    role: input.role?.trim().slice(0, 120) || null,
+    department: input.department?.slice(0, 60) || null,
+    phone: input.phone?.trim().slice(0, 40) || null,
+    gamr_status: GAMR.includes(input.gamr_status ?? "") ? input.gamr_status : "unknown",
+  });
+  if (error) return { error: error.message };
+  revalidatePath("/team");
+  return {};
+}
+
+export async function updateCrew(id: string, patch: Partial<Record<(typeof CREW_FIELDS)[number], string>>): Promise<CrewResult> {
+  const me = await getCurrentMember();
+  if (!me || !["admin", "producer", "coordinator"].includes(me.role)) return { error: "Only editors can change the crew." };
+  const row: Record<string, string | null> = {};
+  for (const k of CREW_FIELDS) if (k in patch) row[k] = (patch[k] ?? "").trim().slice(0, k === "notes" ? 2000 : 200) || null;
+  if ("gamr_status" in row && !GAMR.includes(row.gamr_status ?? "")) row.gamr_status = "unknown";
+  if ("name" in row && !row.name) return { error: "Add a name." };
+  const supabase = await createClient();
+  const { error } = await supabase.from("crew").update({ ...row, updated_at: new Date().toISOString() }).eq("id", id).eq("workspace_id", me.workspace.id);
+  if (error) return { error: error.message };
+  revalidatePath("/team");
+  return {};
+}
+
+export async function deleteCrew(id: string): Promise<CrewResult> {
+  const me = await getCurrentMember();
+  if (!me || !["admin", "producer", "coordinator"].includes(me.role)) return { error: "Only editors can change the crew." };
+  const supabase = await createClient();
+  const { error } = await supabase.from("crew").delete().eq("id", id).eq("workspace_id", me.workspace.id);
+  if (error) return { error: error.message };
+  revalidatePath("/team");
+  return {};
+}
+
+export async function setCrewId(id: string, value: string): Promise<CrewResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_crew_id", { p_crew: id, id_number: value });
+  if (error) return { error: error.message.includes("10 digits") ? "A national ID or iqama number has 10 digits and starts with 1 or 2." : "Not allowed." };
+  revalidatePath("/team");
+  return {};
+}
+
+// Admins and Coordinators only; the database logs the view.
+export async function revealCrewId(id: string): Promise<CrewResult> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("reveal_crew_id", { p_crew: id, purpose: "view" });
+  if (error) return { error: "Only Admins and Coordinators can see full ID numbers." };
+  return { value: (data as string | null) ?? null };
+}

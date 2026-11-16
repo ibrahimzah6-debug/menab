@@ -49,7 +49,8 @@ export async function runStageOne(projectId: string, instruction: string | undef
   let result;
   try {
     const today = new Date().toISOString().slice(0, 10);
-    const language = brief.language?.toLowerCase().includes("arab") || locale === "ar" ? "Arabic (Saudi), with names of deliverables in English where usual" : "English";
+    // Documents follow the person's app language; the video's own language is a brief field.
+    const language = locale === "ar" ? "Arabic (Saudi), with names of deliverables in English where usual" : "English";
     // A rewrite with an instruction revises the current documents instead of starting over.
     let revise: { instruction: string; current: unknown } | undefined;
     const clean = instruction?.trim().slice(0, 2000);

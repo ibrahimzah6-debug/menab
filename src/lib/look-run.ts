@@ -54,7 +54,8 @@ export async function runLook(
 
   const brief = (project.brief ?? {}) as Partial<BriefFields>;
   const seconds = Number(brief.length_seconds) || 30;
-  const language = brief.language?.toLowerCase().includes("arab") || locale === "ar" ? "Arabic (Saudi), with English names for shot sizes and camera terms" : "English";
+  // Documents follow the person's app language; dialogue keeps the script's language.
+  const language = locale === "ar" ? "Arabic (Saudi), with English names for shot sizes and camera terms; dialogue as in the script" : "English; dialogue as in the script";
   const directions = (content(7) as { directions?: unknown[] } | undefined)?.directions ?? [];
   const meeting = (content(8) ?? {}) as { chosen?: number; notes?: string };
   const [{ data: ws }, { data: libChars }, { data: libPlaces }] = await Promise.all([

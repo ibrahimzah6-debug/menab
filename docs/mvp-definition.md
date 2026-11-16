@@ -15,7 +15,7 @@ Output numbers refer to the [Workflow Map](https://claude.ai/artifact/7znRgQTfC8
 | Creative (7 to 12) | Directions, meeting notes, AV script, treatment, visual mood, approval | None |
 | Look and characters (13 to 18) | Characters, wardrobe, locations, art direction, storyboard (sketch or photo-real), shot list | Animatic (19) |
 | Pre-production (20 to 32) | Budget, crew list with GAMR registration, permit data, equipment, PPM booklet, PPM sign-off, shooting schedule, call sheets | Award (21), casting (23), scouting (24), recce (29), fittings (30), pre-light (33) |
-| Generate (34 to 38) | Reference lock, keyframes, video shots, voice, shot review, model switch, editable prompts | Music generation in the app |
+| Generate (34 to 38) | Reference lock, keyframes, video shots, voice, music track (B28), shot review, model switch, editable prompts | Final music licensing and the sound mix (Edit stage, v2) |
 | Shoot (34 to 38) | None | Shoot day, continuity, rushes, daily report, selects |
 | Edit (39 to 49) | None; shots are exported | Built-in editor in v2, AI effects in v3 |
 | Deliver (50 to 55) | Export (PDF, Excel, zip), rights record, archive, optional GAMR approval step | Cutdowns and QC tools (v2) |

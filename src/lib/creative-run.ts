@@ -55,7 +55,10 @@ export async function runCreative(
   };
 
   const brief = (project.brief ?? {}) as Partial<BriefFields>;
-  const language = brief.language?.toLowerCase().includes("arab") || locale === "ar" ? "Arabic (Saudi dialect for VO and dialogue), with English beside it" : "English, with the VO and dialogue also in Saudi dialect Arabic";
+  // Documents follow the person's app language; the VO and dialogue follow the brief's language.
+  const voArabic = (brief.language ?? "").toLowerCase().includes("arab");
+  const vo = voArabic ? "Saudi dialect Arabic in vo_ar, with an English translation in vo_en" : `${brief.language || "English"} in vo_en, and leave vo_ar empty`;
+  const language = `${locale === "ar" ? "Arabic (Saudi)" : "English"}. Voiceover and dialogue: ${vo}`;
   const { data: ws } = await supabase.from("workspaces").select("memory_on").eq("id", project.workspace_id).maybeSingle();
   const memory = ws?.memory_on === false ? [] : ((await supabase.from("memories").select("content").eq("workspace_id", project.workspace_id).order("created_at", { ascending: false }).limit(40)).data ?? []).map((r) => r.content as string);
   const onStep = (s: Step) => {

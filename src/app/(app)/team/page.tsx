@@ -5,9 +5,10 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember, type Role } from "@/lib/workspace";
 import { InviteForm } from "./invite-form";
 import { MemberAdminCells } from "./member-row-actions";
+import { CrewSection } from "./crew-section";
 
 export default async function TeamPage() {
-  const { t } = await getI18n();
+  const { t, locale } = await getI18n();
   const me = await getCurrentMember();
   if (!me) return null;
   const isAdmin = me.role === "admin";
@@ -18,6 +19,12 @@ export default async function TeamPage() {
     .select("id, user_id, email, full_name, role, status")
     .eq("workspace_id", me.workspace.id)
     .order("created_at", { ascending: true });
+  const { data: crew } = await supabase
+    .from("crew")
+    .select("id, name, role, department, phone, gamr_status, gamr_number, id_last4")
+    .eq("workspace_id", me.workspace.id)
+    .order("department", { ascending: true })
+    .order("name", { ascending: true });
 
   return (
     <div className="max-w-[1040px] flex flex-col gap-6">
@@ -79,6 +86,13 @@ export default async function TeamPage() {
           </p>
         ))}
       </section>
+      <CrewSection
+        crew={crew ?? []}
+        c={t.team.crew}
+        lang={locale === "ar" ? "ar" : "en"}
+        canEdit={["admin", "producer", "coordinator"].includes(me.role)}
+        canReveal={["admin", "coordinator"].includes(me.role)}
+      />
     </div>
   );
 }

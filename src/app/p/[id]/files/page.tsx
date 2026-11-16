@@ -18,14 +18,16 @@ export default async function FilesPage({ params }: { params: Promise<{ id: stri
   const supabase = await createClient();
 
   // Every drawn picture, newest first, with a download link.
-  const [{ data: frames }, { data: look }] = await Promise.all([
+  const [{ data: frames }, { data: look }, { data: made }] = await Promise.all([
     supabase.from("frame_images").select("n, version, path, created_at").eq("project_id", id).eq("status", "ready").order("n").order("version", { ascending: false }),
     supabase.from("look_images").select("kind, key, version, path, created_at").eq("project_id", id).eq("status", "ready").order("kind").order("version", { ascending: false }),
+    supabase.from("gen_assets").select("kind, key, version, path").eq("project_id", id).eq("status", "ready").order("kind").order("key").order("version", { ascending: false }),
   ]);
   const prefix = `${deck.project.workspace_id}/projects/${id}/`;
   const items = [
     ...(look ?? []).map((r) => ({ path: r.path as string, label: `${r.kind === "character" ? t.deck.character : t.deck.location}: ${r.key}`, file: `${r.kind}-${r.key}-v${r.version}`, group: r.kind === "character" ? "characters" : "locations" })),
     ...(frames ?? []).map((r) => ({ path: r.path as string, label: `${t.outputs[17]} ${String(r.n).padStart(2, "0")} · v${r.version}`, file: `frame-${r.n}-v${r.version}`, group: "storyboard" })),
+    ...(made ?? []).map((r) => ({ path: r.path as string, label: `${r.kind === "music" ? t.generate.music : r.kind === "voice" ? r.key : r.kind === "sheet" ? `${t.generate.sheet}: ${r.key}` : r.kind === "outfit" ? `${t.generate.outfits}: ${r.key.replace("|", ", ")}` : fill(t.generate.shot, { n: r.key })} · v${r.version}`, file: `${r.kind}-${r.key}-v${r.version}`.replace(/[^a-z0-9\u0600-\u06ff-]+/gi, "-"), group: r.kind === "clip" ? "clips" : r.kind === "keyframe" ? "keyframes" : r.kind === "voice" || r.kind === "music" ? "sound" : "actors" })),
   ].filter((x) => x.path?.startsWith(prefix) && !x.path.includes(".."));
   const links = new Map<string, { view: string; download: string }>();
   try {
@@ -39,12 +41,19 @@ export default async function FilesPage({ params }: { params: Promise<{ id: stri
   const docs = [
     { key: "look-book", name: t.deck.lookBook, note: fill(f.lookNote, { c: deck.characters.length, l: deck.locations.length }), ready: deck.characters.length + deck.locations.length > 0, pictures: [...deck.characters, ...deck.locations].filter((x) => x.picture).length, total: deck.characters.length + deck.locations.length },
     { key: "storyboard", name: t.deck.storyboard, note: fill(f.boardNote, { n: deck.storyboard.length }), ready: deck.storyboard.length > 0, pictures: deck.storyboard.filter((x) => x.picture).length, total: deck.storyboard.length },
+    { key: "cps", name: "CPS", note: t.outputs[6], ready: Boolean(deck.extra.cps?.milestones?.length), pictures: 0, total: 0 },
+    { key: "ppm", name: t.outputs[27], note: t.preprod.intro[27], ready: deck.extra.crew.length > 0 || deck.extra.schedule.length > 0 || deck.storyboard.length > 0, pictures: 0, total: 0 },
+    ...deck.extra.callSheets.map((c) => ({ key: `call-sheet-${c.day}`, name: t.preprod.calls.day.replace("{n}", String(c.day)).replace("{total}", String(deck.extra.callSheets.length)), note: c.date, ready: true, pictures: 0, total: 0 })),
   ];
-  const later = [t.outputs[10], t.outputs[6], t.outputs[27], t.outputs[32]];
+  const later = [t.outputs[10]];
   const groups = [
     { key: "characters", label: t.deck.characters },
     { key: "locations", label: t.deck.locations },
     { key: "storyboard", label: t.deck.storyboard },
+    { key: "actors", label: t.outputs[34] },
+    { key: "keyframes", label: t.outputs[35] },
+    { key: "clips", label: t.outputs[36] },
+    { key: "sound", label: t.outputs[37] },
   ];
 
   return (
@@ -97,8 +106,14 @@ export default async function FilesPage({ params }: { params: Promise<{ id: stri
                   return (
                     <figure key={x.path} className="m-0 rounded-md border border-line overflow-hidden bg-surface flex flex-col">
                       <div className="bg-ground-deep" style={{ aspectRatio: "16 / 9" }}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        {l && <img src={l.view} alt={x.label} className="w-full h-full object-cover" loading="lazy" />}
+                        {l && (/\.(mp4|webm|mov)$/i.test(x.path) ? (
+                          <video src={l.view} controls preload="metadata" className="w-full h-full object-cover" />
+                        ) : /\.(mp3|wav|m4a|ogg)$/i.test(x.path) ? (
+                          <div className="w-full h-full grid place-items-center px-2"><audio src={l.view} controls className="w-full" /></div>
+                        ) : (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={l.view} alt={x.label} className="w-full h-full object-cover" loading="lazy" />
+                        ))}
                       </div>
                       <figcaption className="flex items-center gap-2 px-2.5 py-2">
                         <span className="text-[12px] grow truncate" dir="auto">{x.label}</span>

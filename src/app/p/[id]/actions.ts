@@ -11,6 +11,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember, getMemberships } from "@/lib/workspace";
 import { hiddenOutputs, videoType } from "@/lib/video-types";
+import { stageFive, syncOutputs } from "@/lib/generate";
+import { VOICES } from "@/lib/ai/media";
 import { FILE_TYPES, loadProject, ownPath, runBriefMessage, type BriefPayload } from "@/lib/brief-turn";
 
 export type Result = { error?: string };
@@ -222,6 +224,14 @@ export async function approveStage(projectId: string, stage: number): Promise<Re
     if (!needed.every((n) => ready.includes(n))) return { error: t.project.notReady };
     if (stage === 1 && !project.path) return { error: t.project.choosePathFirst };
     // M4: every shot in the storyboard has a drawn frame.
+    // M5: the references are locked and every shot's clip is approved.
+    if (stage === 5) {
+      const doc = await stageFive(supabase, projectId);
+      if (!doc.lock.locked) return { error: t.generate.lockFirst };
+      const { data: clips } = await supabase.from("gen_assets").select("key").eq("project_id", projectId).eq("kind", "clip").eq("status", "ready").eq("approved", true);
+      const ok = new Set((clips ?? []).map((c) => c.key));
+      if (!doc.shots.length || !doc.shots.every((s) => ok.has(String(s.n)))) return { error: t.project.notReady };
+    }
     if (stage === 3 && !hidden.has(17)) {
       const { data: sb } = await supabase.from("outputs").select("id, current_version").eq("project_id", projectId).eq("number", 17).maybeSingle();
       const { data: v } = sb ? await supabase.from("versions").select("content").eq("output_id", sb.id).eq("version", sb.current_version).maybeSingle() : { data: null };
@@ -259,7 +269,7 @@ export async function approveStage(projectId: string, stage: number): Promise<Re
 
 // Saves a person's edit as a new version. The earlier version is kept and can be restored.
 // Which outputs a person can edit by hand, per stage (approved stages are read only).
-const EDITABLE: Record<number, number[]> = { 1: [3, 4, 5, 6], 2: [7, 9, 10, 11], 3: [13, 14, 15, 16, 17, 18] };
+const EDITABLE: Record<number, number[]> = { 1: [3, 4, 5, 6], 2: [7, 9, 10, 11], 3: [13, 14, 15, 16, 17, 18], 4: [20, 22, 25, 26, 28, 31, 32] };
 
 export async function saveOutputEdit(projectId: string, number: number, content: unknown): Promise<Result> {
   try {
@@ -273,6 +283,8 @@ export async function saveOutputEdit(projectId: string, number: number, content:
       .maybeSingle();
     if (!o) return { error: "Step not found." };
     await saveVersion(supabase, o, content, "edit", me.userId, null);
+    // The PPM meeting is done only when the client signed off.
+    if (number === 28 && !(content as { signed?: boolean } | null)?.signed) await supabase.from("outputs").update({ status: "waiting" }).eq("id", o.id);
   } catch (e) {
     return { error: errText(e) };
   }
@@ -375,5 +387,97 @@ export async function chooseVideoType(projectId: string, typeId: string): Promis
     return { error: errText(e) };
   }
   revalidatePath(`/p/${projectId}`);
+  return {};
+}
+
+// ---------- Stage 5, Generate ----------
+
+// The reference lock (output 34): voices, frame shape, consent, and the lock itself. Once
+// locked, every keyframe and clip follows these references.
+export async function saveReferenceLock(projectId: string, patch: { narrator?: string; voices?: Record<string, string>; aspect?: string; consent?: boolean; locked?: boolean }): Promise<Result> {
+  const { t } = await getI18n();
+  try {
+    const { me, supabase, project } = await loadProject(projectId);
+    if (project.current_stage !== 5) return { error: t.project.notCurrentStage };
+    const { data: o } = await supabase.from("outputs").select("id, workspace_id, current_version").eq("project_id", projectId).eq("number", 34).maybeSingle();
+    if (!o) return { error: "Step not found." };
+    const { data: v } = o.current_version ? await supabase.from("versions").select("content").eq("output_id", o.id).eq("version", o.current_version).maybeSingle() : { data: null };
+    const current = (v?.content ?? {}) as Record<string, unknown>;
+    if (current.locked && patch.locked !== false && patch.locked !== true) return { error: t.generate.lockedNote };
+    const next = { ...current, ...patch, voices: { ...((current.voices as object) ?? {}), ...(patch.voices ?? {}) } };
+    if (patch.locked) {
+      // Real people's photos need their written consent first (B27).
+      const doc = await stageFive(supabase, projectId);
+      if (doc.characters.some((c) => c.library_id) && !next.consent) return { error: t.generate.consentFirst };
+    }
+    await saveVersion(supabase, o, next, "edit", me.userId, null, next.locked ? "ready" : "edited");
+    // The step is done only when locked.
+    if (!next.locked) await supabase.from("outputs").update({ status: "waiting" }).eq("id", o.id);
+  } catch (e) {
+    return { error: errText(e) };
+  }
+  revalidatePath(`/p/${projectId}`);
+  return {};
+}
+
+// Shot review (output 38): approve or reopen the newest clip of a shot.
+export async function approveClip(projectId: string, n: number, approved: boolean): Promise<Result> {
+  const { t } = await getI18n();
+  try {
+    const { supabase, project } = await loadProject(projectId);
+    if (project.current_stage !== 5) return { error: t.project.notCurrentStage };
+    const { data: rows } = await supabase.from("gen_assets").select("id").eq("project_id", projectId).eq("kind", "clip").eq("key", String(n)).eq("status", "ready").order("version", { ascending: false }).limit(1);
+    if (!rows?.length) return { error: t.generate.noClip };
+    const admin = createAdminClient();
+    await admin.from("gen_assets").update({ approved: false }).eq("project_id", projectId).eq("kind", "clip").eq("key", String(n));
+    if (approved) await admin.from("gen_assets").update({ approved: true, updated_at: new Date().toISOString() }).eq("id", rows[0].id);
+    await syncOutputs(admin, projectId);
+  } catch (e) {
+    return { error: errText(e) };
+  }
+  revalidatePath(`/p/${projectId}`);
+  return {};
+}
+
+// Saves a digital actor (its sheet, stage 3 picture, outfit pictures, look and voice) to the
+// company's Libraries, so the same face can come back in the client's next project (I29).
+export async function saveActorToLibrary(projectId: string, name: string): Promise<Result> {
+  const { t } = await getI18n();
+  try {
+    const { supabase, project } = await loadProject(projectId);
+    const doc = await stageFive(supabase, projectId);
+    const c = doc.characters.find((x) => x.name.trim().toLowerCase() === name.trim().toLowerCase());
+    if (!c) return { error: "Character not found." };
+    const key = c.name.trim().toLowerCase().slice(0, 200);
+    const [{ data: gen }, { data: look }] = await Promise.all([
+      supabase.from("gen_assets").select("kind, key, path, version").eq("project_id", projectId).in("kind", ["sheet", "outfit"]).eq("status", "ready").order("version", { ascending: false }),
+      supabase.from("look_images").select("key, path, version").eq("project_id", projectId).eq("kind", "character").eq("key", key).eq("status", "ready").order("version", { ascending: false }).limit(1),
+    ]);
+    const firstOf = new Map<string, string>();
+    for (const r of gen ?? []) if (r.path && !firstOf.has(`${r.kind}:${r.key}`)) firstOf.set(`${r.kind}:${r.key}`, r.path);
+    const sources = [firstOf.get(`sheet:${key}`), look?.[0]?.path, ...[...firstOf.entries()].filter(([k]) => k.startsWith(`outfit:${key}|`)).map(([, p]) => p)].filter((p): p is string => Boolean(p && p.startsWith(`${project.workspace_id}/projects/${projectId}/`) && !p.includes("..")));
+    if (!sources.length) return { error: t.generate.noPicture };
+    const admin = createAdminClient();
+    const paths: string[] = [];
+    for (const [i, from] of sources.slice(0, 12).entries()) {
+      const to = `${project.workspace_id}/library/actor-${Date.now()}-${i}.${from.split(".").pop() ?? "jpg"}`;
+      const { error } = await admin.storage.from("media").copy(from, to);
+      if (!error) paths.push(to);
+    }
+    if (!paths.length) return { error: "Could not copy the pictures." };
+    const voiceId = doc.lock.voices?.[key];
+    const voice = voiceId ? `ElevenLabs ${VOICES.find((v) => v.id === voiceId)?.name ?? ""} (${voiceId})` : null;
+    const outfits = doc.wardrobe.filter((w) => w.character.trim().toLowerCase() === key).map((w) => `${w.scene}: ${w.outfit}`).join("\n");
+    const row = { name: c.name.slice(0, 120), description: (c.role ?? "").slice(0, 4000), age: (c.age ?? "").slice(0, 60), look: (c.look ?? "").slice(0, 4000), wardrobe: outfits.slice(0, 4000), voice, image_paths: paths, updated_at: new Date().toISOString() };
+    const { data: existing } = await supabase.from("characters").select("id").eq("workspace_id", project.workspace_id).eq("name", row.name).limit(1);
+    const res = existing?.length
+      ? await supabase.from("characters").update(row).eq("id", existing[0].id)
+      : await supabase.from("characters").insert({ ...row, workspace_id: project.workspace_id });
+    if (res.error) return { error: res.error.message };
+  } catch (e) {
+    return { error: errText(e) };
+  }
+  revalidatePath(`/p/${projectId}`);
+  revalidatePath("/libraries");
   return {};
 }

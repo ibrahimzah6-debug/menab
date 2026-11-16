@@ -102,6 +102,9 @@ export const TYPICAL_TOKENS = {
   // Estimated from the creative stage's calls until the AI log has real ones.
   look: { in: 30000, out: 11000 },
   lookPart: { in: 11000, out: 4500 },
+  // Stage 4: budget, crew and permits, schedule and call sheets (three calls), and one again.
+  preprod: { in: 33000, out: 16000 },
+  preprodPart: { in: 11000, out: 6000 },
 } as const;
 export function estimateUsd(modelId: string, action: keyof typeof TYPICAL_TOKENS) {
   const m = textModel(modelId);
