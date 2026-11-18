@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Path } from "@/lib/projects";
-import { approveStage, choosePath, writeBriefDocuments, type Result } from "./actions";
+import { approveStage, choosePath, reopenStage, writeBriefDocuments, type Result } from "./actions";
 
 function useRun() {
   const router = useRouter();
@@ -120,5 +120,20 @@ export function StageFooter({
         </button>
       )}
     </footer>
+  );
+}
+
+// Reopens an approved stage, after a confirmation that says nothing later is deleted.
+export function ReopenStage({ projectId, stage, label, confirm, yes, no }: { projectId: string; stage: number; label: string; confirm: string; yes: string; no: string }) {
+  const { pending, error, run } = useRun();
+  const [asking, setAsking] = useState(false);
+  if (!asking) return <button type="button" className="mn-btn mn-btn--secondary" onClick={() => setAsking(true)}>{label}</button>;
+  return (
+    <div className="flex flex-wrap items-center gap-2 basis-full md:basis-auto" role="alertdialog" aria-label={label}>
+      <span className="small max-w-[560px]">{confirm}</span>
+      <button type="button" className="mn-btn mn-btn--secondary" disabled={pending} onClick={() => run(() => reopenStage(projectId, stage), false, `/p/${projectId}`)}>{yes}</button>
+      <button type="button" className="mn-btn mn-btn--ghost" disabled={pending} onClick={() => setAsking(false)}>{no}</button>
+      {error && <span className="small" role="alert">{error}</span>}
+    </div>
   );
 }

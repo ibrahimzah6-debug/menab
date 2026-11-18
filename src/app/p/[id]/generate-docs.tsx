@@ -23,7 +23,8 @@ export type GenData = {
   shots: { n: number; action: string; size: string; movement: string; seconds: number; dialogue: string; frame: string | null }[];
   lines: { key: string; text: string }[];
   dialogue: { key: string; n: number; speaker: string; text: string }[];
-  lock: { locked?: boolean; consent?: boolean; narrator?: string; voices?: Record<string, string>; aspect?: string };
+  lock: { locked?: boolean; consent?: boolean; narrator?: string; voices?: Record<string, string>; aspect?: string; imageModel?: string };
+  imageModels: { id: string; name: string; price: number; note: string }[];
   voices: { id: string; name: string; gender: string; tone: string; preview: string }[];
   clipModels: { id: string; name: string; perSecond: number; fixedSeconds?: number; talking?: boolean; note: string }[];
   prices: { image: number; voiceLine: number[]; dialogueLine: number[]; music: number };
@@ -47,6 +48,36 @@ function Bar({ children, r, run }: { children: React.ReactNode; r: ReturnType<ty
       {(r.busy || r.events.length > 0) && <RunLine events={r.events} busy={r.busy} c={run} startedAt={r.startedAt} />}
       {r.error && <p className="small m-0 px-3 py-2 rounded-md bg-tint-2" role="alert">{r.error}</p>}
     </div>
+  );
+}
+
+// The model that makes the actor sheets, outfit pictures and keyframes. Changing it never
+// remakes anything; it applies to the next pictures made.
+function PictureModel({ d, g }: { d: GenData; g: G }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [note, setNote] = useState<string | undefined>();
+  const value = d.lock.imageModel ?? d.imageModels[0]?.id;
+  return (
+    <label className="flex flex-col gap-1.5 min-w-[280px]">
+      <span className="mn-label">{g.pictureModel}</span>
+      <select
+        className="mn-select h-9"
+        value={value}
+        disabled={!d.editable || pending}
+        onChange={(e) => {
+          const v = e.target.value;
+          start(async () => {
+            const res = await saveReferenceLock(d.projectId, { imageModel: v });
+            setNote(res.error);
+            router.refresh();
+          });
+        }}
+      >
+        {d.imageModels.map((m) => <option key={m.id} value={m.id}>{`${m.name} · ${m.note} · ~$${m.price.toFixed(2)}`}</option>)}
+      </select>
+      {note && <span className="small" role="alert">{note}</span>}
+    </label>
   );
 }
 
@@ -103,6 +134,7 @@ export function ReferenceLockView({ d, g, run }: { d: GenData; g: G; run: RunCop
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-end gap-4">
+        <PictureModel d={d} g={g} />
         <label className="flex flex-col gap-1.5 min-w-[260px]">
           <span className="mn-label">{g.narrator}</span>
           {voiceSelect(d.lock.narrator, (v) => save({ narrator: v }), g.narrator)}
@@ -248,6 +280,7 @@ export function KeyframesView({ d, g, run }: { d: GenData; g: G; run: RunCopy })
   return (
     <div className="flex flex-col gap-4">
       {!d.lock.locked && <p className="small m-0 px-3 py-2 rounded-md bg-tint-2">{g.lockFirst}</p>}
+      {d.lock.locked && <PictureModel d={d} g={g} />}
       {can && missing.length > 0 && (
         <Bar r={r} run={run}>
           <button type="button" className="mn-btn mn-btn--primary" onClick={() => go({ kind: "keyframe", shots: missing.map((s) => s.n) })}>
@@ -302,7 +335,12 @@ export function ClipsView({ d, g, run }: { d: GenData; g: G; run: RunCopy }) {
           <label className="flex items-center gap-2 small">
             <span className="mn-label">{g.clipModel}</span>
             <select className="mn-select h-9" value={model} onChange={(e) => setModel(e.target.value)}>
-              {d.clipModels.map((x) => <option key={x.id} value={x.id}>{`${x.name} · ${usd(x.perSecond)}/s · ${x.note}`}</option>)}
+              <optgroup label={g.videoGroup}>
+                {d.clipModels.filter((x) => !x.talking).map((x) => <option key={x.id} value={x.id}>{`${x.name} · ${usd(x.perSecond)}/s · ${x.note}`}</option>)}
+              </optgroup>
+              <optgroup label={g.talkingGroup}>
+                {d.clipModels.filter((x) => x.talking).map((x) => <option key={x.id} value={x.id}>{`${x.name} · ${usd(x.perSecond)}/s · ${x.note}`}</option>)}
+              </optgroup>
             </select>
           </label>
           <span className="grow" />

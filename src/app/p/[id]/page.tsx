@@ -5,7 +5,7 @@ import { StageBar } from "@/components/stage/stage-bar";
 import { StatusChip, type OutputStatus } from "@/components/status-chip";
 import { missingRequired, type BriefFields, type StageOneDocs } from "@/lib/ai/brain";
 import { DEFAULT_MODEL, DEFAULT_TEXT_MODEL, estimateUsd, IMAGE_MODELS, TEXT_MODELS, textModel } from "@/lib/ai/catalog";
-import { frameImages, lookImages } from "@/lib/frames";
+import { frameImages, lookImages, missingPictures } from "@/lib/frames";
 import { fill, type Dictionary } from "@/lib/i18n/dictionaries";
 import { getI18n } from "@/lib/i18n/server";
 import { stageNumbersFor, type Path } from "@/lib/projects";
@@ -19,7 +19,7 @@ import { BoardCardText, InlineDoc, InlineIdea } from "./inline-doc";
 import { LanguageMenu } from "@/components/menus";
 import { MenabLoader } from "@/components/menab-loader";
 import { StepModelPicker } from "./side-panels";
-import { PathButtons, StageFooter } from "./stage-controls";
+import { PathButtons, ReopenStage, StageFooter } from "./stage-controls";
 import { DirectionsView, MeetingView, MoodView, ScriptView, TreatmentView, Versions } from "./creative-docs";
 import { AutoRefresh, CreativeAssistant, CreativeStart, DocsAssistant, DocsFooter, TryAgain } from "./creative-panels";
 import { ProjectMenu } from "./project-menu";
@@ -27,7 +27,7 @@ import { PanelTabs } from "./panel-tabs";
 import { BoardCursor, TypeIn } from "./board-live";
 import { VideoTypePicker } from "./video-type-picker";
 import { hiddenOutputs } from "@/lib/video-types";
-import { dialogueLines, genAssets, settlePending, stageFive } from "@/lib/generate";
+import { DEFAULT_PICTURE_MODEL, PICTURE_MODELS, dialogueLines, genAssets, settlePending, stageFive } from "@/lib/generate";
 import { CLIP_MODELS, MUSIC_PRICE, VOICES, voicePreview, voicePrice } from "@/lib/ai/media";
 import { lookKey } from "@/lib/frames";
 import { ClipsView, KeyframesView, ReferenceLockView, ReviewView, SoundView, type GenData } from "./generate-docs";
@@ -43,7 +43,7 @@ const money = (n: number) => iso(`$${n < 0.01 && n > 0 ? n.toFixed(3) : n.toFixe
 const approx = (n: number) => iso(`~$${n.toFixed(2)}`);
 const MILESTONE: Record<number, string> = { 2: "M3", 3: "M4", 4: "M6", 5: "M5", 6: "v2", 7: "M7" };
 
-type Output = { id: string; number: number; stage: number; status: OutputStatus | "failed"; current_version: number };
+type Output = { id: string; number: number; stage: number; status: OutputStatus | "failed"; current_version: number; stale_from: number | null };
 
 export default async function ProjectPage({
   params,
@@ -68,7 +68,7 @@ export default async function ProjectPage({
   if (!me) redirect("/");
 
   const [{ data: outputs }, { data: messages }, { data: jobs }, { data: setting }] = await Promise.all([
-    supabase.from("outputs").select("id, number, stage, status, current_version, updated_at").eq("project_id", id).order("number"),
+    supabase.from("outputs").select("id, number, stage, status, current_version, updated_at, stale_from").eq("project_id", id).order("number"),
     supabase.from("messages").select("id, role, kind, content, audio_seconds, attachments, steps").eq("project_id", id).order("created_at"),
     supabase.from("ai_jobs").select("cost_usd").eq("project_id", id),
     supabase.from("model_settings").select("model_id").eq("workspace_id", project.workspace_id).eq("task", "text").maybeSingle(),
@@ -201,13 +201,19 @@ export default async function ProjectPage({
       lock: doc.lock,
       voices: VOICES.map((v) => ({ ...v, preview: voicePreview(v.id) })),
       clipModels: CLIP_MODELS.map((m) => ({ id: m.id, name: m.name, perSecond: m.perSecond, fixedSeconds: m.fixedSeconds, talking: m.talking, note: m.note[locale] })),
-      prices: { image: IMAGE_MODELS.find((m) => m.id === "nano-banana-pro")?.priceFrom ?? 0.09, voiceLine: lines.map((l) => voicePrice(l.text)), dialogueLine: dialogueLines(doc).map((l) => voicePrice(l.text)), music: MUSIC_PRICE },
+      imageModels: PICTURE_MODELS.map((pid) => IMAGE_MODELS.find((m) => m.id === pid)).filter((m) => m !== undefined).map((m) => ({ id: m.id, name: m.name, price: m.priceFrom ?? 0, note: m.goodFor[locale] })),
+      prices: { image: IMAGE_MODELS.find((m) => m.id === (doc.lock.imageModel ?? DEFAULT_PICTURE_MODEL))?.priceFrom ?? 0.09, voiceLine: lines.map((l) => voicePrice(l.text)), dialogueLine: dialogueLines(doc).map((l) => voicePrice(l.text)), music: MUSIC_PRICE },
     };
   }
   const missingFrames = shotFrames.filter((f) => !(images[f.n]?.version) && images[f.n]?.status !== "generating").map((f) => f.n);
 
   // Every version of the open output, to restore an earlier one.
   const openOut = outs.find((x) => x.number === open);
+  // AI characters and locations still without a picture: the storyboard waits for them.
+  const picturesWaiting = showing === 3 && stage === 3 && !stageThreeApproved ? await missingPictures(supabase, id) : [];
+  // Documents made before a change in an earlier, reopened stage.
+  const staleText = (n: number) => fill(t.stage.stale, { name: names[order.indexOf(n)] ?? "" });
+  const openStale = openOut?.stale_from ?? null;
   const { data: versionList } = openOut && openOut.current_version > 1
     ? await supabase.from("versions").select("version, source, created_at").eq("output_id", openOut.id).order("version")
     : { data: [] };
@@ -340,7 +346,7 @@ export default async function ProjectPage({
                       >
                         <div className="mn-card__head">
                           <span className="mn-label" lang="en">{String(x.number).padStart(2, "0")}</span>
-                          <StatusChip status={st as OutputStatus} label={statusLabel(t, st)} />
+                          {x.stale_from ? <span className="mn-chip mn-chip--waiting" title={staleText(x.stale_from)}>{t.stage.staleShort}</span> : <StatusChip status={st as OutputStatus} label={statusLabel(t, st)} />}
                         </div>
                         {st === "generating" && <div data-ai-spot className="mn-skeleton h-[72px] mb-2" />}
                         {(x.number === 35 || x.number === 36) && Object.entries(gen).some(([k, v]) => k.startsWith("keyframe:") && v.url) && (
@@ -440,6 +446,13 @@ export default async function ProjectPage({
           </aside>
         </main>
       ) : (
+        <>
+        {openStale && (
+          <p className="mx-4 md:mx-6 mb-3 small px-3 py-2 rounded-md bg-tint-2 border border-line flex items-center gap-2" role="status">
+            <span className="mn-chip mn-chip--waiting">{t.stage.staleShort}</span>
+            <span>{staleText(openStale)}</span>
+          </p>
+        )}
         <main className="flex-1 min-h-0 px-4 md:px-6 pb-4 flex flex-col md:flex-row gap-4">
           {/* Steps of the stage */}
           <nav aria-label={t.stage.outputsLabel} className="stage-steps relative w-full md:w-[248px] shrink-0 md:min-h-0 md:overflow-y-auto self-start md:max-h-full bg-ground-deep border border-line rounded-lg p-3 flex flex-col gap-1">
@@ -450,7 +463,7 @@ export default async function ProjectPage({
               const inner = (
                 <>
                   <span className={hidden.has(x.number) ? "line-through text-ink-faint" : st === "waiting" ? "text-ink-muted" : ""}>{x.number === 1 ? p.chat : t.outputs[x.number]}</span>
-                  {hidden.has(x.number) ? <span className="mn-chip mn-chip--waiting">{p.videoType.notNeeded}</span> : <StatusChip status={st as OutputStatus} label={statusLabel(t, st)} />}
+                  {hidden.has(x.number) ? <span className="mn-chip mn-chip--waiting">{p.videoType.notNeeded}</span> : x.stale_from ? <span className="mn-chip mn-chip--waiting" title={staleText(x.stale_from)}>{t.stage.staleShort}</span> : <StatusChip status={st as OutputStatus} label={statusLabel(t, st)} />}
                 </>
               );
               const cls = `flex justify-between items-center gap-2 p-2.5 rounded-md text-[14px] ${isOpen ? "font-medium bg-surface border border-line" : "border border-transparent hover:bg-tint-2"}`;
@@ -546,6 +559,7 @@ export default async function ProjectPage({
                       model={imageModel}
                       style={lastStyle}
                       lang={lang}
+                      waitingFor={picturesWaiting.length ? fill(t.project.frames.picturesFirst, { names: picturesWaiting.join(", ") }) : undefined}
                     />
                   ) : (
                     <ShotListView projectId={id} content={content[18] as never} seconds={seconds} editable={editableHere && statusOf(18) !== "generating"} c={t.look} lang={lang} />
@@ -764,12 +778,16 @@ export default async function ProjectPage({
             />
           </aside>
         </main>
+        </>
       )}
 
       <AutoRefresh active={generating} />
       {showing < stage && (
         <footer className="shrink-0 sticky bottom-0 bg-surface border-t border-line px-5 py-3 flex flex-wrap gap-3 items-center z-10">
           <span className="small text-ink-muted grow">{fill(t.stage.viewingApproved, { name: names[order.indexOf(showing)] ?? "" })}</span>
+          {["admin", "producer"].includes(me.role) && !writing && (
+            <ReopenStage projectId={id} stage={showing} label={t.stage.reopen} confirm={fill(t.stage.reopenConfirm, { name: names[order.indexOf(showing)] ?? "" })} yes={t.stage.reopenYes} no={t.stage.reopenNo} />
+          )}
           <Link href={href({})} className="mn-btn mn-btn--primary">{fill(t.stage.goTo, { name: names[currentIndex] ?? "" })}</Link>
         </footer>
       )}
@@ -833,13 +851,15 @@ export default async function ProjectPage({
                 ? t.look.footer.writing
                 : !content[13] && !content[15]
                   ? t.look.footer.start
-                  : !framesDone
-                    ? missingFrames.length && isReady(17) ? t.look.footerDraw : t.look.footer.draw
-                    : t.look.footer.review
+                  : picturesWaiting.length && isReady(17)
+                    ? fill(t.project.frames.picturesFirst, { names: picturesWaiting.join(", ") })
+                    : !framesDone
+                      ? missingFrames.length && isReady(17) ? t.look.footerDraw : t.look.footer.draw
+                      : t.look.footer.review
           }
-          draw={!stageThreeApproved && !hidden.has(17) && isReady(17) && missingFrames.length > 0 && !stageThree.some((x) => x.status === "generating") ? { frames: missingFrames, model: imageModel, style: lastStyle, label: missingFrames.length === 1 ? t.look.frames.drawOne : fill(t.look.frames.drawMissing, { n: missingFrames.length }), cost: approx(imagePrice * missingFrames.length) } : null}
+          draw={!stageThreeApproved && !picturesWaiting.length && !hidden.has(17) && isReady(17) && missingFrames.length > 0 && !stageThree.some((x) => x.status === "generating") ? { frames: missingFrames, model: imageModel, style: lastStyle, label: missingFrames.length === 1 ? t.look.frames.drawOne : fill(t.look.frames.drawMissing, { n: missingFrames.length }), cost: approx(imagePrice * missingFrames.length) } : null}
           write={!stageThreeApproved && !content[13] && !content[15] && !stageThree.some((x) => x.status === "generating") ? { label: t.look.write, cost: approx(estimateUsd(model, "look")) } : null}
-          approve={!stageThreeApproved && [13, 14, 15, 16, 17, 18].filter((n) => !hidden.has(n)).every(isReady) && framesDone ? fill(t.stage.approve, { n: 3 }) : null}
+          approve={!stageThreeApproved && !picturesWaiting.length && [13, 14, 15, 16, 17, 18].filter((n) => !hidden.has(n)).every(isReady) && framesDone ? fill(t.stage.approve, { n: 3 }) : null}
         />
       )}
       {canEdit && showing === 1 && stage === 1 && footerAction === "write" && (

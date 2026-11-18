@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { TEXT_MODELS } from "@/lib/ai/catalog";
+import { IMAGE_MODELS, TEXT_MODELS } from "@/lib/ai/catalog";
 import { runStageOne } from "@/lib/stage-one-run";
 import { transcribe } from "@/lib/ai/transcribe";
 import { getI18n } from "@/lib/i18n/server";
@@ -12,6 +12,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember, getMemberships } from "@/lib/workspace";
 import { hiddenOutputs, videoType } from "@/lib/video-types";
 import { stageFive, syncOutputs } from "@/lib/generate";
+import { missingPictures } from "@/lib/frames";
+import { fill } from "@/lib/i18n/dictionaries";
 import { VOICES } from "@/lib/ai/media";
 import { FILE_TYPES, loadProject, ownPath, runBriefMessage, type BriefPayload } from "@/lib/brief-turn";
 
@@ -240,22 +242,41 @@ export async function approveStage(projectId: string, stage: number): Promise<Re
       const have = new Set((drawn ?? []).map((d) => d.n));
       if (!frames.length || !frames.every((n) => have.has(n))) return { error: t.project.frames.missing };
     }
+    // Every AI character and AI location has its picture before the look is approved.
+    if (stage === 3) {
+      const waiting = await missingPictures(supabase, projectId);
+      if (waiting.length) return { error: fill(t.project.frames.picturesMissing, { names: waiting.join(", ") }) };
+    }
 
     const now = new Date().toISOString();
+    // A reopened stage approved again with changes: later documents were made before the change.
+    const { data: thisStage, error: stageError } = await supabase.from("stages").select("reopened_at").eq("project_id", projectId).eq("number", stage).maybeSingle();
+    if (stageError) throw new Error(stageError.message);
+    if (thisStage?.reopened_at) {
+      if (await changedSince(supabase, projectId, stage, thisStage.reopened_at)) {
+        const { error } = await supabase.from("outputs").update({ stale_from: stage }).eq("project_id", projectId).gt("stage", stage);
+        if (error) throw new Error(error.message);
+      }
+    }
     await supabase.from("outputs").update({ status: "approved", updated_at: now }).eq("project_id", projectId).eq("stage", stage);
-    await supabase.from("stages").update({ status: "approved", approved_by: me.userId, approved_at: now }).eq("project_id", projectId).eq("number", stage);
+    await supabase.from("stages").update({ status: "approved", approved_by: me.userId, approved_at: now, reopened_at: null }).eq("project_id", projectId).eq("number", stage);
 
     // The next stage that applies to the path.
     const order = project.path === "ai" ? [1, 2, 3, 5, 6, 7] : [1, 2, 3, 4, 5, 6, 7];
     const next = order[order.indexOf(stage) + 1];
     if (next) {
       await supabase.from("stages").update({ status: "active" }).eq("project_id", projectId).eq("number", next);
+      // After a reopen the next stage may already have its documents: they open for editing again.
       const nums = STAGE_OUTPUTS[next] ?? [];
-      if (nums.length) {
+      const { data: existing } = await supabase.from("outputs").select("number").eq("project_id", projectId).eq("stage", next);
+      const have = new Set((existing ?? []).map((x) => x.number));
+      const add = nums.filter((n) => !have.has(n));
+      if (add.length) {
         await supabase
           .from("outputs")
-          .insert(nums.map((n) => ({ workspace_id: me.workspace.id, project_id: projectId, stage: next, number: n })));
+          .insert(add.map((n) => ({ workspace_id: me.workspace.id, project_id: projectId, stage: next, number: n })));
       }
+      if (have.size) await supabase.from("outputs").update({ status: "ready" }).eq("project_id", projectId).eq("stage", next).eq("status", "approved");
       await supabase.from("projects").update({ current_stage: next, updated_at: now }).eq("id", projectId);
     }
   } catch (e) {
@@ -263,6 +284,54 @@ export async function approveStage(projectId: string, stage: number): Promise<Re
   }
   revalidatePath(`/p/${projectId}`);
   return {};
+}
+
+// Reopens an approved stage (Admins and Producers). The project goes back to that stage; nothing
+// made in later stages is deleted. Approving it again moves the project forward, and if anything
+// changed, the later documents are marked as made before the change.
+export async function reopenStage(projectId: string, stage: number): Promise<Result> {
+  const { t } = await getI18n();
+  try {
+    const { me, supabase, project } = await loadProject(projectId);
+    if (!["admin", "producer"].includes(me.role)) return { error: t.stage.reopenRole };
+    if (stage >= project.current_stage) return { error: t.project.notCurrentStage };
+    if (project.current_stage === stage) return {};
+    const { data: s } = await supabase.from("stages").select("status").eq("project_id", projectId).eq("number", stage).maybeSingle();
+    if (s?.status !== "approved") return { error: t.project.notCurrentStage };
+    // Nothing is reopened while Menab is still writing or making something.
+    const { count } = await supabase.from("outputs").select("id", { count: "exact", head: true }).eq("project_id", projectId).eq("status", "generating");
+    if (count) return { error: t.project.alreadyWriting };
+    const now = new Date().toISOString();
+    // Each step must succeed: a half-reopened project would be stuck between two stages.
+    const must = (r: { error: { message: string } | null }) => { if (r.error) throw new Error(r.error.message); };
+    must(await supabase.from("stages").update({ status: "active", approved_by: null, approved_at: null, reopened_at: now }).eq("project_id", projectId).eq("number", stage));
+    must(await supabase.from("stages").update({ status: "locked" }).eq("project_id", projectId).gt("number", stage).in("status", ["active", "approved"]));
+    must(await supabase.from("outputs").update({ status: "ready", updated_at: now }).eq("project_id", projectId).eq("stage", stage).eq("status", "approved"));
+    must(await supabase.from("projects").update({ current_stage: stage, updated_at: now }).eq("id", projectId));
+  } catch (e) {
+    return { error: errText(e) };
+  }
+  revalidatePath(`/p/${projectId}`);
+  return {};
+}
+
+// Whether a stage's work changed after a time: a new version of one of its documents, or, for
+// stage 3, a new picture or storyboard frame.
+async function changedSince(supabase: Awaited<ReturnType<typeof loadProject>>["supabase"], projectId: string, stage: number, since: string) {
+  const { data: outs } = await supabase.from("outputs").select("id").eq("project_id", projectId).eq("stage", stage);
+  const ids = (outs ?? []).map((o) => o.id);
+  if (ids.length) {
+    const { count } = await supabase.from("versions").select("id", { count: "exact", head: true }).in("output_id", ids).gt("created_at", since);
+    if (count) return true;
+  }
+  if (stage === 3) {
+    const [{ count: a }, { count: b }] = await Promise.all([
+      supabase.from("look_images").select("id", { count: "exact", head: true }).eq("project_id", projectId).eq("status", "ready").gt("created_at", since),
+      supabase.from("frame_images").select("id", { count: "exact", head: true }).eq("project_id", projectId).eq("status", "ready").gt("created_at", since),
+    ]);
+    if (a || b) return true;
+  }
+  return false;
 }
 
 // ---------- Edits by people ----------
@@ -394,7 +463,7 @@ export async function chooseVideoType(projectId: string, typeId: string): Promis
 
 // The reference lock (output 34): voices, frame shape, consent, and the lock itself. Once
 // locked, every keyframe and clip follows these references.
-export async function saveReferenceLock(projectId: string, patch: { narrator?: string; voices?: Record<string, string>; aspect?: string; consent?: boolean; locked?: boolean }): Promise<Result> {
+export async function saveReferenceLock(projectId: string, patch: { narrator?: string; voices?: Record<string, string>; aspect?: string; consent?: boolean; locked?: boolean; imageModel?: string }): Promise<Result> {
   const { t } = await getI18n();
   try {
     const { me, supabase, project } = await loadProject(projectId);
@@ -403,7 +472,10 @@ export async function saveReferenceLock(projectId: string, patch: { narrator?: s
     if (!o) return { error: "Step not found." };
     const { data: v } = o.current_version ? await supabase.from("versions").select("content").eq("output_id", o.id).eq("version", o.current_version).maybeSingle() : { data: null };
     const current = (v?.content ?? {}) as Record<string, unknown>;
-    if (current.locked && patch.locked !== false && patch.locked !== true) return { error: t.generate.lockedNote };
+    // The picture model can change after the lock: it applies to the next pictures, like keyframes.
+    const onlyModel = Object.keys(patch).every((k) => k === "imageModel");
+    if (patch.imageModel && !IMAGE_MODELS.some((m) => m.id === patch.imageModel)) return { error: "Unknown model." };
+    if (current.locked && !onlyModel && patch.locked !== false && patch.locked !== true) return { error: t.generate.lockedNote };
     const next = { ...current, ...patch, voices: { ...((current.voices as object) ?? {}), ...(patch.voices ?? {}) } };
     if (patch.locked) {
       // Real people's photos need their written consent first (B27).

@@ -41,7 +41,7 @@ export async function saveVersion(
   if (error) throw new Error(error.message);
   await supabase
     .from("outputs")
-    .update({ current_version: next, status, updated_at: new Date().toISOString() })
+    .update({ current_version: next, status, stale_from: null, updated_at: new Date().toISOString() })
     .eq("id", o.id);
   o.current_version = next;
 }

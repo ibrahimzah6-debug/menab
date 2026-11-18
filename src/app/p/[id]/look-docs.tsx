@@ -293,6 +293,7 @@ export function StoryboardView({
   model: initialModel,
   style: initialStyle,
   lang,
+  waitingFor,
 }: {
   projectId: string;
   content: { frames: Frame[] };
@@ -304,6 +305,7 @@ export function StoryboardView({
   model: string;
   style: "sketch" | "photo";
   lang: "en" | "ar";
+  waitingFor?: string;
 }) {
   const { save, note } = useSave(projectId, 17);
   const r = useCreativeRun(projectId, run);
@@ -372,8 +374,8 @@ export function StoryboardView({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <span className="small text-ink-muted grow">{fillIn(f.count, { n: drawn.length, total: frames.length })}</span>
-            {r.busy ? (
+            <span className="small text-ink-muted grow">{waitingFor ?? fillIn(f.count, { n: drawn.length, total: frames.length })}</span>
+            {waitingFor ? null : r.busy ? (
               <button type="button" className="mn-btn mn-btn--secondary" onClick={r.stop}>{run.steps.stop}</button>
             ) : (
               <>
@@ -431,13 +433,13 @@ export function StoryboardView({
                     <InlineText label={f.prompt} value={x.prompt} editable={editable} onCommit={(v) => set(i, { prompt: v })} />
                   </div>
                 </details>
-                {editable && img?.url && !busy && !r.busy && (
+                {editable && !waitingFor && img?.url && !busy && !r.busy && (
                   <button type="button" className="mn-btn mn-btn--ghost mn-btn--sm self-start" onClick={() => draw([x.n])}>
                     {f.redraw}
                     <span className="mn-btn__cost">{usd(price)}</span>
                   </button>
                 )}
-                {editable && !img?.url && !busy && !r.busy && (
+                {editable && !waitingFor && !img?.url && !busy && !r.busy && (
                   <button type="button" className="mn-btn mn-btn--ghost mn-btn--sm self-start" onClick={() => draw([x.n])}>
                     {f.drawOne}
                     <span className="mn-btn__cost">{usd(price)}</span>
