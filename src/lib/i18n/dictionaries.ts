@@ -416,19 +416,45 @@ const en = {
       trusted: "In private use with its first production houses",
     },
     intro: {
-      label: "Menab in 36 seconds",
+      label: "Menab in 42 seconds",
       play: "Play",
       pause: "Pause",
       problem: {
-        title: "Tired of paying again and again for AI videos?",
-        rows: [
-          { name: "Try 1: the face changed", value: "SAR 750" },
-          { name: "Try 2: the place changed", value: "SAR 750" },
-          { name: "Try 3: the voice is off", value: "SAR 750" },
+        before: "Tired of paying again and again for",
+        after: "?",
+        variants: [
+          {
+            word: "AI videos",
+            rows: [
+              { name: "Try 1: the face changed", value: "SAR 750" },
+              { name: "Try 2: the place changed", value: "SAR 750" },
+              { name: "Try 3: the voice is off", value: "SAR 750" },
+            ],
+            total: "Total, and still no video",
+            totalValue: "SAR 2,250",
+          },
+          {
+            word: "shoots",
+            rows: [
+              { name: "Shoot day", value: "SAR 45,000" },
+              { name: "Reshoot", value: "SAR 45,000" },
+              { name: "Another edit round", value: "SAR 12,000" },
+            ],
+            total: "Total, for one video",
+            totalValue: "SAR 102,000",
+          },
+          {
+            word: "hybrid videos",
+            rows: [
+              { name: "Shoot day", value: "SAR 45,000" },
+              { name: "AI shots that do not match the shoot", value: "SAR 1,500" },
+              { name: "Reshoot to match", value: "SAR 45,000" },
+            ],
+            total: "Total, for one video",
+            totalValue: "SAR 91,500",
+          },
         ],
-        total: "Total, and still no video",
-        totalValue: "SAR 2,250",
-        note: "Without a plan, every try starts again from zero.",
+        note: "Without a plan, every change starts again from zero.",
       },
       steps: { title: "Menab takes it one step at a time." },
       approve: {
@@ -1391,19 +1417,45 @@ const ar: Dictionary = {
       trusted: "في استخدام خاص مع أول شركات الإنتاج",
     },
     intro: {
-      label: "مِناب في ٣٦ ثانية",
+      label: "مِناب في ٤٢ ثانية",
       play: "شغّل",
       pause: "وقّف",
       problem: {
-        title: "تعبت وأنت تدفع مرة بعد مرة على فيديوهات الذكاء الاصطناعي؟",
-        rows: [
-          { name: "المحاولة ١: الوجه تغيّر", value: "٧٥٠ ريال" },
-          { name: "المحاولة ٢: المكان تغيّر", value: "٧٥٠ ريال" },
-          { name: "المحاولة ٣: الصوت مو مضبوط", value: "٧٥٠ ريال" },
+        before: "تعبت وأنت تدفع مرة بعد مرة على",
+        after: "؟",
+        variants: [
+          {
+            word: "فيديوهات الذكاء الاصطناعي",
+            rows: [
+              { name: "المحاولة ١: الوجه تغيّر", value: "٧٥٠ ريال" },
+              { name: "المحاولة ٢: المكان تغيّر", value: "٧٥٠ ريال" },
+              { name: "المحاولة ٣: الصوت مو مضبوط", value: "٧٥٠ ريال" },
+            ],
+            total: "المجموع، وللحين ما فيه فيديو",
+            totalValue: "٢٬٢٥٠ ريال",
+          },
+          {
+            word: "التصوير",
+            rows: [
+              { name: "يوم التصوير", value: "٤٥٬٠٠٠ ريال" },
+              { name: "إعادة التصوير", value: "٤٥٬٠٠٠ ريال" },
+              { name: "جولة مونتاج ثانية", value: "١٢٬٠٠٠ ريال" },
+            ],
+            total: "المجموع، لفيديو واحد",
+            totalValue: "١٠٢٬٠٠٠ ريال",
+          },
+          {
+            word: "الفيديوهات المدمجة",
+            rows: [
+              { name: "يوم التصوير", value: "٤٥٬٠٠٠ ريال" },
+              { name: "لقطات ذكاء اصطناعي ما تطابق التصوير", value: "١٬٥٠٠ ريال" },
+              { name: "إعادة تصوير عشان تتطابق", value: "٤٥٬٠٠٠ ريال" },
+            ],
+            total: "المجموع، لفيديو واحد",
+            totalValue: "٩١٬٥٠٠ ريال",
+          },
         ],
-        total: "المجموع، وللحين ما فيه فيديو",
-        totalValue: "٢٬٢٥٠ ريال",
-        note: "بدون خطة، كل محاولة تبدأ من الصفر.",
+        note: "بدون خطة، كل تعديل يبدأ من الصفر.",
       },
       steps: { title: "مِناب يمشي معك خطوة خطوة." },
       approve: {

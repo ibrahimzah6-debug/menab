@@ -174,10 +174,6 @@ html[lang="ar"] .site-h1, html[lang="ar"] .site-h2, html[lang="ar"] .site-h3 { l
 .site-pill__tag { display: inline-flex; align-items: center; height: 22px; padding: 0 10px; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: 20px; background: var(--tint-2); color: var(--ink); }
 .site-hero__text { margin: 24px 0 0; font-size: 16px; line-height: 22.4px; font-weight: 400; color: var(--ink-muted); }
 .site-hero__art { position: relative; display: grid; place-items: center; color: var(--ink); padding-block: 24px; }
-.site-burst { position: absolute; width: 656px; height: 656px; inset: 0; margin: auto; animation: site-burst 1.2s ease both; }
-@keyframes site-burst { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
-.site-tile { position: relative; width: 178px; height: 178px; border-radius: 40px; background: var(--surface-raised); border: 1px solid var(--line-strong); display: grid; place-items: center; }
-.site-tile img { width: 96px; }
 .site-trusted { margin: 0 auto; padding-bottom: 32px; text-align: center; font-family: var(--font-mono); font-size: 12px; line-height: 19.2px; text-transform: uppercase; color: var(--ink-muted); }
 html[lang="ar"] .site-trusted { font-family: var(--font-sans); text-transform: none; }
 
@@ -306,24 +302,19 @@ html[lang="ar"] .site-film__title { letter-spacing: 0; line-height: 36px; }
 @keyframes mk-press { 0% { transform: none; } 40% { transform: scale(.92); opacity: .75; } 100% { transform: none; opacity: 1; } }
 .site-film__select { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 8px; color: var(--ink); min-width: 120px; justify-content: space-between; }
 .site-film__price { min-width: 84px; justify-content: center; }
-.site-film__burst { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ink); pointer-events: none; }
-.site-film__burst .site-burst { width: 520px; height: 520px; }
-.site-film__tile { width: 128px; height: 128px; border-radius: 32px; }
-.site-film__tile img { width: 68px; }
-.site-film__scene--close .site-film__title { margin-top: 20px; position: relative; }
-.site-film__scene--close .site-film__note { position: relative; }
+.site-film__scene--close { text-align: center; }
+.site-film__title--close { font-size: 32px; line-height: 38px; }
+.site-film__word { display: inline-block; animation: mk-word .5s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes mk-word { from { opacity: 0; transform: translateY(10px); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
 .site-film__bar { display: flex; align-items: center; gap: 6px; padding: 16px 0 0; }
 .site-film__play { width: 28px; height: 28px; flex: none; border-radius: 50%; border: 1px solid var(--line-strong); background: none; color: var(--ink); display: grid; place-items: center; cursor: pointer; margin-inline-end: 6px; }
 .site-film__seg { flex: 1; height: 16px; padding: 0; border: 0; background: none; cursor: pointer; display: flex; align-items: center; }
 .site-film__seg i { display: block; width: 100%; height: 3px; border-radius: 3px; background: var(--tint-3); position: relative; overflow: hidden; }
 .site-film__seg i.done { background: var(--ink-muted); }
-.site-film__seg i.run::after { content: ""; position: absolute; inset: 0; background: var(--ink); transform-origin: left; transform: scaleX(0); animation: mk-fill 6s linear forwards; }
+.site-film__seg i.run::after { content: ""; position: absolute; inset: 0; background: var(--ink); transform-origin: left; transform: scaleX(0); animation: mk-fill var(--run, 6s) linear forwards; }
 [dir="rtl"] .site-film__seg i.run::after { transform-origin: right; }
 .site-film__seg i.paused::after { animation-play-state: paused; }
-.site-logo-light { display: none; }
-.site[data-theme="light"] .site-logo-light { display: block; }
-.site[data-theme="light"] .site-logo-dark { display: none; }
-
+.site[data-theme="light"] 
 /* Tablet. */
 @media (max-width: 1023px) {
   .site-hero { grid-template-columns: 1fr 1fr; }
@@ -340,8 +331,7 @@ html[lang="ar"] .site-film__title { letter-spacing: 0; line-height: 36px; }
   .site-film { height: 420px; }
   .site-film__title { font-size: 20px; line-height: 26px; }
   .site-film__select { min-width: 0; }
-  .site-film__burst .site-burst { width: 400px; height: 400px; }
-  .site-hero__copy { align-items: center; text-align: center; width: 100%; }
+  .site-film__burst   .site-hero__copy { align-items: center; text-align: center; width: 100%; }
   .site-hero__buttons { flex-direction: column; width: 100%; }
   .site-hero__buttons .site-btn { width: 100%; justify-content: center; }
   .site-hero__text { order: 3; margin-top: 24px; }

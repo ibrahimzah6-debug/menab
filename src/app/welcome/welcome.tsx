@@ -67,7 +67,7 @@ export function Welcome({ c, uiLocale, langLabel, preparing }: { c: C; uiLocale:
           <p className="site-hero__text" dir="auto">{c.hero.text}</p>
         </div>
         <div className="site-hero__art">
-          <Intro c={c.intro} stages={c.how.stages.map((s) => s.name)} approved={c.ways.mock.approved} burst={<Burst />} />
+          <Intro c={c.intro} stages={c.how.stages.map((s) => s.name)} approved={c.ways.mock.approved} />
         </div>
       </section>
 
@@ -135,34 +135,6 @@ export function Welcome({ c, uiLocale, langLabel, preparing }: { c: C; uiLocale:
 
 function Arrow({ size = 14 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="rtl:-scale-x-100"><path d="M2.5 7h9M7.5 3l4 4-4 4" /></svg>;
-}
-
-// The burst of fine lines and dots behind the logo tile. Fixed numbers (no randomness at load),
-// so the picture is the same on every visit and on the server.
-const BURST = (() => {
-  let s = 7;
-  const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
-  const lines: { x1: number; y1: number; x2: number; y2: number; o: number }[] = [];
-  const dots: { x: number; y: number; r: number; o: number }[] = [];
-  for (let i = 0; i < 300; i++) {
-    const a = rnd() * Math.PI * 2;
-    const r1 = 112 + rnd() * 50;
-    const r2 = r1 + 30 + rnd() * rnd() * 150;
-    const cos = Math.cos(a), sin = Math.sin(a);
-    lines.push({ x1: 328 + cos * r1, y1: 328 + sin * r1, x2: 328 + cos * r2, y2: 328 + sin * r2, o: 0.12 + rnd() * 0.3 });
-    if (rnd() < 0.8) { const rd = r1 + rnd() * (r2 - r1 + 20); dots.push({ x: 328 + cos * rd, y: 328 + sin * rd, r: 0.8 + rnd() * 1.3, o: 0.35 + rnd() * 0.5 }); }
-  }
-  const f = (n: number) => Math.round(n * 10) / 10;
-  return { lines: lines.map((l) => ({ x1: f(l.x1), y1: f(l.y1), x2: f(l.x2), y2: f(l.y2), o: f(l.o * 100) / 100 })), dots: dots.map((d) => ({ x: f(d.x), y: f(d.y), r: f(d.r), o: f(d.o * 100) / 100 })) };
-})();
-
-function Burst() {
-  return (
-    <svg className="site-burst" viewBox="0 0 656 656" fill="none">
-      {BURST.lines.map((l, i) => <line key={i} {...l} stroke="currentColor" strokeWidth="0.5" opacity={l.o} />)}
-      {BURST.dots.map((d, i) => <circle key={i} cx={d.x} cy={d.y} r={d.r} fill="currentColor" opacity={d.o} />)}
-    </svg>
-  );
 }
 
 // ---------- Top bar ----------
