@@ -16,6 +16,6 @@ export default async function WelcomePage() {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   if (data?.claims?.sub) redirect("/");
-  const { t, locale, uiLocale } = await getI18n();
-  return <Welcome c={t.site} locale={locale === "ar" ? "ar" : "en"} uiLocale={uiLocale} langLabel={t.settings.language} preparing={t.frame.preparing} />;
+  const { t, uiLocale } = await getI18n();
+  return <Welcome c={t.site} uiLocale={uiLocale} langLabel={t.settings.language} preparing={t.frame.preparing} />;
 }

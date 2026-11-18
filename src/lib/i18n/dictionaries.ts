@@ -389,6 +389,7 @@ const en = {
       blog: "Blog",
       login: "Log in",
       signup: "Sign up",
+      menu: "Menu",
       productItems: [
         { name: "Brief", note: "Talk or type your brief" },
         { name: "Creative", note: "Directions, script and treatment" },
@@ -1319,6 +1320,7 @@ const ar: Dictionary = {
       blog: "المدونة",
       login: "دخول",
       signup: "سجّل",
+      menu: "القائمة",
       productItems: [
         { name: "البريف", note: "تكلم أو اكتب البريف" },
         { name: "الفكرة", note: "الاتجاهات والسكربت والتريتمنت" },

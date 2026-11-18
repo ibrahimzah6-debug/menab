@@ -16,7 +16,7 @@ type Theme = "dark" | "light" | "auto";
 const STEP_MS = 6000;
 const SOON = (topic: string) => `/soon?topic=${encodeURIComponent(topic)}`;
 
-export function Welcome({ c, locale, uiLocale, langLabel, preparing }: { c: C; locale: "en" | "ar"; uiLocale: string; langLabel: string; preparing: string }) {
+export function Welcome({ c, uiLocale, langLabel, preparing }: { c: C; uiLocale: string; langLabel: string; preparing: string }) {
   const [theme, setTheme] = useState<Theme>("dark");
   const [resolved, setResolved] = useState<"dark" | "light">("dark");
   useEffect(() => {
@@ -44,36 +44,37 @@ export function Welcome({ c, locale, uiLocale, langLabel, preparing }: { c: C; l
       // No storage.
     }
   };
-  const bodyClass = locale === "ar" ? "body-ar" : "body";
 
   return (
     <div data-theme={resolved} className="site" style={{ background: "var(--ground)", color: "var(--ink)", minHeight: "100vh" }}>
       <Nav c={c} uiLocale={uiLocale} langLabel={langLabel} preparing={preparing} />
 
-      {/* Hero: small headline, two buttons, the tile, a short paragraph. */}
-      <section className="site-wrap grid gap-10 items-center py-16 md:py-28 md:grid-cols-[1.1fr_auto_1fr]">
-        <div className="flex flex-col gap-6">
-          <h1 className="m-0" style={{ fontSize: "clamp(30px, 3.1vw, 42px)", lineHeight: 1.14, fontWeight: 600, letterSpacing: "-0.01em", maxWidth: 500 }} dir="auto">{c.hero.title}</h1>
-          <div className="flex flex-wrap gap-2">
+      {/* Hero: fills the first screen. The words on one side, the logo tile with its burst on the
+          other. On a phone everything is centred and the tile comes first. */}
+      <section className="site-wrap site-hero">
+        <div className="site-hero__copy">
+          <h1 className="site-h1" dir="auto">{c.hero.title}</h1>
+          <div className="site-hero__buttons">
             <a href="/login?next=/start" className="site-btn site-btn--primary">{c.hero.start} <Arrow /></a>
             <a href={SOON("talk")} className="site-btn site-btn--soft">{c.hero.talk}</a>
           </div>
-        </div>
-        <div className="site-tile justify-self-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={resolved === "dark" ? "/brand/menab-mark-light.png" : "/brand/menab-mark-ink.png"} alt="" style={{ width: 84 }} />
-        </div>
-        <div className="flex flex-col gap-4 md:justify-self-end" style={{ maxWidth: 360 }}>
-          <a href="#stage-5" className="inline-flex items-center gap-2 self-start rounded-full border px-1 py-1 pe-3 text-[13px]" style={{ borderColor: "var(--line)" }}>
-            <span className="rounded-full px-2 py-0.5 text-[12px]" style={{ background: "var(--tint-2)" }}>{c.hero.newTag}</span>
-            <span style={{ color: "var(--ink-muted)" }}>{c.hero.newText}</span>
-            <Arrow />
+          <a href="#stage-5" onClick={() => openStage(4)} className="site-pill">
+            <span className="site-pill__tag">{c.hero.newTag}</span>
+            <span dir="auto">{c.hero.newText}</span>
+            <Arrow size={12} />
           </a>
-          <p className={`${bodyClass} m-0`} style={{ color: "var(--ink-muted)" }} dir="auto">{c.hero.text}</p>
+          <p className="site-hero__text" dir="auto">{c.hero.text}</p>
+        </div>
+        <div className="site-hero__art" aria-hidden="true">
+          <Burst />
+          <div className="site-tile">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={resolved === "dark" ? "/brand/menab-mark-light.png" : "/brand/menab-mark-ink.png"} alt="" />
+          </div>
         </div>
       </section>
 
-      <p className="site-wrap mn-label text-center m-0 pb-14" style={{ color: "var(--ink-faint)", letterSpacing: "0.08em" }} dir="auto">{c.hero.trusted}</p>
+      <p className="site-wrap site-trusted" dir="auto">{c.hero.trusted}</p>
 
       {/* The big card: the three ways to make a video, each with its scene. */}
       <section className="site-wrap">
@@ -81,50 +82,50 @@ export function Welcome({ c, locale, uiLocale, langLabel, preparing }: { c: C; l
       </section>
 
       {/* How it works: the seven stages. The Product menu opens a stage here. */}
-      <How c={c.how} bodyClass={bodyClass} />
+      <How c={c.how} />
 
       {/* What you get: one card per kind of team. */}
-      <section id="who" className="site-wrap pt-24 md:pt-32">
-        <h2 className="site-h2" style={{ marginBottom: 40 }} dir="auto">{c.who.title}</h2>
-        <div className="grid gap-4 md:grid-cols-2">
+      <section id="who" className="site-wrap site-section">
+        <h2 className="site-h2 site-h2--section" dir="auto">{c.who.title}</h2>
+        <div className="site-grid site-grid--2">
           {c.who.cards.map((x, i) => (
-            <article key={i} id={`who-${i + 1}`} className="site-card p-8 flex flex-col gap-3 min-h-[180px]">
-              <span className="mn-label" lang="en" style={{ color: "var(--ink-faint)" }}>{String(i + 1).padStart(2, "0")}</span>
-              <h3 className="m-0" style={{ fontSize: 22, fontWeight: 600, lineHeight: 1.2 }} dir="auto">{x.name}</h3>
-              <p className="small m-0" style={{ color: "var(--ink-muted)", lineHeight: "22px", maxWidth: 460 }} dir="auto">{x.text}</p>
+            <article key={i} id={`who-${i + 1}`} className="site-card site-card--big">
+              <span className="site-num" lang="en">{String(i + 1).padStart(2, "0")}</span>
+              <h3 className="site-h2" dir="auto">{x.name}</h3>
+              <p className="site-text" dir="auto">{x.text}</p>
             </article>
           ))}
         </div>
       </section>
 
       {/* Why Menab. */}
-      <section className="site-wrap pt-24 md:pt-32">
-        <h2 className="site-h2" style={{ marginBottom: 40 }} dir="auto">{c.proof.title}</h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="site-wrap site-section">
+        <h2 className="site-h2 site-h2--section" dir="auto">{c.proof.title}</h2>
+        <div className="site-grid site-grid--4">
           {c.proof.items.map((x, i) => (
-            <article key={i} className="site-card p-6 flex flex-col gap-2" style={{ borderRadius: 20 }}>
-              <h3 className="h3 m-0" dir="auto">{x.name}</h3>
-              <p className="small m-0" style={{ color: "var(--ink-muted)", lineHeight: "22px" }} dir="auto">{x.text}</p>
+            <article key={i} className="site-card site-card--small">
+              <h3 className="site-h3" dir="auto">{x.name}</h3>
+              <p className="site-text" dir="auto">{x.text}</p>
             </article>
           ))}
         </div>
       </section>
 
       {/* Pricing. */}
-      <section id="pricing" className="site-wrap pt-24 md:pt-32">
-        <div className="site-card p-10 md:p-14 flex flex-col md:flex-row md:items-center gap-8">
-          <div className="flex flex-col gap-3 grow">
+      <section id="pricing" className="site-wrap site-section">
+        <div className="site-card site-card--big site-pricing">
+          <div className="flex flex-col gap-4 grow">
             <h2 className="site-h2" dir="auto">{c.pricing.title}</h2>
-            <p className={`${bodyClass} m-0`} style={{ color: "var(--ink-muted)", maxWidth: 560 }} dir="auto">{c.pricing.text}</p>
+            <p className="site-text" style={{ maxWidth: 560 }} dir="auto">{c.pricing.text}</p>
           </div>
           <a href={SOON("pricing")} className="site-btn site-btn--line self-start">{c.pricing.cta}</a>
         </div>
       </section>
 
       {/* Closing. */}
-      <section className="site-wrap py-28 md:py-36 text-center flex flex-col items-center gap-6">
-        <h2 className="m-0" style={{ fontSize: "clamp(28px, 3.2vw, 40px)", lineHeight: 1.15, fontWeight: 600, maxWidth: 720 }} dir="auto">{c.closing.title}</h2>
-        <div className="flex flex-wrap gap-2 justify-center">
+      <section className="site-wrap site-closing">
+        <h2 className="site-h1 site-h1--closing" dir="auto">{c.closing.title}</h2>
+        <div className="site-hero__buttons justify-center">
           <a href="/login?next=/start" className="site-btn site-btn--accent">{c.closing.start} <Arrow /></a>
           <a href={SOON("talk")} className="site-btn site-btn--soft">{c.closing.talk}</a>
         </div>
@@ -135,14 +136,43 @@ export function Welcome({ c, locale, uiLocale, langLabel, preparing }: { c: C; l
   );
 }
 
-function Arrow() {
-  return <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="rtl:-scale-x-100"><path d="M2.5 7h9M7.5 3l4 4-4 4" /></svg>;
+function Arrow({ size = 14 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="rtl:-scale-x-100"><path d="M2.5 7h9M7.5 3l4 4-4 4" /></svg>;
+}
+
+// The burst of fine lines and dots behind the logo tile. Fixed numbers (no randomness at load),
+// so the picture is the same on every visit and on the server.
+const BURST = (() => {
+  let s = 7;
+  const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  const lines: { x1: number; y1: number; x2: number; y2: number; o: number }[] = [];
+  const dots: { x: number; y: number; r: number; o: number }[] = [];
+  for (let i = 0; i < 300; i++) {
+    const a = rnd() * Math.PI * 2;
+    const r1 = 112 + rnd() * 50;
+    const r2 = r1 + 30 + rnd() * rnd() * 150;
+    const cos = Math.cos(a), sin = Math.sin(a);
+    lines.push({ x1: 328 + cos * r1, y1: 328 + sin * r1, x2: 328 + cos * r2, y2: 328 + sin * r2, o: 0.12 + rnd() * 0.3 });
+    if (rnd() < 0.8) { const rd = r1 + rnd() * (r2 - r1 + 20); dots.push({ x: 328 + cos * rd, y: 328 + sin * rd, r: 0.8 + rnd() * 1.3, o: 0.35 + rnd() * 0.5 }); }
+  }
+  const f = (n: number) => Math.round(n * 10) / 10;
+  return { lines: lines.map((l) => ({ x1: f(l.x1), y1: f(l.y1), x2: f(l.x2), y2: f(l.y2), o: f(l.o * 100) / 100 })), dots: dots.map((d) => ({ x: f(d.x), y: f(d.y), r: f(d.r), o: f(d.o * 100) / 100 })) };
+})();
+
+function Burst() {
+  return (
+    <svg className="site-burst" viewBox="0 0 656 656" fill="none">
+      {BURST.lines.map((l, i) => <line key={i} {...l} stroke="currentColor" strokeWidth="0.5" opacity={l.o} />)}
+      {BURST.dots.map((d, i) => <circle key={i} cx={d.x} cy={d.y} r={d.r} fill="currentColor" opacity={d.o} />)}
+    </svg>
+  );
 }
 
 // ---------- Top bar ----------
 
 function Nav({ c, uiLocale, langLabel, preparing }: { c: C; uiLocale: string; langLabel: string; preparing: string }) {
   const [open, setOpen] = useState<"product" | "solutions" | null>(null);
+  const [mobile, setMobile] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -186,8 +216,30 @@ function Nav({ c, uiLocale, langLabel, preparing }: { c: C; uiLocale: string; la
       </nav>
       <span className="grow" />
       <LanguageMenu locale={uiLocale} label={langLabel} soon={preparing} compact placement="down" />
-      <a href="/login" className="site-btn site-btn--line site-btn--sm ms-2">{c.nav.login}</a>
-      <a href="/login" className="site-btn site-btn--primary site-btn--sm ms-2">{c.nav.signup}</a>
+      <a href="/login" className="site-btn site-btn--line site-btn--sm ms-2 site-desk">{c.nav.login}</a>
+      <a href="/login" className="site-btn site-btn--primary site-btn--sm ms-2 site-desk">{c.nav.signup}</a>
+      <button type="button" className="site-burger site-phone ms-2" aria-label={c.nav.menu} aria-expanded={mobile} onClick={() => setMobile((v) => !v)}>
+        {mobile
+          ? <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+          : <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><path d="M3 6h10M3 10h10" /></svg>}
+      </button>
+      {mobile && (
+        <div className="site-mobile site-phone">
+          <span className="site-num">{c.nav.product}</span>
+          {c.nav.productItems.map((x, i) => <a key={i} href={`#stage-${i + 1}`} onClick={() => { setMobile(false); openStage(i); }} dir="auto">{x.name}</a>)}
+          <span className="site-num">{c.nav.solutions}</span>
+          {c.nav.solutionItems.map((x, i) => <a key={i} href={`#who-${i + 1}`} onClick={() => setMobile(false)} dir="auto">{x.name}</a>)}
+          <span className="site-num" />
+          <a href={SOON("templates")}>{c.nav.templates}</a>
+          <a href="#pricing" onClick={() => setMobile(false)}>{c.nav.pricing}</a>
+          <a href={SOON("enterprise")}>{c.nav.enterprise}</a>
+          <a href={SOON("blog")}>{c.nav.blog}</a>
+          <div className="flex flex-col gap-2 mt-4">
+            <a href="/login" className="site-btn site-btn--primary justify-center">{c.nav.signup}</a>
+            <a href="/login" className="site-btn site-btn--line justify-center">{c.nav.login}</a>
+          </div>
+        </div>
+      )}
     </header>
   );
 }
@@ -208,8 +260,8 @@ function Ways({ c }: { c: C["ways"] }) {
   }, [playing, step, round, c.steps.length]);
   const go = (i: number) => { setStep(i); setRound((r) => r + 1); };
   return (
-    <div className="site-card p-6 md:p-12 grid grid-cols-1 gap-10 md:grid-cols-[1fr_1.25fr] items-center" style={{ borderRadius: 32 }}>
-      <div className="flex flex-col gap-8">
+    <div className="site-card site-ways">
+      <div className="flex flex-col gap-10">
         <h2 className="site-h2" dir="auto">{c.title}</h2>
         <ol className="m-0 p-0 list-none flex flex-col">
           {c.steps.map((s, i) => (
@@ -252,7 +304,7 @@ function openStage(i: number) {
   window.dispatchEvent(new CustomEvent("site-stage", { detail: i }));
 }
 
-function How({ c, bodyClass }: { c: C["how"]; bodyClass: string }) {
+function How({ c }: { c: C["how"] }) {
   const [on, setOn] = useState(0);
   const box = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -274,12 +326,12 @@ function How({ c, bodyClass }: { c: C["how"]; bodyClass: string }) {
   }, [c.stages.length]);
   const s = c.stages[on];
   return (
-    <section id="how" ref={box} className="site-wrap pt-24 md:pt-32" style={{ scrollMarginTop: 24 }}>
-      <div className="flex flex-col gap-3 mb-10 max-w-[640px]">
-        <h2 className="site-h2" dir="auto">{c.title}</h2>
-        <p className={`${bodyClass} m-0`} style={{ color: "var(--ink-muted)" }} dir="auto">{c.text}</p>
+    <section id="how" ref={box} className="site-wrap site-section" style={{ scrollMarginTop: 24 }}>
+      <div className="site-section__head">
+        <h2 className="site-h2 site-h2--section" dir="auto">{c.title}</h2>
+        <p className="site-text" dir="auto">{c.text}</p>
       </div>
-      <div className="site-card p-3 md:p-4 grid grid-cols-1 gap-3 md:grid-cols-[300px_1fr]" style={{ borderRadius: 28 }}>
+      <div className="site-card site-how">
         <ol className="m-0 p-0 list-none flex flex-col gap-1" role="tablist" aria-label={c.title}>
           {c.stages.map((x, i) => (
             <li key={i}>
@@ -290,14 +342,14 @@ function How({ c, bodyClass }: { c: C["how"]; bodyClass: string }) {
             </li>
           ))}
         </ol>
-        <div key={on} role="tabpanel" className="site-stage-panel flex flex-col gap-6 p-6 md:p-10">
-          <span className="mn-label" lang="en" style={{ color: "var(--ink-faint)" }}>{String(on + 1).padStart(2, "0")} / {String(c.stages.length).padStart(2, "0")}</span>
-          <h3 className="m-0" style={{ fontSize: 28, fontWeight: 600, lineHeight: 1.15 }} dir="auto">{s.name}</h3>
+        <div key={on} role="tabpanel" className="site-stage-panel">
+          <span className="site-num" lang="en">{String(on + 1).padStart(2, "0")} / {String(c.stages.length).padStart(2, "0")}</span>
+          <h3 className="site-h2" dir="auto">{s.name}</h3>
           <div className="flex flex-col gap-2 max-w-[520px]">
-            {s.lines.map((l, i) => <p key={i} className={`${bodyClass} m-0`} style={{ color: i ? "var(--ink-muted)" : "var(--ink)" }} dir="auto">{l}</p>)}
+            {s.lines.map((l, i) => <p key={i} className="site-text" style={i ? undefined : { color: "var(--ink)" }} dir="auto">{l}</p>)}
           </div>
           <div className="flex flex-col gap-3 mt-auto">
-            <span className="mn-label" style={{ color: "var(--ink-faint)" }}>{c.makes}</span>
+            <span className="site-num">{c.makes}</span>
             <ul className="m-0 p-0 list-none flex flex-wrap gap-2">
               {s.outputs.map((o, i) => <li key={i} className="site-chip" dir="auto">{o}</li>)}
             </ul>
@@ -312,9 +364,9 @@ function How({ c, bodyClass }: { c: C["how"]; bodyClass: string }) {
 
 function Footer({ c, theme, onTheme }: { c: C; theme: Theme; onTheme: (t: Theme) => void }) {
   const col = (title: string, items: { name: string; href: string; stage?: number }[]) => (
-    <div className="flex flex-col gap-2">
-      <span className="mn-label mb-1" style={{ color: "var(--ink-faint)" }}>{title}</span>
-      {items.map((x, i) => <a key={i} href={x.href} onClick={x.stage === undefined ? undefined : () => openStage(x.stage!)} className="small" style={{ color: "var(--ink-muted)", textDecoration: "none" }} dir="auto">{x.name}</a>)}
+    <div className="flex flex-col gap-3">
+      <span className="site-foot-h" dir="auto">{title}</span>
+      {items.map((x, i) => <a key={i} href={x.href} onClick={x.stage === undefined ? undefined : () => openStage(x.stage!)} className="site-foot-a" dir="auto">{x.name}</a>)}
     </div>
   );
   return (

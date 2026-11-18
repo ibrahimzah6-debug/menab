@@ -262,3 +262,21 @@ Replaces B4.
 - The big card is "Three ways to make it" (AI, shoot, hybrid), not four steps like expo.dev's. Each way plays a small animated copy of Menab's own screens, built in code (no video files): AI shows the brief, the cost, storyboard shots being made and approved, voice and music; Shoot shows the call sheet, crew with GAMR registration, the location permit and the schedule; Hybrid shows a shot list where each shot is set to AI or Shoot. The isometric drawings are removed.
 - How it works is one card: the seven stages on one side, the chosen stage on the other with its two lines and the documents it makes. Each item in the Product menu, and in the footer, opens its stage there.
 - The language menu is in the top bar only. The light, dark and auto switch sits at the bottom of the footer, next to menab.si.
+
+## B35. The website uses expo.dev's measured colours, sizes and spacing (Ibrahim, 18 Nov 2026)
+
+Measured on expo.dev in a browser on 18 Nov 2026, desktop and phone, dark and light. Only colours, sizes and spacing are taken, never their words, pictures or code. Our content is unchanged. These values live in `src/app/globals.css` under `.site` and will become the website chapter of the design system.
+
+| Part | Dark | Light |
+|---|---|---|
+| Page | #111113 | #FFFFFF |
+| Cards | #18191B | #F9F9FB |
+| Soft button, raised panels | #212225 | #F0F0F3 |
+| Borders | #363A3F | #D9D9E0 |
+| Text, soft text, faint text | #EDEEF0, #B0B4BA, #696E77 | #1C2024, #60646C, #80838D |
+| Main button | white with black text | black with white text |
+
+- **Sizes:** headline 48px (closing 64px), section titles 48px, card titles 32px, steps and small card titles 24px, body 16px, top bar and buttons 14px, labels 12px mono. On a phone: section titles 32px, card titles 24px, steps 16px, step text 14px. Rubik reads heavier than Expo's font at the same weight, so headings use 500 and body text 400 to look the same.
+- **Spacing:** content 1280px wide with 24px sides (16px on a phone), top bar 68px, buttons 40px high and fully round, cards rounded 40px with 40 to 64px inside, 64px between big cards, 128px between sections (80px on a phone).
+- **Hero:** fills the first screen. Headline, the two buttons, the "New" pill and the paragraph sit in one column on the left. The logo tile (178px, rounded 40px) sits on the right inside a burst of fine lines and dots drawn in code. On a phone everything is centred, the tile comes first, the buttons are full width, and the top bar has a menu button that opens every link.
+- The tile stays dark with a white logo in dark mode (Expo's is white). Ibrahim can choose the white tile later.
