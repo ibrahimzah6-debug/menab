@@ -285,4 +285,6 @@ Measured on expo.dev in a browser on 18 Nov 2026, desktop and phone, dark and li
 
 - The logo tile in the hero is replaced by a film of about 36 seconds, drawn in code like the scenes in "Three ways to make it". Six scenes of six seconds, looping: paying again for the same video (a shoot day, a reshoot, another edit round, the total); Menab takes it one step at a time (the seven stages approved one by one); you approve each step so nothing is made twice (a script approved and locked, the storyboard opens next); the price before every action (the cost on the button, the balance going down, a failed shot costs nothing); choose the model for each job and pay for what you choose (video, voice and music models changing, with the video price); and the close with the logo in its burst.
 - A bar under the film shows the six scenes. Pressing one jumps to it, and a button pauses it. It does not play for people who turn motion off.
+- The film has no frame, background or dots. In each scene the sentence comes first, then the card, then the last line.
+- The first scene is about AI: paying again and again for tries where the face, the place or the voice changes, because without a plan every try starts from zero.
 - The amounts in the first scene are examples, not quotes. The words can change after Ibrahim's talk with his manager.

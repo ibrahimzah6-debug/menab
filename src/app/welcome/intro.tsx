@@ -4,9 +4,12 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 
 // The film in the hero: Menab in about 36 seconds, six scenes of six seconds, drawn in code like
-// the scenes in the big card. The problem (paying again for the same video), the steps, approving
-// so nothing is made twice, the price first, choosing the model, and the close. It loops; the
-// bar under it shows the scenes, jumps to one when pressed, and can be paused.
+// the scenes in the big card, with no frame or background. A bar under it shows the six scenes, jumps to one when pressed,
+// and a button pauses it. The problem (paying again
+// and again for AI tries), the steps, approving so nothing is made twice, the price first,
+// choosing the model, and the close. In each scene the sentence comes first, then the card, then
+// the last line. It loops,
+// and stays on the first scene for people who turn motion off.
 
 type I = Dictionary["site"]["intro"];
 const SCENE_MS = 6000;
@@ -54,7 +57,7 @@ export function Intro({ c, stages, approved, burst }: { c: I; stages: string[]; 
 }
 
 function Title({ children }: { children: ReactNode }) {
-  return <p className="site-film__title mk-in" style={d(0.1)} dir="auto">{children}</p>;
+  return <p className="site-film__title mk-in" style={d(0)} dir="auto">{children}</p>;
 }
 
 function Check() {
@@ -70,10 +73,10 @@ function Problem({ c }: { c: I }) {
   return (
     <div className="site-film__scene">
       <Title>{c.problem.title}</Title>
-      <div className="mk-panel mk-in" style={d(0.5)}>
+      <div className="mk-panel mk-in" style={d(0.9)}>
         <ul className="mk-list">
           {c.problem.rows.map((r, i) => (
-            <li key={i} className="mk-in site-film__row" style={d(0.9 + i * 0.7)}>
+            <li key={i} className="mk-in site-film__row" style={d(1.3 + i * 0.6)}>
               <span className="mk-text grow" dir="auto">{r.name}</span>
               <span className="mk-text site-film__money" dir="auto">{r.value}</span>
             </li>
@@ -84,7 +87,7 @@ function Problem({ c }: { c: I }) {
           </li>
         </ul>
       </div>
-      <p className="site-film__note mk-in" style={d(4)} dir="auto">{c.problem.note}</p>
+      <p className="site-film__note mk-in" style={d(4.1)} dir="auto">{c.problem.note}</p>
     </div>
   );
 }
@@ -94,13 +97,13 @@ function Steps({ c, stages, approved }: { c: I; stages: string[]; approved: stri
   return (
     <div className="site-film__scene">
       <Title>{c.steps.title}</Title>
-      <div className="mk-panel mk-in" style={d(0.4)}>
+      <div className="mk-panel mk-in" style={d(0.9)}>
         <ul className="mk-list">
           {stages.map((s, i) => (
-            <li key={i} className="mk-in" style={d(0.6 + i * 0.12)}>
+            <li key={i} className="mk-in" style={d(1.1 + i * 0.1)}>
               <span className="mk-num">{String(i + 1).padStart(2, "0")}</span>
               <span className="mk-text grow" dir="auto">{s}</span>
-              <span className="mk-tag mk-in" style={d(1.4 + i * 0.5)}><Check />{approved}</span>
+              <span className="mk-tag mk-in" style={d(1.8 + i * 0.4)}><Check />{approved}</span>
             </li>
           ))}
         </ul>
@@ -114,23 +117,23 @@ function Approve({ c }: { c: I }) {
   return (
     <div className="site-film__scene">
       <Title>{c.approve.title}</Title>
-      <div className="mk-panel mk-in" style={d(0.5)}>
+      <div className="mk-panel mk-in" style={d(0.9)}>
         <span className="mk-label">{c.approve.doc}</span>
         <div className="mk-doc"><i style={{ width: "90%" }} /><i style={{ width: "75%" }} /><i style={{ width: "82%" }} /><i style={{ width: "60%" }} /></div>
         <div className="flex items-center gap-3">
-          <span className="site-film__btn mk-press" style={d(1.8)}>{c.approve.button}</span>
+          <span className="site-film__btn mk-press" style={d(2)}>{c.approve.button}</span>
           <span className="mk-status grow">
-            <span className="mk-in mk-done" style={d(2.3)}><Lock />{c.approve.locked}</span>
+            <span className="mk-in mk-done" style={d(2.5)}><Lock />{c.approve.locked}</span>
           </span>
         </div>
       </div>
-      <div className="mk-panel mk-in" style={d(3)}>
+      <div className="mk-panel mk-in" style={d(3.4)}>
         <div className="flex items-center gap-3">
           <span className="mk-label grow">{c.approve.next}</span>
           <span className="mk-small">{c.approve.nextNote}</span>
         </div>
         <div className="mk-frames">
-          {[0, 1, 2, 3].map((n) => <div key={n} className="mk-frame-pic mk-in" style={{ ...d(3.4 + n * 0.2), background: "var(--mk-sky)" }} />)}
+          {[0, 1, 2, 3].map((n) => <div key={n} className="mk-frame-pic mk-in" style={{ ...d(3.8 + n * 0.2), background: "var(--mk-sky)" }} />)}
         </div>
       </div>
     </div>
@@ -142,9 +145,9 @@ function Price({ c }: { c: I }) {
   return (
     <div className="site-film__scene">
       <Title>{c.price.title}</Title>
-      <div className="mk-panel mk-in" style={d(0.5)}>
+      <div className="mk-panel mk-in" style={d(0.9)}>
         <div className="flex items-center gap-3 flex-wrap">
-          <span className="site-film__btn mk-press" style={d(2)}>{c.price.action}</span>
+          <span className="site-film__btn mk-press" style={d(1.9)}>{c.price.action}</span>
           <span className="mk-tag">{c.price.cost}</span>
         </div>
         <div className="flex items-center gap-3 mt-2">
@@ -155,7 +158,7 @@ function Price({ c }: { c: I }) {
           </span>
         </div>
       </div>
-      <p className="site-film__note mk-in" style={d(3.4)} dir="auto"><Check /> {c.price.free}</p>
+      <p className="site-film__note mk-in" style={d(3.6)} dir="auto"><Check /> {c.price.free}</p>
     </div>
   );
 }
@@ -170,12 +173,12 @@ function Models({ c }: { c: I }) {
   return (
     <div className="site-film__scene">
       <Title>{c.models.title}</Title>
-      <div className="mk-panel mk-in" style={d(0.5)}>
+      <div className="mk-panel mk-in" style={d(0.9)}>
         <ul className="mk-list">
           {c.models.rows.map((r, i) => {
             const k = (tick + i) % r.options.length;
             return (
-              <li key={i} className="mk-in site-film__row" style={d(0.7 + i * 0.3)}>
+              <li key={i} className="mk-in site-film__row" style={d(1.2 + i * 0.3)}>
                 <span className="mk-text grow" dir="auto">{r.name}</span>
                 <span className="site-film__select" key={k}>
                   <span className="mk-in" style={d(0)}>{r.options[k]}</span>
@@ -187,7 +190,7 @@ function Models({ c }: { c: I }) {
           })}
         </ul>
       </div>
-      <p className="site-film__note mk-in" style={d(1.8)} dir="auto">{c.models.note}</p>
+      <p className="site-film__note mk-in" style={d(3.6)} dir="auto">{c.models.note}</p>
     </div>
   );
 }
