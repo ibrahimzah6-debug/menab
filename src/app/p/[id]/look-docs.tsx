@@ -20,7 +20,7 @@ type Art = { set: string; dressing: string; props: string[] };
 type Shot = { n: number; scene: string; int_ext: string; day_night: string; size: string; angle: string; movement: string; lens: string; action: string; dialogue: string; seconds: number; cast: string[]; props: string[]; set: string };
 type Frame = { n: number; scene: string; size: string; angle: string; movement: string; lens: string; action: string; dialogue: string; seconds: number; cast: string[]; set: string; prompt: string };
 export type LookPicture = { status: string; url: string | null; model: string; cost: number | null; error: string | null; version: number };
-type Draw = { model: string; price: number; run: RunCopy; pictures: Record<string, LookPicture>; lang: "en" | "ar" };
+type Draw = { model: string; price: number; run: RunCopy; pictures: Record<string, LookPicture>; lang: "en" | "ar"; models: ModelOption[] };
 const key = (name: string) => name.trim().toLowerCase().slice(0, 200);
 const termText = (kind: TermKind, v: string, lang: "en" | "ar") => findTerm(kind, v)?.[lang] ?? v;
 export type FrameImage = { status: string; url: string | null; model: string; style: string; cost: number | null; error: string | null; version: number };
@@ -65,10 +65,13 @@ function Note({ note }: { note?: string }) {
 
 function usePictures(projectId: string, kind: "character" | "location", names: string[], d: Draw) {
   const r = useCreativeRun(projectId, d.run);
+  // The picture model for this list: the project's last image model until another is picked.
+  const [model, setModel] = useState(d.model);
+  const price = d.models.find((m) => m.id === model)?.price ?? d.price;
   const pic = (name: string) => d.pictures[`${kind}:${key(name)}`];
   const missing = names.filter((n) => !pic(n)?.url && pic(n)?.status !== "generating");
-  const draw = (ns: string[]) => r.run({ kind: "refs", refs: kind, names: ns, model: d.model });
-  return { r, pic, missing, draw };
+  const draw = (ns: string[]) => r.run({ kind: "refs", refs: kind, names: ns, model });
+  return { r, pic, missing, draw, model, setModel, price };
 }
 
 function PictureBar({ names, p, d, c, editable }: { names: string[]; p: ReturnType<typeof usePictures>; d: Draw; c: L; editable: boolean }) {
@@ -76,19 +79,27 @@ function PictureBar({ names, p, d, c, editable }: { names: string[]; p: ReturnTy
   const f = c.refs;
   return (
     <div className="rounded-lg border border-line p-4 flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="small text-ink-muted grow">{f.note}</span>
+      <span className="small text-ink-muted">{f.note}</span>
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="flex flex-col gap-1.5 min-w-[260px] grow">
+          <span className="mn-label">{c.frames.model}</span>
+          <select className="mn-select h-9" value={p.model} disabled={p.r.busy} onChange={(e) => p.setModel(e.target.value)}>
+            {d.models.map((m) => (
+              <option key={m.id} value={m.id}>{`${m.name} · ${fillIn(c.refs.per, { price: usd(m.price) })} · ${m.note}`}</option>
+            ))}
+          </select>
+        </label>
         {p.r.busy ? (
           <button type="button" className="mn-btn mn-btn--secondary" onClick={p.r.stop}>{d.run.steps.stop}</button>
         ) : p.missing.length ? (
           <button type="button" className="mn-btn mn-btn--primary" onClick={() => p.draw(p.missing)}>
             {p.missing.length === 1 ? f.drawOnePic : fillIn(f.drawMissing, { n: p.missing.length })}
-            <span className="mn-btn__cost">{usd(d.price * p.missing.length)}</span>
+            <span className="mn-btn__cost">{usd(p.price * p.missing.length)}</span>
           </button>
         ) : (
           <button type="button" className="mn-btn mn-btn--secondary" onClick={() => p.draw(names)}>
             {f.drawAll}
-            <span className="mn-btn__cost">{usd(d.price * names.length)}</span>
+            <span className="mn-btn__cost">{usd(p.price * names.length)}</span>
           </button>
         )}
       </div>
@@ -113,7 +124,7 @@ function PictureBox({ name, p, d, c, editable }: { name: string; p: ReturnType<t
       {editable && !busy && !p.r.busy && (
         <button type="button" className="absolute bottom-2 end-2 mn-btn mn-btn--secondary mn-btn--sm" onClick={() => p.draw([name])}>
           {img?.url ? c.refs.redraw : c.refs.drawOne}
-          <span className="mn-btn__cost">{usd(d.price)}</span>
+          <span className="mn-btn__cost">{usd(p.price)}</span>
         </button>
       )}
     </div>

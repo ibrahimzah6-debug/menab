@@ -1,6 +1,8 @@
 import "server-only";
 import { z } from "zod";
 import { structured } from "@/lib/ai/brain-core";
+import { textModel } from "@/lib/ai/catalog";
+import { logAiJob } from "@/lib/projects";
 import { modelHealth } from "@/lib/ai/health";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -95,14 +97,24 @@ export async function runAnalysis(language: "en" | "ar" = "en") {
     activeRules: rules,
   };
 
-  const r = await structured(
+  const started = Date.now();
+  let r: Awaited<ReturnType<typeof structured<typeof Report>>>;
+  try {
+    r = await structured(
     ANALYST_MODEL,
     `You are the product development analyst for Menab, a Saudi web app that takes a video from brief to delivery with AI, a production house, or both. Its users are producers at ZAH Production Services in Riyadh, working in Arabic and English. Menab AI runs the brief chat and writes the stage documents.
 Read a week of usage data and propose what to improve. Be specific and practical. Prefer fixes that make answers better, faster and cheaper, and that remove friction people complained about. A prompt_rule is the cheapest fix: one clear line Menab AI will follow on every call. Never propose anything that sends national ID or iqama numbers to an AI. No em dashes. Write in ${language === "ar" ? "Arabic" : "English"}.`,
     [{ role: "user", content: `Usage data (JSON):\n${JSON.stringify(data)}` }],
     Report,
     { effort: "medium", maxTokens: 6000, timeoutMs: 120_000 },
-  );
+    );
+  } catch (e) {
+    // A failed analysis costs nothing, but is still listed with the model that failed.
+    await logAiJob({ workspaceId: null, projectId: null, userId: null, task: "development", provider: textModel(ANALYST_MODEL).provider, model: ANALYST_MODEL, ok: false, error: e instanceof Error ? e.message : String(e), usage: { inputTokens: 0, outputTokens: 0, costUsd: 0, seconds: Math.round((Date.now() - started) / 1000) } });
+    throw e;
+  }
+  // Menab's own cost: shown in the owner dashboard, never in a client's credits.
+  await logAiJob({ workspaceId: null, projectId: null, userId: null, task: "development", provider: textModel(r.model).provider, model: r.model, ok: true, usage: r.usage, fallbackFrom: r.fallbackFrom });
 
   const { data: report } = await admin.from("dev_reports").insert({ model: r.model, summary: r.data.summary.slice(0, 8000), stats }).select("id").single();
   const items = r.data.items.slice(0, 8).map((i) => ({

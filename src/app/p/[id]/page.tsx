@@ -540,11 +540,11 @@ export default async function ProjectPage({
                 {hidden.has(open) && <p className="small m-0 px-3 py-2 rounded-md bg-tint-2 max-w-[760px]">{p.videoType.notNeededNote}</p>}
                 {content[open] ? (
                   open === 13 ? (
-                    <CharactersView projectId={id} content={content[13] as never} editable={editableHere && statusOf(13) !== "generating"} c={t.look} d={{ model: imageModel, price: imagePrice, run: runCopy, pictures, lang }} />
+                    <CharactersView projectId={id} content={content[13] as never} editable={editableHere && statusOf(13) !== "generating"} c={t.look} d={{ model: imageModel, price: imagePrice, run: runCopy, pictures, lang, models: imageOptions }} />
                   ) : open === 14 ? (
                     <WardrobeView projectId={id} content={content[14] as never} editable={editableHere && statusOf(14) !== "generating"} c={t.look} />
                   ) : open === 15 ? (
-                    <LocationsView projectId={id} content={content[15] as never} editable={editableHere && statusOf(15) !== "generating"} c={t.look} d={{ model: imageModel, price: imagePrice, run: runCopy, pictures, lang }} />
+                    <LocationsView projectId={id} content={content[15] as never} editable={editableHere && statusOf(15) !== "generating"} c={t.look} d={{ model: imageModel, price: imagePrice, run: runCopy, pictures, lang, models: imageOptions }} />
                   ) : open === 16 ? (
                     <ArtView projectId={id} content={content[16] as never} editable={editableHere && statusOf(16) !== "generating"} c={t.look} />
                   ) : open === 17 ? (
