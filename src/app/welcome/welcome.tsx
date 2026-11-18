@@ -4,17 +4,16 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { LanguageMenu } from "@/components/menus";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
-import { Isometric } from "./isometric";
+import { Mockup } from "./mockups";
 
 // The public website. The page follows expo.dev's structure (small headline, two buttons, a tile,
-// a big rounded card with four steps that cycle every five seconds beside a line drawing, a grid
-// of cards, a full footer with a theme switch) in Menab's colours: dark by default, with the
-// cards in our surface colour. English and Arabic, mirrored.
+// a big rounded card whose steps cycle beside an animated scene, a grid of cards, a full footer
+// with a theme switch) in Menab's colours: a black page in dark, with the cards in our surface
+// colour. English and Arabic, mirrored. The language menu lives in the top bar only.
 
 type C = Dictionary["site"];
 type Theme = "dark" | "light" | "auto";
-const STEP_SCENES = [2, 3, 5, 7];
-const STEP_MS = 5000;
+const STEP_MS = 6000;
 const SOON = (topic: string) => `/soon?topic=${encodeURIComponent(topic)}`;
 
 export function Welcome({ c, locale, uiLocale, langLabel, preparing }: { c: C; locale: "en" | "ar"; uiLocale: string; langLabel: string; preparing: string }) {
@@ -54,7 +53,7 @@ export function Welcome({ c, locale, uiLocale, langLabel, preparing }: { c: C; l
       {/* Hero: small headline, two buttons, the tile, a short paragraph. */}
       <section className="site-wrap grid gap-10 items-center py-16 md:py-28 md:grid-cols-[1.1fr_auto_1fr]">
         <div className="flex flex-col gap-6">
-          <h1 className="m-0" style={{ fontSize: "clamp(32px, 3.4vw, 44px)", lineHeight: 1.12, fontWeight: 600, letterSpacing: "-0.01em", maxWidth: 440 }} dir="auto">{c.hero.title}</h1>
+          <h1 className="m-0" style={{ fontSize: "clamp(30px, 3.1vw, 42px)", lineHeight: 1.14, fontWeight: 600, letterSpacing: "-0.01em", maxWidth: 500 }} dir="auto">{c.hero.title}</h1>
           <div className="flex flex-wrap gap-2">
             <a href="/login?next=/start" className="site-btn site-btn--primary">{c.hero.start} <Arrow /></a>
             <a href={SOON("talk")} className="site-btn site-btn--soft">{c.hero.talk}</a>
@@ -76,43 +75,34 @@ export function Welcome({ c, locale, uiLocale, langLabel, preparing }: { c: C; l
 
       <p className="site-wrap mn-label text-center m-0 pb-14" style={{ color: "var(--ink-faint)", letterSpacing: "0.08em" }} dir="auto">{c.hero.trusted}</p>
 
-      {/* The big card: four steps that cycle, with the drawing. */}
+      {/* The big card: the three ways to make a video, each with its scene. */}
       <section className="site-wrap">
-        <Blocks c={c.blocks} />
+        <Ways c={c.ways} />
       </section>
 
-      {/* How it works: the seven stages. */}
-      <section id="how" className="site-wrap pt-24 md:pt-32">
-        <div className="flex flex-col gap-3 mb-10 max-w-[640px]">
-          <h2 className="site-h2" dir="auto">{c.how.title}</h2>
-          <p className={`${bodyClass} m-0`} style={{ color: "var(--ink-muted)" }} dir="auto">{c.how.text}</p>
-        </div>
-        <ol className="m-0 p-0 list-none grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
-          {c.how.stages.map((s, i) => (
-            <li key={i} id={`stage-${i + 1}`} className="site-card p-6 flex flex-col gap-3" style={{ borderRadius: 20 }}>
-              <span className="mn-label" lang="en" style={{ color: "var(--ink-faint)" }}>{String(i + 1).padStart(2, "0")}</span>
-              <h3 className="h3 m-0" dir="auto">{s.name}</h3>
-              <p className="small m-0" style={{ color: "var(--ink-muted)", lineHeight: "22px" }} dir="auto">{s.text}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
+      {/* How it works: the seven stages. The Product menu opens a stage here. */}
+      <How c={c.how} bodyClass={bodyClass} />
 
-      {/* What you get: the grid of cards. */}
+      {/* What you get: one card per kind of team. */}
       <section id="who" className="site-wrap pt-24 md:pt-32">
-        <h2 className="site-h2 mb-10" dir="auto">{c.who.title}</h2>
+        <h2 className="site-h2" style={{ marginBottom: 40 }} dir="auto">{c.who.title}</h2>
         <div className="grid gap-4 md:grid-cols-2">
           {c.who.cards.map((x, i) => (
-            <article key={i} id={`who-${i + 1}`} className="site-card p-8 flex flex-col gap-3 min-h-[200px]">
+            <article key={i} id={`who-${i + 1}`} className="site-card p-8 flex flex-col gap-3 min-h-[180px]">
               <span className="mn-label" lang="en" style={{ color: "var(--ink-faint)" }}>{String(i + 1).padStart(2, "0")}</span>
-              <h3 className="m-0" style={{ fontSize: 24, fontWeight: 600, lineHeight: 1.2 }} dir="auto">{x.name}</h3>
-              <p className={`${bodyClass} m-0`} style={{ color: "var(--ink-muted)" }} dir="auto">{x.text}</p>
+              <h3 className="m-0" style={{ fontSize: 22, fontWeight: 600, lineHeight: 1.2 }} dir="auto">{x.name}</h3>
+              <p className="small m-0" style={{ color: "var(--ink-muted)", lineHeight: "22px", maxWidth: 460 }} dir="auto">{x.text}</p>
             </article>
           ))}
         </div>
-        <div className="grid gap-4 md:grid-cols-3 mt-4">
-          {c.who.small.map((x, i) => (
-            <article key={i} className="site-card p-6 flex flex-col gap-2">
+      </section>
+
+      {/* Why Menab. */}
+      <section className="site-wrap pt-24 md:pt-32">
+        <h2 className="site-h2" style={{ marginBottom: 40 }} dir="auto">{c.proof.title}</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {c.proof.items.map((x, i) => (
+            <article key={i} className="site-card p-6 flex flex-col gap-2" style={{ borderRadius: 20 }}>
               <h3 className="h3 m-0" dir="auto">{x.name}</h3>
               <p className="small m-0" style={{ color: "var(--ink-muted)", lineHeight: "22px" }} dir="auto">{x.text}</p>
             </article>
@@ -140,7 +130,7 @@ export function Welcome({ c, locale, uiLocale, langLabel, preparing }: { c: C; l
         </div>
       </section>
 
-      <Footer c={c} theme={theme} onTheme={pickTheme} uiLocale={uiLocale} langLabel={langLabel} preparing={preparing} />
+      <Footer c={c} theme={theme} onTheme={pickTheme} />
     </div>
   );
 }
@@ -171,7 +161,7 @@ function Nav({ c, uiLocale, langLabel, preparing }: { c: C; uiLocale: string; la
       {open === id && (
         <div className="site-menu" role="menu">
           {items.map((x, i) => (
-            <a key={i} href={hrefOf(i)} role="menuitem" onClick={() => setOpen(null)}>
+            <a key={i} href={hrefOf(i)} role="menuitem" onClick={() => { setOpen(null); if (id === "product") openStage(i); }}>
               <span dir="auto">{x.name}</span>
               <small dir="auto">{x.note}</small>
             </a>
@@ -204,14 +194,12 @@ function Nav({ c, uiLocale, langLabel, preparing }: { c: C; uiLocale: string; la
 
 // ---------- The big card ----------
 
-function Blocks({ c }: { c: C["blocks"] }) {
+function Ways({ c }: { c: C["ways"] }) {
   const [step, setStep] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [round, setRound] = useState(0);
-  const reduced = useRef(false);
   useEffect(() => {
-    reduced.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduced.current) setPlaying(false);
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) setPlaying(false);
   }, []);
   useEffect(() => {
     if (!playing) return;
@@ -220,7 +208,7 @@ function Blocks({ c }: { c: C["blocks"] }) {
   }, [playing, step, round, c.steps.length]);
   const go = (i: number) => { setStep(i); setRound((r) => r + 1); };
   return (
-    <div className="site-card p-8 md:p-12 grid gap-10 md:grid-cols-[1fr_1.1fr] items-center" style={{ borderRadius: 32 }}>
+    <div className="site-card p-6 md:p-12 grid grid-cols-1 gap-10 md:grid-cols-[1fr_1.25fr] items-center" style={{ borderRadius: 32 }}>
       <div className="flex flex-col gap-8">
         <h2 className="site-h2" dir="auto">{c.title}</h2>
         <ol className="m-0 p-0 list-none flex flex-col">
@@ -228,7 +216,7 @@ function Blocks({ c }: { c: C["blocks"] }) {
             <li key={i} className={`site-step ${step === i ? "site-step--on" : ""}`}>
               <button type="button" className="site-step" onClick={() => go(i)} aria-current={step === i ? "step" : undefined}>
                 <span className="site-step__title">
-                  <span dir="auto">{i + 1}. {s.name}</span>
+                  <span dir="auto">{s.name}</span>
                   {step === i && (
                     <span
                       role="button"
@@ -250,43 +238,105 @@ function Blocks({ c }: { c: C["blocks"] }) {
           ))}
         </ol>
       </div>
-      <div className="site-art" style={{ aspectRatio: "13 / 10" }}>
-        <Isometric scene={STEP_SCENES[step]} />
+      <div className="site-art" key={round}>
+        <Mockup way={step} m={c.mock} />
       </div>
     </div>
   );
 }
 
+// ---------- How it works ----------
+
+// The Product menu and the footer open a stage with this event; a link to #stage-N does too.
+function openStage(i: number) {
+  window.dispatchEvent(new CustomEvent("site-stage", { detail: i }));
+}
+
+function How({ c, bodyClass }: { c: C["how"]; bodyClass: string }) {
+  const [on, setOn] = useState(0);
+  const box = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const show = (i: number, scroll: boolean) => {
+      if (i < 0 || i >= c.stages.length) return;
+      setOn(i);
+      if (scroll) box.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    const fromHash = (scroll: boolean) => {
+      const m = /^#stage-(\d+)$/.exec(window.location.hash);
+      if (m) show(Number(m[1]) - 1, scroll);
+    };
+    fromHash(true);
+    const onHash = () => fromHash(true);
+    const onEvent = (e: Event) => show((e as CustomEvent<number>).detail, true);
+    window.addEventListener("hashchange", onHash);
+    window.addEventListener("site-stage", onEvent);
+    return () => { window.removeEventListener("hashchange", onHash); window.removeEventListener("site-stage", onEvent); };
+  }, [c.stages.length]);
+  const s = c.stages[on];
+  return (
+    <section id="how" ref={box} className="site-wrap pt-24 md:pt-32" style={{ scrollMarginTop: 24 }}>
+      <div className="flex flex-col gap-3 mb-10 max-w-[640px]">
+        <h2 className="site-h2" dir="auto">{c.title}</h2>
+        <p className={`${bodyClass} m-0`} style={{ color: "var(--ink-muted)" }} dir="auto">{c.text}</p>
+      </div>
+      <div className="site-card p-3 md:p-4 grid grid-cols-1 gap-3 md:grid-cols-[300px_1fr]" style={{ borderRadius: 28 }}>
+        <ol className="m-0 p-0 list-none flex flex-col gap-1" role="tablist" aria-label={c.title}>
+          {c.stages.map((x, i) => (
+            <li key={i}>
+              <button type="button" role="tab" aria-selected={on === i} className="site-stage" onClick={() => setOn(i)}>
+                <span className="mn-label" lang="en">{String(i + 1).padStart(2, "0")}</span>
+                <span dir="auto">{x.name}</span>
+              </button>
+            </li>
+          ))}
+        </ol>
+        <div key={on} role="tabpanel" className="site-stage-panel flex flex-col gap-6 p-6 md:p-10">
+          <span className="mn-label" lang="en" style={{ color: "var(--ink-faint)" }}>{String(on + 1).padStart(2, "0")} / {String(c.stages.length).padStart(2, "0")}</span>
+          <h3 className="m-0" style={{ fontSize: 28, fontWeight: 600, lineHeight: 1.15 }} dir="auto">{s.name}</h3>
+          <div className="flex flex-col gap-2 max-w-[520px]">
+            {s.lines.map((l, i) => <p key={i} className={`${bodyClass} m-0`} style={{ color: i ? "var(--ink-muted)" : "var(--ink)" }} dir="auto">{l}</p>)}
+          </div>
+          <div className="flex flex-col gap-3 mt-auto">
+            <span className="mn-label" style={{ color: "var(--ink-faint)" }}>{c.makes}</span>
+            <ul className="m-0 p-0 list-none flex flex-wrap gap-2">
+              {s.outputs.map((o, i) => <li key={i} className="site-chip" dir="auto">{o}</li>)}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ---------- Footer ----------
 
-function Footer({ c, theme, onTheme, uiLocale, langLabel, preparing }: { c: C; theme: Theme; onTheme: (t: Theme) => void; uiLocale: string; langLabel: string; preparing: string }) {
-  const col = (title: string, items: { name: string; href: string }[]) => (
+function Footer({ c, theme, onTheme }: { c: C; theme: Theme; onTheme: (t: Theme) => void }) {
+  const col = (title: string, items: { name: string; href: string; stage?: number }[]) => (
     <div className="flex flex-col gap-2">
       <span className="mn-label mb-1" style={{ color: "var(--ink-faint)" }}>{title}</span>
-      {items.map((x, i) => <a key={i} href={x.href} className="small" style={{ color: "var(--ink-muted)", textDecoration: "none" }} dir="auto">{x.name}</a>)}
+      {items.map((x, i) => <a key={i} href={x.href} onClick={x.stage === undefined ? undefined : () => openStage(x.stage!)} className="small" style={{ color: "var(--ink-muted)", textDecoration: "none" }} dir="auto">{x.name}</a>)}
     </div>
   );
   return (
     <footer className="site-wrap pb-10 border-t pt-12" style={{ borderColor: "var(--line)" }}>
       <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr_1fr]">
-        <div className="flex flex-col gap-4">
+        <div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand/menab-logo-light.png" alt="Menab" style={{ height: 22, width: "fit-content" }} className="site-logo" />
-          <div className="site-seg self-start" role="group" aria-label={c.footer.theme.label}>
-            {(["light", "dark", "auto"] as Theme[]).map((t) => (
-              <button key={t} type="button" aria-pressed={theme === t} onClick={() => onTheme(t)}>{c.footer.theme[t]}</button>
-            ))}
-          </div>
-          <LanguageMenu locale={uiLocale} label={langLabel} soon={preparing} compact={false} placement="up" />
         </div>
-        {col(c.footer.product, c.nav.productItems.map((x, i) => ({ name: x.name, href: `#stage-${i + 1}` })))}
+        {col(c.footer.product, c.nav.productItems.map((x, i) => ({ name: x.name, href: `#stage-${i + 1}`, stage: i })))}
         {col(c.footer.solutions, c.nav.solutionItems.map((x, i) => ({ name: x.name, href: `#who-${i + 1}` })))}
         {col(c.footer.company, c.footer.companyItems.map((name, i) => ({ name, href: i === 1 ? "#pricing" : SOON(["about", "pricing", "talk", "blog"][i]) })))}
         {col(c.footer.legal, c.footer.legalItems.map((name, i) => ({ name, href: SOON(["terms", "privacy"][i]) })))}
       </div>
-      <div className="flex items-center gap-4 mt-12 pt-6 border-t" style={{ borderColor: "var(--line)" }}>
+      <div className="flex flex-wrap items-center gap-4 mt-12 pt-6 border-t" style={{ borderColor: "var(--line)" }}>
         <span className="small" style={{ color: "var(--ink-faint)" }}>© 2026 {c.footer.copyright}</span>
         <span className="grow" />
+        <div className="site-seg" role="group" aria-label={c.footer.theme.label}>
+          {(["light", "dark", "auto"] as Theme[]).map((t) => (
+            <button key={t} type="button" aria-pressed={theme === t} onClick={() => onTheme(t)}>{c.footer.theme[t]}</button>
+          ))}
+        </div>
         <span className="mn-label" lang="en" style={{ color: "var(--ink-faint)" }}>menab.si</span>
       </div>
     </footer>
