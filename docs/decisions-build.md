@@ -280,3 +280,9 @@ Measured on expo.dev in a browser on 18 Nov 2026, desktop and phone, dark and li
 - **Spacing:** content 1280px wide with 24px sides (16px on a phone), top bar 68px, buttons 40px high and fully round, cards rounded 40px with 40 to 64px inside, 64px between big cards, 128px between sections (80px on a phone).
 - **Hero:** fills the first screen. Headline, the two buttons, the "New" pill and the paragraph sit in one column on the left. The logo tile (178px, rounded 40px) sits on the right inside a burst of fine lines and dots drawn in code. On a phone everything is centred, the tile comes first, the buttons are full width, and the top bar has a menu button that opens every link.
 - The tile stays dark with a white logo in dark mode (Expo's is white). Ibrahim can choose the white tile later.
+
+## B36. A short film in the hero introduces Menab (Ibrahim, 18 Nov 2026)
+
+- The logo tile in the hero is replaced by a film of about 36 seconds, drawn in code like the scenes in "Three ways to make it". Six scenes of six seconds, looping: paying again for the same video (a shoot day, a reshoot, another edit round, the total); Menab takes it one step at a time (the seven stages approved one by one); you approve each step so nothing is made twice (a script approved and locked, the storyboard opens next); the price before every action (the cost on the button, the balance going down, a failed shot costs nothing); choose the model for each job and pay for what you choose (video, voice and music models changing, with the video price); and the close with the logo in its burst.
+- A bar under the film shows the six scenes. Pressing one jumps to it, and a button pauses it. It does not play for people who turn motion off.
+- The amounts in the first scene are examples, not quotes. The words can change after Ibrahim's talk with his manager.

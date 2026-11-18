@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { LanguageMenu } from "@/components/menus";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
+import { Intro } from "./intro";
 import { Mockup } from "./mockups";
 
 // The public website. The page follows expo.dev's structure (small headline, two buttons, a tile,
@@ -65,12 +66,8 @@ export function Welcome({ c, uiLocale, langLabel, preparing }: { c: C; uiLocale:
           </a>
           <p className="site-hero__text" dir="auto">{c.hero.text}</p>
         </div>
-        <div className="site-hero__art" aria-hidden="true">
-          <Burst />
-          <div className="site-tile">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={resolved === "dark" ? "/brand/menab-mark-light.png" : "/brand/menab-mark-ink.png"} alt="" />
-          </div>
+        <div className="site-hero__art">
+          <Intro c={c.intro} stages={c.how.stages.map((s) => s.name)} approved={c.ways.mock.approved} burst={<Burst />} />
         </div>
       </section>
 
