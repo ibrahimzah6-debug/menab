@@ -17,7 +17,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const DEFAULT_PICTURE_MODEL = "nano-banana-pro";
 // Models offered for actor sheets, outfits and keyframes: the ones best at real people.
-export const PICTURE_MODELS = ["nano-banana-pro", "seedream-5-pro", "gpt-image-2", "nano-banana-2", "flux-2-pro"];
+export const PICTURE_MODELS = ["nano-banana-pro", "gpt-image-2", "seedream-5-pro", "nano-banana-2", "flux-2-pro"];
 
 export type GenKind = "sheet" | "outfit" | "keyframe" | "clip" | "voice" | "music";
 export type GenEvent =
