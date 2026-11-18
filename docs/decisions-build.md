@@ -296,3 +296,15 @@ Measured on expo.dev in a browser on 18 Nov 2026, desktop and phone, dark and li
 - Done in full: French, Spanish, German. Portuguese is half done. The others (Turkish, Indonesian, Russian, Chinese, Hindi, Urdu, Amharic) and the rest of Portuguese use the last AI translation saved in the database, then English for anything newer. The owner dashboard shows how many texts each language still has in English, and `npm run i18n:check` lists them.
 - New English text is not translated with each change. Ibrahim asks when to translate everything that is missing, in one go.
 - The globe language menu is on every page: the website, login and set password, the coming soon page, and the app. The old two-way English and Arabic button is gone.
+
+## B38. Reopening a stage, pictures before the storyboard, a picture model menu (Ibrahim, 18 Nov 2026)
+
+Found while testing the Moringa cream project: the character picture in stage 3 failed with "Invalid key", stage 3 was approved anyway, the storyboard was drawn without the character, and an approved stage could not be reopened.
+
+- **Arabic names in file names:** storage accepts Latin letters only. Pictures are saved under a safe Latin name; the Arabic name stays the label. This was why every Arabic-named character or location failed.
+- **Pictures before approval:** stage 3 is approved only when every AI character and AI location has its picture. Real actors, real places and library entries (which have their own photos) are not counted.
+- **The storyboard waits:** drawing frames stays off, with a line saying which pictures are missing, because frames are drawn from those pictures so faces and places stay the same.
+- **Reopen this stage:** Admins and Producers can reopen any approved stage. The project goes back to it and nothing made later is deleted. Approving it again moves the project forward; if anything in it changed, every later document is marked "Before a change" with the sentence "Made before a change in [stage]. Write it again to update it." Nothing is remade on its own, because remaking costs money. The mark goes away when the document gets a new version.
+- **Picture model menu:** actor sheets, outfit pictures and keyframes use the model picked in the reference lock (Nano Banana Pro by default; Seedream 5 Pro, GPT Image 2, Nano Banana 2, Flux 2 Pro offered). It can change after the lock; it applies to the next pictures.
+- **Talking avatars:** Kling AI Avatar Pro and Infinitalk are in their own group in the Video shots model menu, "Talking avatars (lip-sync, needs a dialogue line in Voice)".
+- **Avatar test, 18 Nov:** the Moringa character's actor sheet with Menab's own instructions. Nano Banana Pro: $0.09, 26 seconds, sharp and clear layout, but it wrote a title on the image, so the instruction against text is now stronger. Seedream 5 Pro: $0.035, 52 seconds, very natural face and clothes, no text. Ibrahim picks the default.

@@ -15,6 +15,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // records the real cost. A failed job is tried once more, then on the backup model; a job that
 // still fails costs nothing. A job still running when the request ends is collected later.
 
+export const DEFAULT_PICTURE_MODEL = "nano-banana-pro";
+// Models offered for actor sheets, outfits and keyframes: the ones best at real people.
+export const PICTURE_MODELS = ["nano-banana-pro", "seedream-5-pro", "gpt-image-2", "nano-banana-2", "flux-2-pro"];
+
 export type GenKind = "sheet" | "outfit" | "keyframe" | "clip" | "voice" | "music";
 export type GenEvent =
   | { t: "genStart"; label: string; model: string }
@@ -55,7 +59,7 @@ export async function stageFive(supabase: SupabaseClient, projectId: string) {
   const shots = ((content(17)?.frames as Shot[] | undefined) ?? []).filter((f) => f.n);
   const script = (content(9)?.rows as { vo_ar?: string; vo_en?: string; seconds?: number }[] | undefined) ?? [];
   const mood = (content(11) ?? {}) as { look?: string; grade?: string; references?: string[] };
-  const lock = (content(34) ?? {}) as { locked?: boolean; consent?: boolean; narrator?: string; voices?: Record<string, string>; aspect?: string };
+  const lock = (content(34) ?? {}) as { locked?: boolean; consent?: boolean; narrator?: string; voices?: Record<string, string>; aspect?: string; imageModel?: string };
   // Outfits that change between scenes need their own picture; one outfit is shown on the sheet.
   const outfits = characters.flatMap((c) => {
     const list = [...new Set(wardrobe.filter((w) => lookKey(w.character) === lookKey(c.name)).map((w) => w.outfit.trim()).filter(Boolean))];
@@ -180,8 +184,8 @@ export async function syncOutputs(admin: Admin, projectId: string) {
 // ---------- Running jobs ----------
 
 export type GenRequest =
-  | { kind: "sheet"; names: string[] }
-  | { kind: "outfit"; keys: string[] }
+  | { kind: "sheet"; names: string[]; model?: string }
+  | { kind: "outfit"; keys: string[]; model?: string }
   | { kind: "keyframe"; shots: number[]; model?: string }
   | { kind: "clip"; shots: number[]; model?: string; prompts?: Record<string, string> }
   | { kind: "voice"; keys: string[] }
@@ -196,8 +200,9 @@ export async function runGenerate(projectId: string, req: GenRequest, emit: (e: 
   const doc = await stageFive(supabase, projectId);
   const brief = (project.brief ?? {}) as { language?: string; feeling?: string };
   const aspect: Aspect = ASPECTS.includes(doc.lock.aspect as Aspect) ? (doc.lock.aspect as Aspect) : "16:9";
-  // Final pictures use the strongest model for keeping faces the same, unless another is picked.
-  const imgModel = imageModel(req.kind === "keyframe" && req.model ? req.model : "nano-banana-pro").id;
+  // Sheets, outfits and keyframes use the picture model picked in the reference lock; by default
+  // the strongest model for keeping faces the same.
+  const imgModel = imageModel(("model" in req && req.model) || doc.lock.imageModel || DEFAULT_PICTURE_MODEL).id;
   const assets = await genAssets(supabase, projectId, project.workspace_id);
 
   // Signed links to pictures that guide the work.
@@ -224,7 +229,7 @@ export async function runGenerate(projectId: string, req: GenRequest, emit: (e: 
     for (const c of doc.characters.filter((x) => req.names.map(lookKey).includes(lookKey(x.name)))) {
       const ref = await sign(lookPath("character", c.name));
       const outfit = doc.wardrobe.find((w) => lookKey(w.character) === lookKey(c.name))?.outfit;
-      const prompt = `Digital actor reference sheet for a film, all in one image: ${c.name}${c.role ? `, ${c.role}` : ""}. Age: ${c.age ?? ""}. ${c.look ?? ""}${outfit ? ` Wearing: ${outfit}.` : ""} Left: full body from the front. Middle: full body from the side. Right: four head-and-shoulders close-ups with the expressions neutral, smiling, serious and surprised. Plain light grey studio background, even soft light.${ref ? " Keep the face exactly as in the reference photo." : ""}\n\n${PHOTO}`;
+      const prompt = `Digital actor reference sheet for a film, all in one image: ${c.name}${c.role ? `, ${c.role}` : ""}. Age: ${c.age ?? ""}. ${c.look ?? ""}${outfit ? ` Wearing: ${outfit}.` : ""} Left: full body from the front. Middle: full body from the side. Right: four head-and-shoulders close-ups with the expressions neutral, smiling, serious and surprised. Plain light grey studio background, even soft light. No words, titles or labels anywhere in the image.${ref ? " Keep the face exactly as in the reference photo." : ""}\n\n${PHOTO}`;
       jobs.push(imageJob(lookKey(c.name), c.name, prompt, ref ? [ref] : [], "16:9"));
     }
   } else if (req.kind === "outfit") {

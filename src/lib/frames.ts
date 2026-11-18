@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { ASPECTS, STYLE_PROMPT, imageBackup, imageModel, imageRequest, type Aspect, type Style } from "@/lib/ai/images";
 import { createTask, getTask, KIE_USD_PER_CREDIT, KieError } from "@/lib/ai/kie";
 import { loadProject } from "@/lib/brief-turn";
+import { fill } from "@/lib/i18n/dictionaries";
 import { getI18n } from "@/lib/i18n/server";
 import { logAiJob, notify } from "@/lib/projects";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -22,8 +23,8 @@ export type FrameEvent =
   | { t: "drawRefFailed"; name: string; reason: string };
 
 type Frame = { n: number; prompt: string; cast?: string[]; set?: string };
-type Character = { name: string; role?: string; age?: string; look?: string; library_id?: string | null };
-type Location = { name: string; int_ext?: string; description?: string; library_id?: string | null };
+type Character = { name: string; role?: string; age?: string; look?: string; library_id?: string | null; made_with?: string };
+type Location = { name: string; int_ext?: string; description?: string; library_id?: string | null; made_with?: string };
 type Outfit = { character: string; outfit: string };
 type Admin = ReturnType<typeof createAdminClient>;
 type Drawn = { url: string; credits: number; seconds: number; model: string; taskId: string };
@@ -136,6 +137,19 @@ async function stageThree(supabase: SupabaseClient, projectId: string) {
   };
 }
 
+// AI characters and AI locations that still have no picture. The storyboard is drawn from these
+// pictures, so frames wait for them, and stage 3 is not approved without them. Real actors, real
+// places and library entries (which have their own photos) are not counted.
+export async function missingPictures(supabase: SupabaseClient, projectId: string): Promise<string[]> {
+  const doc = await stageThree(supabase, projectId);
+  const { data } = await supabase.from("look_images").select("kind, key").eq("project_id", projectId).eq("status", "ready");
+  const have = new Set((data ?? []).map((r) => `${r.kind}:${r.key}`));
+  const out: string[] = [];
+  for (const c of doc.characters) if (c.made_with !== "cast" && !c.library_id && !have.has(`character:${lookKey(c.name)}`)) out.push(c.name);
+  for (const l of doc.locations) if (l.made_with !== "real" && !l.library_id && !have.has(`location:${lookKey(l.name)}`)) out.push(l.name);
+  return out;
+}
+
 // Signed links to the pictures that guide a drawing: this project's reference pictures first,
 // else the first photo of a library character or location.
 async function referencePhotos(supabase: SupabaseClient, admin: Admin, project: { id: string; workspace_id: string }, doc: Awaited<ReturnType<typeof stageThree>>) {
@@ -184,6 +198,8 @@ export async function runFrames(
   const model = imageModel(req.model).id;
 
   const doc = await stageThree(supabase, projectId);
+  const waiting = await missingPictures(supabase, projectId);
+  if (waiting.length) throw new Error(fill(t.project.frames.picturesFirst, { names: waiting.join(", ") }));
   const frames = doc.frames.filter((f) => req.frames.includes(f.n) && f.prompt?.trim());
   if (!frames.length) throw new Error(t.project.docs.notWritten);
 
@@ -323,7 +339,8 @@ export async function runRefs(
     if (accountProblem || signal?.aborted) return fail(accountProblem ?? "Stopped");
     emit({ t: "drawingRef", name: x.name, model: imageModel(model).name });
     try {
-      const slug = key.replace(/[^a-z0-9؀-ۿ]+/gi, "-").slice(0, 60) || "item";
+      // Storage accepts Latin letters only: an Arabic name stays the label, never the file name.
+      const slug = key.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "item";
       const d = await drawAndStore({
         admin,
         model,
