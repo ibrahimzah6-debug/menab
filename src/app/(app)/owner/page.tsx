@@ -90,6 +90,12 @@ export default async function OwnerPage({ searchParams }: { searchParams: Promis
                       <td className="py-2 pe-4 data">{usd(jobs.filter((j) => j.workspace_id === w.id).reduce((s, j) => s + Number(j.cost_usd ?? 0), 0))}</td>
                     </tr>
                   ))}
+                  <tr className="border-t border-line">
+                    <td className="py-2 pe-4" dir="auto">{o.devCost}</td>
+                    <td className="py-2 pe-4 data">-</td>
+                    <td className="py-2 pe-4 data">-</td>
+                    <td className="py-2 pe-4 data">{usd(jobs.filter((j) => !j.workspace_id).reduce((s, j) => s + Number(j.cost_usd ?? 0), 0))}</td>
+                  </tr>
                 </tbody>
               </table>
             </section>
@@ -132,17 +138,22 @@ type Admin = ReturnType<typeof createAdminClient>;
 
 async function Development({ o, admin, date, status, card }: { o: O; admin: Admin; date: (x: string) => string; status?: string; card: string }) {
   const shown = STATUSES.includes(status as (typeof STATUSES)[number]) ? (status as (typeof STATUSES)[number]) : "open";
-  const [{ data: report }, { data: items }, { data: accepted }] = await Promise.all([
+  const since = new Date(Date.now() - 30 * 86400_000).toISOString();
+  const [{ data: report }, { data: items }, { data: accepted }, { data: runs }] = await Promise.all([
     admin.from("dev_reports").select("summary, model, created_at, stats").order("created_at", { ascending: false }).limit(1).maybeSingle(),
     admin.from("dev_items").select("id, title, detail, evidence, kind, priority, status, created_at").eq("status", shown).order("created_at", { ascending: false }).limit(60),
     admin.from("dev_items").select("title, detail, evidence, kind").eq("status", "accepted").neq("kind", "prompt_rule").limit(40),
+    // Menab's own cost of the analysis (not a client's).
+    admin.from("ai_jobs").select("cost_usd").is("workspace_id", null).eq("task", "development").gte("created_at", since),
   ]);
+  const devCost = (runs ?? []).reduce((s, j) => s + Number(j.cost_usd ?? 0), 0);
   const rank = { high: 0, medium: 1, low: 2 } as const;
   const list = [...(items ?? [])].sort((a, b) => rank[a.priority as keyof typeof rank] - rank[b.priority as keyof typeof rank]);
   return (
     <>
       <section className={card}>
         <p className="small text-ink-muted m-0">{o.dev.intro}</p>
+        <p className="small m-0">{fill(o.devRuns, { n: (runs ?? []).length, cost: `$${devCost.toFixed(3)}` })}</p>
         <RunAnalysis label={o.dev.run} busy={o.dev.running} />
       </section>
       <section className={card}>

@@ -47,10 +47,11 @@ export async function saveVersion(
 }
 
 // Every AI call is logged with its real cost. The table is written by the server only.
+// workspaceId null: Menab's own work (the daily development analysis), not a client's.
 export async function logAiJob(job: {
-  workspaceId: string;
+  workspaceId: string | null;
   projectId: string | null;
-  userId: string;
+  userId: string | null;
   task: string;
   provider: string;
   model: string;

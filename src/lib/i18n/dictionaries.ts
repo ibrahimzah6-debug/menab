@@ -240,6 +240,7 @@ const en = {
       note: "A photo-real picture of each one keeps the same face and place in every storyboard frame, and in the final shots.",
       drawMissing: "Draw {n} pictures",
       drawOnePic: "Draw 1 picture",
+      per: "{price} a picture",
       drawAll: "Draw every picture again",
       drawOne: "Draw",
       redraw: "Draw again",
@@ -896,6 +897,8 @@ const en = {
     health: { title: "Model health, last 24 hours", ok: "Answered", failed: "Failed or taken over", time: "Avg time", status: "Status", good: "Working", bad: "Skipped for now", none: "No calls yet." },
     fb: { title: "What people said", none: "No feedback yet. Thumbs and ideas show here.", kinds: { up: "Good", down: "Not good", idea: "Idea", bug: "Problem" } },
     rules: { title: "Rules Menab AI follows", intro: "Each rule is added to Menab AI's instructions on every call, in every workspace.", add: "Add rule", placeholder: "e.g. Never ask for the budget more than once", none: "No rules yet.", on: "On", off: "Off", turnOn: "Turn on", turnOff: "Turn off", remove: "Remove" },
+    devCost: "Menab development (daily analysis)",
+    devRuns: "Analysis in the last 30 days: {n} runs, {cost}",
     tools: { languages: "Languages", ready: "Ready", missing: "{n} texts still in English", memory: "Memory across workspaces", memories: "{n} things remembered" },
   },
   credits: {
@@ -1249,6 +1252,7 @@ const ar: Dictionary = {
       note: "صورة واقعية لكل واحد تخلّي نفس الوجه ونفس المكان في كل فريم من الستوري بورد، وفي اللقطات النهائية.",
       drawMissing: "ارسم {n} صور",
       drawOnePic: "ارسم صورة وحدة",
+      per: "{price} للصورة",
       drawAll: "ارسم كل الصور من جديد",
       drawOne: "ارسم",
       redraw: "ارسمها من جديد",
@@ -1906,6 +1910,8 @@ const ar: Dictionary = {
     health: { title: "صحة النماذج، آخر ٢٤ ساعة", ok: "رد", failed: "فشل أو استلم البديل", time: "متوسط الوقت", status: "الحالة", good: "شغّال", bad: "متجاوز مؤقتاً", none: "ما فيه طلبات للحين." },
     fb: { title: "وش قال الناس", none: "ما فيه آراء للحين. التقييمات والأفكار تطلع هنا.", kinds: { up: "حلو", down: "مو حلو", idea: "فكرة", bug: "مشكلة" } },
     rules: { title: "القواعد اللي يتبعها مِناب AI", intro: "كل قاعدة تنضاف لتعليمات مِناب AI في كل طلب وكل مساحة عمل.", add: "أضف قاعدة", placeholder: "مثل: لا تسأل عن الميزانية أكثر من مرة", none: "ما فيه قواعد للحين.", on: "شغّالة", off: "طافية", turnOn: "شغّلها", turnOff: "طفّها", remove: "احذف" },
+    devCost: "تطوير مِناب (التحليل اليومي)",
+    devRuns: "التحليل في آخر ٣٠ يوم: {n} مرات، {cost}",
     tools: { languages: "اللغات", ready: "جاهزة", missing: "{n} نص للحين بالإنجليزي", memory: "الذاكرة في كل المساحات", memories: "{n} أشياء محفوظة" },
   },
   credits: {
