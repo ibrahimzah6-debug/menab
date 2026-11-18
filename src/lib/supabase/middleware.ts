@@ -4,7 +4,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./env";
 
 // /api/cron is called by Vercel's scheduler with its own secret, not a login.
 // /welcome is the public website; a visitor who is not signed in sees it at "/".
-const PUBLIC_PATHS = ["/login", "/auth", "/api/cron", "/welcome"];
+const PUBLIC_PATHS = ["/login", "/auth", "/api/cron", "/welcome", "/soon"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
