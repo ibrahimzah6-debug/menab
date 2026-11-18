@@ -12,10 +12,12 @@ import type { Dictionary } from "@/lib/i18n/dictionaries";
 // and stays on the first scene for people who turn motion off.
 
 type I = Dictionary["site"]["intro"];
-const SCENE_MS = 6000;
+// The first scene is longer: it shows the same problem for AI videos, shoots and hybrid videos.
+const SCENE_MS = [12000, 6000, 6000, 6000, 6000, 6000];
+const VARIANT_MS = 4000;
 const d = (s: number) => ({ "--d": `${s}s` }) as CSSProperties;
 
-export function Intro({ c, stages, approved, burst }: { c: I; stages: string[]; approved: string; burst: ReactNode }) {
+export function Intro({ c, stages, approved }: { c: I; stages: string[]; approved: string }) {
   const [scene, setScene] = useState(0);
   const [round, setRound] = useState(0);
   const [playing, setPlaying] = useState(true);
@@ -25,7 +27,7 @@ export function Intro({ c, stages, approved, burst }: { c: I; stages: string[]; 
   }, []);
   useEffect(() => {
     if (!playing) return;
-    const t = setTimeout(() => { setScene((s) => (s + 1) % count); setRound((r) => r + 1); }, SCENE_MS);
+    const t = setTimeout(() => { setScene((s) => (s + 1) % count); setRound((r) => r + 1); }, SCENE_MS[scene]);
     return () => clearTimeout(t);
   }, [playing, scene, round]);
   const go = (i: number) => { setScene(i); setRound((r) => r + 1); };
@@ -33,12 +35,12 @@ export function Intro({ c, stages, approved, burst }: { c: I; stages: string[]; 
   return (
     <div className="site-film" role="region" aria-label={c.label}>
       <div className="site-film__stage" key={round}>
-        {scene === 0 && <Problem c={c} />}
+        {scene === 0 && <Problem c={c} playing={playing} />}
         {scene === 1 && <Steps c={c} stages={stages} approved={approved} />}
         {scene === 2 && <Approve c={c} />}
         {scene === 3 && <Price c={c} />}
         {scene === 4 && <Models c={c} />}
-        {scene === 5 && <Close c={c} burst={burst} />}
+        {scene === 5 && <Close c={c} />}
       </div>
       <div className="site-film__bar">
         <button type="button" className="site-film__play" aria-label={playing ? c.pause : c.play} aria-pressed={!playing} onClick={() => setPlaying((p) => !p)}>
@@ -48,7 +50,7 @@ export function Intro({ c, stages, approved, burst }: { c: I; stages: string[]; 
         </button>
         {Array.from({ length: count }, (_, i) => (
           <button key={i} type="button" className="site-film__seg" aria-label={`${i + 1}`} aria-current={scene === i ? "step" : undefined} onClick={() => go(i)}>
-            <i className={i < scene ? "done" : i === scene ? (playing ? "run" : "run paused") : ""} key={i === scene ? round : undefined} />
+            <i className={i < scene ? "done" : i === scene ? (playing ? "run" : "run paused") : ""} key={i === scene ? round : undefined} style={{ "--run": `${SCENE_MS[i] / 1000}s` } as CSSProperties} />
           </button>
         ))}
       </div>
@@ -68,26 +70,37 @@ function Lock() {
   return <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true"><rect x="2.5" y="5.5" width="7" height="5" rx="1" /><path d="M4 5.5V4a2 2 0 014 0v1.5" /></svg>;
 }
 
-// 1. Paying again for the same video.
-function Problem({ c }: { c: I }) {
+// 1. Paying again and again: first for AI videos, then shoots, then hybrid videos. Everything
+// shows at once; then the word and the bills change together.
+function Problem({ c, playing }: { c: I; playing: boolean }) {
+  const [v, setV] = useState(0);
+  const n = c.problem.variants.length;
+  useEffect(() => {
+    if (!playing || v >= n - 1) return;
+    const t = setTimeout(() => setV((x) => x + 1), VARIANT_MS);
+    return () => clearTimeout(t);
+  }, [playing, v, n]);
+  const x = c.problem.variants[v];
   return (
     <div className="site-film__scene">
-      <Title>{c.problem.title}</Title>
-      <div className="mk-panel mk-in" style={d(0.9)}>
-        <ul className="mk-list">
-          {c.problem.rows.map((r, i) => (
-            <li key={i} className="mk-in site-film__row" style={d(1.3 + i * 0.6)}>
+      <p className="site-film__title mk-in" style={d(0)} dir="auto">
+        {c.problem.before} <span className="site-film__word" key={v}>{x.word}</span>{c.problem.after}
+      </p>
+      <div className="mk-panel mk-in" style={d(0)}>
+        <ul className="mk-list" key={v}>
+          {x.rows.map((r, i) => (
+            <li key={i} className="mk-in site-film__row" style={d(v ? 0.15 + i * 0.12 : 0)}>
               <span className="mk-text grow" dir="auto">{r.name}</span>
               <span className="mk-text site-film__money" dir="auto">{r.value}</span>
             </li>
           ))}
-          <li className="mk-in site-film__row site-film__row--total" style={d(3.2)}>
-            <span className="mk-text grow" dir="auto">{c.problem.total}</span>
-            <span className="mk-big" dir="auto">{c.problem.totalValue}</span>
+          <li className="mk-in site-film__row site-film__row--total" style={d(v ? 0.6 : 0)}>
+            <span className="mk-text grow" dir="auto">{x.total}</span>
+            <span className="mk-big" dir="auto">{x.totalValue}</span>
           </li>
         </ul>
       </div>
-      <p className="site-film__note mk-in" style={d(4.1)} dir="auto">{c.problem.note}</p>
+      <p className="site-film__note mk-in" style={d(0)} dir="auto">{c.problem.note}</p>
     </div>
   );
 }
@@ -195,19 +208,12 @@ function Models({ c }: { c: I }) {
   );
 }
 
-// 6. The close.
-function Close({ c, burst }: { c: I; burst: ReactNode }) {
+// 6. The close: words only.
+function Close({ c }: { c: I }) {
   return (
     <div className="site-film__scene site-film__scene--close">
-      <div className="site-film__burst">{burst}</div>
-      <div className="site-tile site-film__tile mk-in" style={d(0.3)}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/menab-mark-light.png" alt="" className="site-logo-dark" />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/menab-mark-ink.png" alt="" className="site-logo-light" />
-      </div>
-      <p className="site-film__title mk-in" style={{ ...d(1), textAlign: "center" }} dir="auto">{c.close.title}</p>
-      <p className="site-film__note mk-in" style={{ ...d(1.6), textAlign: "center" }} dir="auto">{c.close.text}</p>
+      <p className="site-film__title site-film__title--close mk-in" style={d(0.2)} dir="auto">{c.close.title}</p>
+      <p className="site-film__note mk-in" style={d(1)} dir="auto">{c.close.text}</p>
     </div>
   );
 }

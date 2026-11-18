@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { clearRulesCache, runAnalysis } from "@/lib/dev";
-import { ensureTranslation, MACHINE_LOCALES } from "@/lib/i18n/translate";
 import { getI18n } from "@/lib/i18n/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPlatformAdmin } from "@/lib/usage";
@@ -76,17 +75,3 @@ export async function setRule(id: string, active: boolean | null): Promise<Resul
   }
 }
 
-export async function prepareAllLanguages(): Promise<Result> {
-  try {
-    await owner();
-    const errors: string[] = [];
-    for (const l of Object.keys(MACHINE_LOCALES)) {
-      const r = await ensureTranslation(l);
-      if (!r.ok && r.error) errors.push(`${MACHINE_LOCALES[l].name}: ${r.error}`);
-    }
-    revalidatePath("/owner");
-    return errors.length ? { error: errors.join(" | ") } : {};
-  } catch (e) {
-    return { error: errText(e) };
-  }
-}

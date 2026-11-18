@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { addRule, prepareAllLanguages, runAnalysisNow, setItemStatus, setRule } from "./actions";
+import { addRule, runAnalysisNow, setItemStatus, setRule } from "./actions";
 
 function useRun() {
   const router = useRouter();
@@ -99,12 +99,3 @@ export function RuleActions({ id, active, c }: { id: string; active: boolean; c:
   );
 }
 
-export function PrepareLanguages({ label, busy }: { label: string; busy: string }) {
-  const { pending, note, run } = useRun();
-  return (
-    <div className="flex flex-wrap items-center gap-3">
-      <button type="button" className="mn-btn mn-btn--secondary mn-btn--sm" disabled={pending} onClick={() => run(prepareAllLanguages)}>{pending ? busy : label}</button>
-      {note && <span className="small" role="alert">{note}</span>}
-    </div>
-  );
-}

@@ -1,12 +1,16 @@
 import Link from "next/link";
+import { LanguageMenu } from "@/components/menus";
 import { getI18n } from "@/lib/i18n/server";
 
 // A page of the website that is not written yet. Every link on the site leads somewhere.
 export default async function SoonPage() {
-  const { t, dir } = await getI18n();
+  const { t, dir, uiLocale } = await getI18n();
   const c = t.site.soon;
   return (
     <div data-theme="dark" dir={dir} style={{ background: "var(--ground)", color: "var(--ink)", minHeight: "100vh", display: "grid", placeItems: "center", padding: 24, fontFamily: "var(--font-sans)" }}>
+      <div style={{ position: "fixed", top: 16, insetInlineEnd: 16 }}>
+        <LanguageMenu locale={uiLocale} label={t.settings.language} soon={t.frame.preparing} compact placement="down" />
+      </div>
       <div className="flex flex-col items-center gap-5 text-center" style={{ maxWidth: 520 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/brand/menab-mark-light.png" alt="" style={{ width: 48 }} />

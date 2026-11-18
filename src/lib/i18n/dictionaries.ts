@@ -2,9 +2,7 @@
 // Arabic is written for Saudi users, not translated word for word.
 
 const en = {
-  langSwitch: "العربية",
-  langSwitchLabel: "Switch to Arabic",
-  frame: { openMenu: "Open the menu", closeMenu: "Close the menu", workspaces: "Workspaces", soon: "Soon", preparing: "Preparing the language, about a minute the first time", newWorkspace: "New workspace", workspaceName: "Company name", add: "Add", usage: "Usage", help: "Get help", languageItem: "Language" },
+  frame: { openMenu: "Open the menu", closeMenu: "Close the menu", workspaces: "Workspaces", soon: "Soon", preparing: "Switching the language", newWorkspace: "New workspace", workspaceName: "Company name", add: "Add", usage: "Usage", help: "Get help", languageItem: "Language" },
   mic: { start: "Speak instead of typing", stop: "Listening. Press to stop", working: "Writing down what you said", blocked: "The microphone is blocked. Allow it in the browser, then try again." },
   nav: {
     newProject: "New project",
@@ -416,19 +414,45 @@ const en = {
       trusted: "In private use with its first production houses",
     },
     intro: {
-      label: "Menab in 36 seconds",
+      label: "Menab in 42 seconds",
       play: "Play",
       pause: "Pause",
       problem: {
-        title: "Tired of paying again and again for AI videos?",
-        rows: [
-          { name: "Try 1: the face changed", value: "SAR 750" },
-          { name: "Try 2: the place changed", value: "SAR 750" },
-          { name: "Try 3: the voice is off", value: "SAR 750" },
+        before: "Tired of paying again and again for",
+        after: "?",
+        variants: [
+          {
+            word: "AI videos",
+            rows: [
+              { name: "Try 1: the face changed", value: "SAR 750" },
+              { name: "Try 2: the place changed", value: "SAR 750" },
+              { name: "Try 3: the voice is off", value: "SAR 750" },
+            ],
+            total: "Total, and still no video",
+            totalValue: "SAR 2,250",
+          },
+          {
+            word: "shoots",
+            rows: [
+              { name: "Shoot day", value: "SAR 45,000" },
+              { name: "Reshoot", value: "SAR 45,000" },
+              { name: "Another edit round", value: "SAR 12,000" },
+            ],
+            total: "Total, for one video",
+            totalValue: "SAR 102,000",
+          },
+          {
+            word: "hybrid videos",
+            rows: [
+              { name: "Shoot day", value: "SAR 45,000" },
+              { name: "AI shots that do not match the shoot", value: "SAR 1,500" },
+              { name: "Reshoot to match", value: "SAR 45,000" },
+            ],
+            total: "Total, for one video",
+            totalValue: "SAR 91,500",
+          },
         ],
-        total: "Total, and still no video",
-        totalValue: "SAR 2,250",
-        note: "Without a plan, every try starts again from zero.",
+        note: "Without a plan, every change starts again from zero.",
       },
       steps: { title: "Menab takes it one step at a time." },
       approve: {
@@ -662,7 +686,7 @@ const en = {
       { q: "What does each AI action cost?", a: "The price shows on the button before anything runs. A failed action costs nothing." },
       { q: "Can I change the AI model?", a: "Yes. Pick a model in the reply box or on any step. Admins set the defaults here under AI models." },
     ],
-    languagesNote: "English and Arabic are written by hand. The other languages are translated by AI and get ready in the background.",
+    languagesNote: "English and Arabic are written by hand. The other languages are translated ahead of time and switch at once.",
     suggest: { title: "Suggest an improvement", body: "Tell us what to fix or add. It goes straight into Menab's development list.", placeholder: "What should Menab do better?", idea: "Idea", bug: "Problem", send: "Send", thanks: "Thanks. It is in the development list now." },
   },
   project: {
@@ -869,7 +893,7 @@ const en = {
     health: { title: "Model health, last 24 hours", ok: "Answered", failed: "Failed or taken over", time: "Avg time", status: "Status", good: "Working", bad: "Skipped for now", none: "No calls yet." },
     fb: { title: "What people said", none: "No feedback yet. Thumbs and ideas show here.", kinds: { up: "Good", down: "Not good", idea: "Idea", bug: "Problem" } },
     rules: { title: "Rules Menab AI follows", intro: "Each rule is added to Menab AI's instructions on every call, in every workspace.", add: "Add rule", placeholder: "e.g. Never ask for the budget more than once", none: "No rules yet.", on: "On", off: "Off", turnOn: "Turn on", turnOff: "Turn off", remove: "Remove" },
-    tools: { languages: "Languages", ready: "Ready", notReady: "Not ready", prepare: "Prepare all now", preparing: "Preparing, this takes a few minutes", memory: "Memory across workspaces", memories: "{n} things remembered" },
+    tools: { languages: "Languages", ready: "Ready", missing: "{n} texts still in English", memory: "Memory across workspaces", memories: "{n} things remembered" },
   },
   credits: {
     intro: "What this workspace spent on AI in the last 30 days. Top-up by card comes later; for now ZAH tops up by hand.",
@@ -977,9 +1001,7 @@ const en = {
 export type Dictionary = typeof en;
 
 const ar: Dictionary = {
-  langSwitch: "English",
-  langSwitchLabel: "التبديل إلى الإنجليزية",
-  frame: { openMenu: "افتح القائمة", closeMenu: "أغلق القائمة", workspaces: "مساحات العمل", soon: "قريباً", preparing: "نجهّز اللغة، تقريباً دقيقة أول مرة", newWorkspace: "مساحة عمل جديدة", workspaceName: "اسم الشركة", add: "أضف", usage: "الاستخدام", help: "المساعدة", languageItem: "اللغة" },
+  frame: { openMenu: "افتح القائمة", closeMenu: "أغلق القائمة", workspaces: "مساحات العمل", soon: "قريباً", preparing: "نغيّر اللغة", newWorkspace: "مساحة عمل جديدة", workspaceName: "اسم الشركة", add: "أضف", usage: "الاستخدام", help: "المساعدة", languageItem: "اللغة" },
   mic: { start: "تكلم بدال الكتابة", stop: "أسمعك. اضغط عشان توقف", working: "أكتب اللي قلته", blocked: "المايك مقفول. اسمح له في المتصفح وجرّب مرة ثانية." },
   nav: {
     newProject: "مشروع جديد",
@@ -1391,19 +1413,45 @@ const ar: Dictionary = {
       trusted: "في استخدام خاص مع أول شركات الإنتاج",
     },
     intro: {
-      label: "مِناب في ٣٦ ثانية",
+      label: "مِناب في ٤٢ ثانية",
       play: "شغّل",
       pause: "وقّف",
       problem: {
-        title: "تعبت وأنت تدفع مرة بعد مرة على فيديوهات الذكاء الاصطناعي؟",
-        rows: [
-          { name: "المحاولة ١: الوجه تغيّر", value: "٧٥٠ ريال" },
-          { name: "المحاولة ٢: المكان تغيّر", value: "٧٥٠ ريال" },
-          { name: "المحاولة ٣: الصوت مو مضبوط", value: "٧٥٠ ريال" },
+        before: "تعبت وأنت تدفع مرة بعد مرة على",
+        after: "؟",
+        variants: [
+          {
+            word: "فيديوهات الذكاء الاصطناعي",
+            rows: [
+              { name: "المحاولة ١: الوجه تغيّر", value: "٧٥٠ ريال" },
+              { name: "المحاولة ٢: المكان تغيّر", value: "٧٥٠ ريال" },
+              { name: "المحاولة ٣: الصوت مو مضبوط", value: "٧٥٠ ريال" },
+            ],
+            total: "المجموع، وللحين ما فيه فيديو",
+            totalValue: "٢٬٢٥٠ ريال",
+          },
+          {
+            word: "التصوير",
+            rows: [
+              { name: "يوم التصوير", value: "٤٥٬٠٠٠ ريال" },
+              { name: "إعادة التصوير", value: "٤٥٬٠٠٠ ريال" },
+              { name: "جولة مونتاج ثانية", value: "١٢٬٠٠٠ ريال" },
+            ],
+            total: "المجموع، لفيديو واحد",
+            totalValue: "١٠٢٬٠٠٠ ريال",
+          },
+          {
+            word: "الفيديوهات المدمجة",
+            rows: [
+              { name: "يوم التصوير", value: "٤٥٬٠٠٠ ريال" },
+              { name: "لقطات ذكاء اصطناعي ما تطابق التصوير", value: "١٬٥٠٠ ريال" },
+              { name: "إعادة تصوير عشان تتطابق", value: "٤٥٬٠٠٠ ريال" },
+            ],
+            total: "المجموع، لفيديو واحد",
+            totalValue: "٩١٬٥٠٠ ريال",
+          },
         ],
-        total: "المجموع، وللحين ما فيه فيديو",
-        totalValue: "٢٬٢٥٠ ريال",
-        note: "بدون خطة، كل محاولة تبدأ من الصفر.",
+        note: "بدون خطة، كل تعديل يبدأ من الصفر.",
       },
       steps: { title: "مِناب يمشي معك خطوة خطوة." },
       approve: {
@@ -1638,7 +1686,7 @@ const ar: Dictionary = {
       { q: "كم تكلف كل عملية ذكاء اصطناعي؟", a: "السعر يطلع على الزر قبل أي شي يشتغل. والعملية اللي تفشل ما تكلف شي." },
       { q: "أقدر أغيّر النموذج؟", a: "إيه. اختر النموذج في صندوق الرد أو في أي خطوة. والمدير يحدد الافتراضي هنا في نماذج الذكاء الاصطناعي." },
     ],
-    languagesNote: "الإنجليزي والعربي مكتوبة يدوياً. باقي اللغات مترجمة بالذكاء الاصطناعي وتجهز في الخلفية.",
+    languagesNote: "الإنجليزي والعربي مكتوبة يدوياً. باقي اللغات مترجمة مسبقاً وتتغيّر فوراً.",
     suggest: { title: "اقترح تحسين", body: "قول لنا وش نصلّح أو نضيف. يروح مباشرة لقائمة تطوير مِناب.", placeholder: "وش لازم مِناب يسوي أحسن؟", idea: "فكرة", bug: "مشكلة", send: "أرسل", thanks: "شكراً. صار في قائمة التطوير." },
   },
   project: {
@@ -1845,7 +1893,7 @@ const ar: Dictionary = {
     health: { title: "صحة النماذج، آخر ٢٤ ساعة", ok: "رد", failed: "فشل أو استلم البديل", time: "متوسط الوقت", status: "الحالة", good: "شغّال", bad: "متجاوز مؤقتاً", none: "ما فيه طلبات للحين." },
     fb: { title: "وش قال الناس", none: "ما فيه آراء للحين. التقييمات والأفكار تطلع هنا.", kinds: { up: "حلو", down: "مو حلو", idea: "فكرة", bug: "مشكلة" } },
     rules: { title: "القواعد اللي يتبعها مِناب AI", intro: "كل قاعدة تنضاف لتعليمات مِناب AI في كل طلب وكل مساحة عمل.", add: "أضف قاعدة", placeholder: "مثل: لا تسأل عن الميزانية أكثر من مرة", none: "ما فيه قواعد للحين.", on: "شغّالة", off: "طافية", turnOn: "شغّلها", turnOff: "طفّها", remove: "احذف" },
-    tools: { languages: "اللغات", ready: "جاهزة", notReady: "مو جاهزة", prepare: "جهّزها كلها الحين", preparing: "نجهّزها، ياخذ كم دقيقة", memory: "الذاكرة في كل المساحات", memories: "{n} أشياء محفوظة" },
+    tools: { languages: "اللغات", ready: "جاهزة", missing: "{n} نص للحين بالإنجليزي", memory: "الذاكرة في كل المساحات", memories: "{n} أشياء محفوظة" },
   },
   credits: {
     intro: "اللي صرفته مساحة العمل على الذكاء الاصطناعي في آخر ٣٠ يوم. الشحن بالبطاقة يجي لاحقاً، وحالياً ZAH تشحن يدوي.",

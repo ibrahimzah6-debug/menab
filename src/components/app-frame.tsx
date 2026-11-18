@@ -1,6 +1,4 @@
-import { after } from "next/server";
 import { cookies } from "next/headers";
-import { warmTranslations } from "@/lib/i18n/translate";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { getI18n } from "@/lib/i18n/server";
@@ -30,7 +28,6 @@ export async function AppFrame({ children, defaultOpen = false }: { children: Re
     }
   }
   // After the page is sent, prepare a couple of languages nobody has picked yet.
-  after(() => warmTranslations(2));
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row" data-menu={open ? "open" : "closed"}>
@@ -39,7 +36,7 @@ export async function AppFrame({ children, defaultOpen = false }: { children: Re
         logo={<Logo height={20} />}
         mark={<Logo height={18} mark />}
         locale={locale}
-        labels={{ ...t.nav, ...t.frame, signOut: t.account.signOut, langSwitch: t.langSwitch, langSwitchLabel: t.langSwitchLabel, viewerNote: t.projects.viewerNote, owner: t.owner.nav, account: t.settings.account, language: t.settings.language, soon: t.frame.soon }}
+        labels={{ ...t.nav, ...t.frame, signOut: t.account.signOut, viewerNote: t.projects.viewerNote, owner: t.owner.nav, account: t.settings.account, language: t.settings.language, soon: t.frame.soon }}
         workspaces={all.map((m) => m.workspace)}
         currentWorkspace={member?.workspace ?? null}
         canCreate={Boolean(member && ["admin", "producer"].includes(member.role))}

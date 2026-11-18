@@ -116,8 +116,7 @@ export function WorkspaceForm({ name, canEdit, c }: { name: string; canEdit: boo
   );
 }
 
-// Every language in one list. Ready languages switch at once; one still being prepared
-// takes about a minute the first time.
+// Every language in one list. All are stored with the app, so each switches at once.
 export function LanguageList({ current, label, preparing }: { current: string; label: string; preparing: string }) {
   const [pending, start] = useTransition();
   const [picked, setPicked] = useState<string | null>(null);

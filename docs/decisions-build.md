@@ -283,8 +283,16 @@ Measured on expo.dev in a browser on 18 Nov 2026, desktop and phone, dark and li
 
 ## B36. A short film in the hero introduces Menab (Ibrahim, 18 Nov 2026)
 
-- The logo tile in the hero is replaced by a film of about 36 seconds, drawn in code like the scenes in "Three ways to make it". Six scenes of six seconds, looping: paying again for the same video (a shoot day, a reshoot, another edit round, the total); Menab takes it one step at a time (the seven stages approved one by one); you approve each step so nothing is made twice (a script approved and locked, the storyboard opens next); the price before every action (the cost on the button, the balance going down, a failed shot costs nothing); choose the model for each job and pay for what you choose (video, voice and music models changing, with the video price); and the close with the logo in its burst.
+- The logo tile in the hero is replaced by a film, drawn in code like the scenes in "Three ways to make it". Six scenes of six seconds, looping: paying again for the same video (a shoot day, a reshoot, another edit round, the total); Menab takes it one step at a time (the seven stages approved one by one); you approve each step so nothing is made twice (a script approved and locked, the storyboard opens next); the price before every action (the cost on the button, the balance going down, a failed shot costs nothing); choose the model for each job and pay for what you choose (video, voice and music models changing, with the video price); and the close with the logo in its burst.
 - A bar under the film shows the six scenes. Pressing one jumps to it, and a button pauses it. It does not play for people who turn motion off.
 - The film has no frame, background or dots. In each scene the sentence comes first, then the card, then the last line.
-- The first scene is about AI: paying again and again for tries where the face, the place or the voice changes, because without a plan every try starts from zero.
+- The first scene lasts 12 seconds and covers all three ways. It shows everything at once, then the word changes from "AI videos" to "shoots" to "hybrid videos", and the bills change with it: failed AI tries; a shoot day, a reshoot and another edit round; a shoot plus AI shots that do not match, then a reshoot. Without a plan, every change starts again from zero.
+- The last scene is words only: "From brief to delivery, step by step. Made with AI, shot for real, or both." The film is about 42 seconds.
 - The amounts in the first scene are examples, not quotes. The words can change after Ibrahim's talk with his manager.
+
+## B37. Languages are stored with the app (Ibrahim, 18 Nov 2026)
+
+- The 11 languages beyond English and Arabic are no longer translated by AI the first time someone picks one. Their translations are files in the app (`src/lib/i18n/locales`), so switching is instant everywhere, with no "about a minute" wait. The Kie.ai account was below zero, so the translations were written by Claude, not by Gemini.
+- Done in full: French, Spanish, German. Portuguese is half done. The others (Turkish, Indonesian, Russian, Chinese, Hindi, Urdu, Amharic) and the rest of Portuguese use the last AI translation saved in the database, then English for anything newer. The owner dashboard shows how many texts each language still has in English, and `npm run i18n:check` lists them.
+- New English text is not translated with each change. Ibrahim asks when to translate everything that is missing, in one go.
+- The globe language menu is on every page: the website, login and set password, the coming soon page, and the app. The old two-way English and Arabic button is gone.
