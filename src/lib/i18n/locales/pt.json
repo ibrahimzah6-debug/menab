@@ -1,0 +1,948 @@
+{
+ "frame": {
+  "openMenu": "Abrir o menu",
+  "closeMenu": "Fechar o menu",
+  "workspaces": "Espaços de trabalho",
+  "soon": "Em breve",
+  "preparing": "Mudando o idioma",
+  "newWorkspace": "Novo espaço de trabalho",
+  "workspaceName": "Nome da empresa",
+  "add": "Adicionar",
+  "usage": "Uso",
+  "help": "Obter ajuda",
+  "languageItem": "Idioma"
+ },
+ "mic": {
+  "start": "Falar em vez de digitar",
+  "stop": "Ouvindo. Toque para parar",
+  "working": "Transcrevendo o que você disse",
+  "blocked": "O microfone está bloqueado. Permita no navegador e tente de novo."
+ },
+ "nav": {
+  "newProject": "Novo projeto",
+  "newProjectLater": "Começar um projeto a partir de um briefing chega no M2.",
+  "home": "Início",
+  "projects": "Projetos",
+  "libraries": "Bibliotecas",
+  "templates": "Modelos",
+  "team": "Equipe",
+  "credits": "Créditos",
+  "settings": "Configurações",
+  "mainMenu": "Menu principal"
+ },
+ "roles": {
+  "admin": "Admin",
+  "producer": "Produtor",
+  "coordinator": "Coordenador",
+  "viewer": "Leitor"
+ },
+ "status": {
+  "invited": "Convidado",
+  "active": "Ativo",
+  "waiting": "Aguardando",
+  "generating": "Gerando",
+  "ready": "Pronto",
+  "edited": "Editado",
+  "approved": "Aprovado"
+ },
+ "login": {
+  "title": "Entrar no Menab",
+  "email": "E-mail",
+  "password": "Senha",
+  "submit": "Entrar",
+  "wrong": "Esse e-mail e essa senha não conferem. Tente de novo ou peça ao seu Admin um novo link de convite.",
+  "inviteOnly": "Por enquanto o Menab é só para convidados. Peça um convite ao seu Admin."
+ },
+ "setPassword": {
+  "title": "Escolha sua senha",
+  "intro": "Você está entrando em {workspace}. Escolha a senha que vai usar para entrar.",
+  "password": "Nova senha",
+  "confirm": "Digite de novo",
+  "submit": "Salvar senha",
+  "tooShort": "Use pelo menos 8 caracteres.",
+  "mismatch": "As duas senhas não conferem.",
+  "failed": "Não foi possível salvar essa senha. Tente de novo."
+ },
+ "auth": {
+  "linkExpired": "Esse link de convite expirou ou já foi usado. Peça um novo ao seu Admin.",
+  "acceptTitle": "Aceite seu convite",
+  "acceptBody": "Você foi convidado para o Menab. Aceite o convite e depois escolha sua senha.",
+  "acceptSubmit": "Aceitar convite",
+  "otherAccount": "Este navegador está conectado como {email}. Aceitar desconecta essa conta primeiro."
+ },
+ "account": {
+  "signOut": "Sair",
+  "signedInAs": "Conectado como"
+ },
+ "noWorkspace": {
+  "title": "Você ainda não está em um espaço de trabalho",
+  "body": "Peça ao seu Admin para convidar você. Depois, entre de novo e seu espaço de trabalho vai abrir."
+ },
+ "home": {
+  "title": "Início",
+  "morning": "Bom dia, {name}",
+  "evening": "Boa noite, {name}",
+  "lead": "O que vamos fazer hoje? Comece com um briefing, uma mensagem de voz ou uma única linha.",
+  "inProgress": "Projetos em andamento",
+  "noProjects": "Ainda não há projetos. Começar um projeto a partir de um briefing chega no M2.",
+  "waiting": "Aguardando sua aprovação",
+  "nothingWaiting": "Nada está esperando por você.",
+  "todo": {
+   "approveBrief": "Aprovar o briefing",
+   "choosePath": "Escolha um caminho e depois aprove o briefing",
+   "pickDirection": "Escolher uma direção criativa",
+   "approveCreative": "Aprovar a criação"
+  },
+  "activity": "Atividade recente",
+  "noActivity": "Ainda não há atividade.",
+  "balance": "Saldo de créditos",
+  "balanceLater": "Os créditos chegam no M5.",
+  "previewTitle": "Layout da tela de etapa",
+  "previewBody": "Veja o layout que cada etapa do projeto vai usar, com conteúdo de exemplo.",
+  "previewOpen": "Abrir a prévia do layout"
+ },
+ "libraries": {
+  "intro": "O que sua empresa reutiliza em todo projeto. Cada projeto guarda a própria cópia, então mudanças aqui nunca alteram um trabalho aprovado.",
+  "tabs": {
+   "brand": "Kits de marca",
+   "characters": "Personagens",
+   "locations": "Locações",
+   "assets": "Arquivos"
+  },
+  "add": {
+   "brand": "Adicionar kit de marca",
+   "characters": "Adicionar personagem",
+   "locations": "Adicionar locação",
+   "assets": "Enviar arquivos"
+  },
+  "empty": {
+   "brand": "Ainda não há kits de marca. Adicione logo, cores e fontes uma vez, e todo documento pode usá-los.",
+   "characters": "Ainda não há personagens. Salve as pessoas que voltam nos seus vídeos, com fotos, para que fiquem iguais toda vez.",
+   "locations": "Ainda não há locações. Salve os lugares que você filma ou gera com frequência, com fotos.",
+   "assets": "Ainda não há arquivos. Envie logos, fotos de produto, músicas, imagens gravadas ou documentos."
+  },
+  "fields": {
+   "name": "Nome",
+   "logo": "Logo",
+   "colors": "Cores",
+   "fonts": "Fontes",
+   "tone": "Tom de voz",
+   "notes": "Notas",
+   "age": "Idade",
+   "description": "Quem são",
+   "look": "Aparência",
+   "wardrobe": "Figurino",
+   "voice": "Voz",
+   "photos": "Fotos",
+   "city": "Cidade",
+   "kind": "Como é feito",
+   "fileKind": "Tipo"
+  },
+  "kinds": {
+   "real": "Lugar real",
+   "ai": "Feito com IA",
+   "either": "Qualquer um"
+  },
+  "assetKinds": {
+   "logo": "Logo",
+   "product": "Produto",
+   "reference": "Referência",
+   "music": "Música",
+   "footage": "Imagens gravadas",
+   "document": "Documento",
+   "other": "Outro"
+  },
+  "addColor": "Adicionar cor",
+  "addFont": "Adicionar fonte",
+  "addPhotos": "Adicionar fotos",
+  "uploading": "Enviando",
+  "save": "Salvar",
+  "saving": "Salvando",
+  "cancel": "Cancelar",
+  "remove": "Remover",
+  "removeConfirm": "Remover de vez? Projetos que já usam isso mantêm a cópia deles.",
+  "close": "Fechar",
+  "viewerNote": "Leitores podem ver as bibliotecas, mas não alterá-las.",
+  "fileRules": "Imagens, PDFs, áudio e vídeo de até 50 MB.",
+  "open": "Abrir",
+  "count": "{n} itens"
+ },
+ "templates": {
+  "intro": "Comece um projeto a partir de uma configuração pronta. O Menab preenche o briefing com o que esse tipo de vídeo costuma precisar, e você muda o que quiser.",
+  "projectTypes": "Tipos de projeto",
+  "commercial": "Comercial",
+  "commercialNote": "Um comercial de 30 segundos com versões curtas. O fluxo completo, do briefing à entrega.",
+  "presets": "Configurações prontas",
+  "use": "Começar um projeto",
+  "starting": "Começando",
+  "documents": "Modelos de documentos",
+  "documentsNote": "Todo documento leva seu kit de marca. Eles são escritos pelo Menab AI dentro de cada etapa.",
+  "docStage": "Na etapa {n}",
+  "comesIn": "Chega com {m}",
+  "otherTypes": "Filme, podcast, documentário e fotografia vêm depois.",
+  "length": "{n} s",
+  "preset": {
+   "ramadan": {
+    "name": "Comercial de Ramadã",
+    "note": "Família, iftar e o calor do mês. Filme principal com versões de 15 e 6 segundos.",
+    "opening": "Começamos pela configuração de comercial de Ramadã: um filme de 30 segundos com versões de 15 e 6 segundos, para TV, YouTube e redes verticais. Fale da marca e do produto, e do que você quer que as pessoas sintam neste Ramadã."
+   },
+   "launch": {
+    "name": "Lançamento de produto",
+    "note": "Mostre o produto, o que ele faz e por que agora. Filme principal com versões para redes.",
+    "opening": "Começamos pela configuração de lançamento de produto: um filme principal de 30 segundos com versões de 15 e 6 segundos, e o produto real em cena. Qual é o produto, para quem é e quando lança?"
+   },
+   "event": {
+    "name": "Resumo de evento",
+    "note": "Os melhores momentos de um evento, editados com música, com um teaser curto.",
+    "opening": "Começamos pela configuração de resumo de evento: um resumo de 60 segundos e um teaser de 15 segundos, com pessoas reais em cena. Qual é o evento, onde e quando, e quais momentos precisamos captar?"
+   }
+  },
+  "docs": {
+   "cps": "CPS",
+   "treatment": "Tratamento",
+   "budget": "Orçamento",
+   "ppm": "Livreto PPM",
+   "callsheet": "Ordem do dia"
+  }
+ },
+ "creative": {
+  "pickFirst": "Escolha uma direção primeiro.",
+  "writeDirections": "Escrever as direções criativas",
+  "rewriteDirections": "Escrever três direções novas",
+  "directionsIntro": "Três jeitos diferentes de contar este vídeo. Escolha um na reunião de criação, e o Menab escreve a partir dele o roteiro, o tratamento e o clima visual.",
+  "recommended": "A escolha do Menab",
+  "story": "História",
+  "feeling": "Sensação",
+  "why": "Por que funciona",
+  "references": "Referências",
+  "risk": "Atenção a",
+  "choose": "Escolher esta direção",
+  "chosen": "Escolhida",
+  "chooseAndWrite": "Escolher e escrever o roteiro, o tratamento e o clima",
+  "notes": "Notas da reunião",
+  "notesPlaceholder": "O que o cliente disse, o que manter ou mudar. Digite, ou toque no microfone.",
+  "meetingIntro": "Compare as direções com o cliente, escolha uma e anote o que ele disse. O Menab usa as notas em tudo o que escreve depois.",
+  "noDirections": "Escreva as direções primeiro.",
+  "rewriteAll": "Reescrever o roteiro, o tratamento e o clima",
+  "script": {
+   "scene": "#",
+   "picture": "Imagem",
+   "sound": "Som",
+   "vo": "Locução, árabe",
+   "voEn": "Locução, inglês",
+   "super": "Na tela",
+   "seconds": "s",
+   "total": "{n} de {target} s",
+   "fits": "Cabe na duração",
+   "off": "{d} s fora da duração",
+   "notes": "Notas",
+   "add": "Adicionar linha",
+   "remove": "Remover linha"
+  },
+  "treatment": {
+   "idea": "Ideia",
+   "tone": "Tom",
+   "references": "Referências",
+   "frames": "Plano a plano",
+   "size": "Enquadramento",
+   "description": "O que vemos",
+   "vo": "Locução",
+   "cast": "Elenco",
+   "role": "Papel",
+   "planA": "Plano A",
+   "planB": "Plano B",
+   "wardrobe": "Figurino",
+   "character": "Personagem",
+   "look": "Aparência",
+   "locations": "Locações",
+   "options": "Opções",
+   "art": "Direção de arte",
+   "space": "Espaço",
+   "notes": "Notas"
+  },
+  "mood": {
+   "look": "Look",
+   "palette": "Paleta",
+   "light": "Luz",
+   "camera": "Câmera",
+   "grade": "Cor e textura",
+   "references": "Referências",
+   "do": "Fazer",
+   "dont": "Não fazer"
+  },
+  "approval": {
+   "intro": "Tudo o que o cliente aprova nesta etapa, num só lugar.",
+   "ready": "Pronto para aprovação",
+   "waiting": "Aguardando: {items}",
+   "direction": "Direção",
+   "length": "Duração",
+   "open": "Abrir"
+  },
+  "footer": {
+   "start": "Comece pelas direções criativas.",
+   "pick": "Escolha uma direção na reunião de criação para continuar.",
+   "writing": "O Menab está escrevendo. Leia o que já está pronto enquanto o resto chega.",
+   "review": "Revise o roteiro, o tratamento e o clima, e depois aprove a etapa.",
+   "approved": "Criação aprovada."
+  },
+  "steps": {
+   "writing": "Escrevendo: {name}",
+   "saved": "{name} está pronto"
+  },
+  "versions": "Versões",
+  "restore": "Restaurar",
+  "current": "Atual",
+  "sources": {
+   "ai": "Menab",
+   "edit": "Editada",
+   "restore": "Restaurada"
+  },
+  "restored": "Restaurada como nova versão.",
+  "later": "A etapa 3, Look e personagens, é construída no M4. Seu trabalho aprovado está salvo.",
+  "redo": {
+   "failed": "O Menab não conseguiu escrever isso, então nada foi cobrado. Tente de novo; começa do zero.",
+   "missing": "Ainda não foi escrito.",
+   "tryAgain": "Tentar de novo",
+   "write": "Escrever agora"
+  }
+ },
+ "look": {
+  "write": "Escrever o look e os personagens",
+  "rewrite": "Escrever de novo do zero",
+  "intro": {
+   "13": "Todos que aparecem na tela, com uma aparência precisa o bastante para desenhar a mesma pessoa em cada quadro.",
+   "14": "O que cada personagem veste em cada cena, e o que precisa continuar igual entre os planos.",
+   "15": "Onde cada cena acontece: um lugar real para visitar, ou um lugar de IA.",
+   "16": "Como cada cenário é montado, e os objetos de cena nele.",
+   "17": "Um quadro para cada plano. Escolha o estilo e o modelo de imagem, e depois desenhe.",
+   "18": "Cada plano do filme em ordem, para a equipe e para os planos de IA."
+  },
+  "footer": {
+   "start": "O Menab escreve personagens, figurino, locações, direção de arte e lista de planos a partir da criação aprovada.",
+   "writing": "O Menab está escrevendo. Leia o que já está pronto enquanto o resto chega.",
+   "draw": "Desenhe um quadro para cada plano do storyboard e depois aprove a etapa.",
+   "review": "Cada plano tem seu quadro. Revise tudo e depois aprove a etapa.",
+   "approved": "Look e personagens aprovados."
+  },
+  "characters": {
+   "name": "Nome",
+   "role": "Papel",
+   "age": "Idade",
+   "look": "Aparência",
+   "personality": "Personalidade",
+   "made": "Feito como",
+   "ai": "Personagem de IA",
+   "cast": "Escalar um ator",
+   "planA": "Plano A",
+   "planB": "Plano B",
+   "library": "Da biblioteca"
+  },
+  "wardrobe": {
+   "character": "Personagem",
+   "scene": "Cena",
+   "outfit": "Roupa",
+   "continuity": "Manter igual"
+  },
+  "locations": {
+   "name": "Locação",
+   "intExt": "INT ou EXT",
+   "description": "Como é",
+   "made": "Feito como",
+   "ai": "Lugar de IA",
+   "real": "Lugar real para visitar",
+   "options": "Opções",
+   "library": "Da biblioteca"
+  },
+  "art": {
+   "set": "Cenário",
+   "dressing": "Montagem do cenário",
+   "props": "Objetos de cena"
+  },
+  "shots": {
+   "n": "#",
+   "scene": "Cena",
+   "intExt": "INT/EXT",
+   "dayNight": "Horário",
+   "size": "Tamanho",
+   "angle": "Ângulo",
+   "movement": "Movimento",
+   "lens": "Lente",
+   "action": "Ação",
+   "dialogue": "Diálogo ou locução",
+   "seconds": "s",
+   "cast": "Elenco",
+   "props": "Objetos de cena",
+   "set": "Cenário",
+   "total": "{n} de {target} s"
+  },
+  "frames": {
+   "style": "Estilo",
+   "sketch": "Esboço",
+   "photo": "Fotorrealista",
+   "model": "Modelo de imagem",
+   "aspect": "Formato do quadro",
+   "drawMissing": "Desenhar {n} quadros",
+   "drawOne": "Desenhar 1 quadro",
+   "drawAll": "Desenhar todos os quadros de novo",
+   "redraw": "Desenhar de novo",
+   "drawing": "Desenhando",
+   "failed": "Não foi possível desenhar. Nada foi cobrado.",
+   "notDrawn": "Ainda não desenhado",
+   "prompt": "O que o quadro mostra",
+   "count": "{n} de {total} quadros desenhados",
+   "per": "{price} por quadro",
+   "noShots": "Escreva a lista de planos primeiro. O storyboard tem um quadro por plano."
+  },
+  "steps": {
+   "drawing": "Desenhando o quadro {n} de {total} com {model}",
+   "drawn": "O quadro {n} está pronto",
+   "drawFailed": "Não foi possível desenhar o quadro {n}: {reason}",
+   "drawBackup": "Quadro {n}: {from} não funcionou, desenhando com {to}",
+   "drawingRef": "Desenhando {name} com {model}",
+   "drawnRef": "{name} está pronto",
+   "drawRefFailed": "Não foi possível desenhar {name}: {reason}"
+  },
+  "refs": {
+   "note": "Uma imagem fotorrealista de cada um mantém o mesmo rosto e o mesmo lugar em cada quadro do storyboard e nos planos finais.",
+   "drawMissing": "Desenhar {n} imagens",
+   "drawOnePic": "Desenhar 1 imagem",
+   "drawAll": "Desenhar todas as imagens de novo",
+   "drawOne": "Desenhar",
+   "redraw": "Desenhar de novo",
+   "drawing": "Desenhando",
+   "failed": "Não foi possível desenhar. Nada foi cobrado.",
+   "none": "Ainda sem imagem"
+  },
+  "choice": {
+   "other": "Outro, digite",
+   "use": "Usar"
+  },
+  "footerDraw": "A lista de planos está pronta. Desenhe os quadros do storyboard e depois aprove a etapa.",
+  "startsWhen": {
+   "write": "Começa quando você escreve o look e os personagens.",
+   "shots": "Começa quando os personagens e as locações estão prontos.",
+   "frames": "Desenhe os quadros quando a lista de planos estiver pronta."
+  }
+ },
+ "deck": {
+  "lookBook": "Personagens e locações",
+  "storyboard": "Storyboard",
+  "characters": "Personagens",
+  "locations": "Locações",
+  "character": "Personagem",
+  "location": "Locação",
+  "preparedFor": "Preparado para {client}",
+  "madeWith": "Feito com Menab",
+  "savePdf": "Salvar como PDF",
+  "back": "Voltar ao projeto",
+  "tip": "Na janela de impressão, escolha Salvar como PDF. As páginas já estão em paisagem.",
+  "empty": "Nada para mostrar ainda. Escreva a etapa 3 primeiro."
+ },
+ "files": {
+  "title": "Arquivos",
+  "back": "Voltar para {name}",
+  "documents": "Documentos",
+  "pictures": "Imagens",
+  "savePdf": "Salvar como PDF",
+  "open": "Abrir",
+  "download": "Baixar",
+  "notYet": "Escrito na etapa 3, Look e personagens.",
+  "lookNote": "{c} personagens e {l} locações, cada um em sua página com sua imagem.",
+  "boardNote": "{n} quadros, seis por página, com enquadramento, ângulo, movimento, lente e duração.",
+  "missingPictures": "{n} de {total} ainda não têm imagem. Desenhe-as na etapa 3 para um documento completo.",
+  "later": "Chega depois",
+  "noPictures": "Ainda não há imagens. Elas aparecem aqui assim que forem desenhadas.",
+  "menabKit": "Os documentos usam o estilo neutro do Menab. Adicione um kit de marca em Bibliotecas para usar seu logo e sua cor.",
+  "brandKit": "Os documentos usam seu kit de marca: {name}.",
+  "button": "Arquivos"
+ },
+ "generate": {
+  "intro": {
+   "34": "Defina a aparência de cada pessoa e lugar antes de fazer qualquer vídeo. Cada personagem de IA ganha uma ficha de ator digital e uma voz.",
+   "35": "Uma imagem final por plano, feita a partir das referências travadas. Cada clipe de vídeo parte dela.",
+   "36": "Um clipe de vídeo por plano, saindo do seu quadro-chave com o movimento de câmera do plano.",
+   "37": "A locução do roteiro e uma trilha feita para o filme.",
+   "38": "Assista a cada plano. Aprove, ou faça de novo com um novo prompt ou outro modelo."
+  },
+  "shot": "Plano {n}",
+  "line": "Fala {n}",
+  "music": "Trilha musical",
+  "nothing": "Nada para fazer. Confira as etapas anteriores.",
+  "lockedNote": "As referências estão travadas. Destrave para mudar uma ficha ou uma roupa.",
+  "lockFirst": "Trave as referências primeiro.",
+  "keyframeFirst": "Faça o quadro-chave dele primeiro.",
+  "consentFirst": "Confirme que você tem o consentimento por escrito das pessoas reais cujas fotos são usadas.",
+  "noClip": "Este plano ainda não tem clipe.",
+  "dialogue": "Plano {n}, {name}",
+  "dialogueTitle": "Diálogo",
+  "dialogueNote": "Falas que um personagem diz em cena, com a voz dele. Os clipes com sincronia labial usam essas falas.",
+  "makeDialogue": "Fazer o diálogo ({n} falas)",
+  "dialogueFirst": "Faça primeiro a fala deste plano (em Voz).",
+  "talkingNote": "Modelos de sincronia labial fazem a pessoa do quadro-chave dizer a fala do plano. Faça o diálogo em Voz primeiro.",
+  "saveLibrary": "Salvar em Bibliotecas",
+  "savedLibrary": "Salvo em Bibliotecas",
+  "startsWhen": {
+   "34": "Começa quando esta etapa abre.",
+   "35": "Começa quando as referências são travadas.",
+   "36": "Começa quando os quadros-chave são feitos.",
+   "37": "Locução, diálogo e música.",
+   "38": "Pronto quando todos os clipes forem feitos."
+  },
+  "characters": "Personagens",
+  "locations": "Locações",
+  "sheet": "Ficha de ator digital",
+  "makeSheet": "Fazer a ficha",
+  "makeSheets": "Fazer {n} fichas",
+  "remake": "Fazer de novo",
+  "outfits": "Imagens de roupas",
+  "outfitsNote": "Só para personagens que trocam de roupa entre as cenas.",
+  "makeOutfits": "Fazer {n} imagens de roupas",
+  "stagePicture": "Da etapa 3",
+  "noPicture": "Ainda sem imagem",
+  "voice": "Voz",
+  "narrator": "Voz do narrador",
+  "listen": "Ouvir",
+  "shape": "Formato do quadro",
+  "consent": "Tenho o consentimento por escrito de cada pessoa real cujas fotos são usadas aqui.",
+  "lock": "Travar as referências",
+  "unlock": "Destravar",
+  "locked": "Travadas",
+  "makeKeyframes": "Fazer {n} quadros-chave",
+  "makeClips": "Fazer {n} clipes",
+  "makeOne": "Fazer",
+  "clipModel": "Modelo de vídeo",
+  "prompt": "O que acontece no clipe",
+  "seconds": "{n} s",
+  "makeVoice": "Fazer a locução ({n} falas)",
+  "makeMusic": "Fazer a trilha musical",
+  "noVoice": "O roteiro não tem falas de locução.",
+  "approve": "Aprovar",
+  "approved": "Aprovado",
+  "reopen": "Reabrir",
+  "approvedCount": "{n} de {total} planos aprovados",
+  "making": "Fazendo",
+  "failed": "Não foi possível fazer. Nada foi cobrado.",
+  "notMade": "Ainda não feito",
+  "later": "Ainda sendo feito. Aparece aqui quando estiver pronto.",
+  "footer": {
+   "lock": "Trave as referências para começar os quadros-chave.",
+   "make": "Faça os quadros-chave e os clipes, e depois revise cada plano.",
+   "review": "Aprove cada plano para terminar esta etapa.",
+   "ready": "Todos os planos estão aprovados. Aprove a etapa."
+  },
+  "shootLater": "As ferramentas de gravação (dia de gravação, continuidade, material bruto) chegam numa etapa posterior. Os planos de IA de um projeto híbrido são feitos aqui.",
+  "steps": {
+   "genStart": "Fazendo {label} com {model}",
+   "genDone": "{label} está pronto",
+   "genBackup": "{label}: {from} não funcionou, fazendo com {to}",
+   "genFailed": "Não foi possível fazer {label}: {reason}",
+   "genLater": "{label} ainda está sendo feito; aparece quando estiver pronto"
+  }
+ },
+ "preprod": {
+  "write": "Escrever a pré-produção",
+  "rewrite": "Escrever de novo do zero",
+  "intro": {
+   "20": "Cada item de que a gravação precisa, com preços do mercado de Riad, contingência, seu honorário e IVA.",
+   "22": "As funções de que a gravação precisa e as pessoas da sua equipe que as ocupam. Todos precisam ter registro na GAMR.",
+   "25": "Os dados da licença de filmagem da GAMR, as autorizações dos locais e a licença de drone da GACA se um drone voar.",
+   "26": "Câmera, lentes, iluminação, maquinária e som, a partir da lista de planos.",
+   "27": "O livreto PPM, montado com tudo o que foi aprovado até agora.",
+   "28": "A aprovação do cliente na reunião PPM, e o que mudou.",
+   "31": "Dias de gravação, cenários em ordem, planos por cenário e tempo de preparação.",
+   "32": "Uma ordem do dia por dia de gravação."
+  },
+  "footer": {
+   "start": "O Menab escreve o orçamento, as necessidades de equipe, as licenças, o equipamento, o cronograma e as ordens do dia a partir do plano aprovado.",
+   "writing": "O Menab está escrevendo. Leia o que já está pronto enquanto o resto chega.",
+   "review": "Adicione sua equipe, revise tudo e registre a aprovação do cliente na reunião PPM.",
+   "sign": "Registre a aprovação do cliente na reunião PPM para aprovar a etapa.",
+   "approved": "Pré-produção aprovada."
+  },
+  "ready": "Pronto",
+  "waiting": "Aguardando",
+  "savePpm": "Salvar o livreto PPM como PDF",
+  "open": "Abrir",
+  "ppmSections": [
+   "Capa",
+   "Briefing",
+   "Lista da equipe",
+   "História por cena",
+   "Storyboard",
+   "Clima visual",
+   "Fotografia",
+   "Direção de arte",
+   "Edição e som",
+   "Locações com fotos",
+   "Elenco com opções",
+   "Arte por cena",
+   "Figurino por personagem e por cena"
+  ],
+  "budget": {
+   "item": "Item",
+   "qty": "Qtd.",
+   "unit": "Unidade",
+   "days": "Dias",
+   "rate": "Valor",
+   "total": "Total",
+   "subtotal": "Subtotal",
+   "contingency": "Contingência",
+   "fee": "Honorário de produção",
+   "vat": "IVA 15%",
+   "grand": "Total com IVA",
+   "notes": "Premissas",
+   "reference": "Feito a partir da prática de orçamento do setor adaptada à produção saudita. Envie o modelo de orçamento da ZAH para seguir exatamente."
+  },
+  "crew": {
+   "needs": "Funções necessárias",
+   "department": "Departamento",
+   "role": "Função",
+   "count": "Pessoas",
+   "days": "Dias",
+   "members": "Equipe neste projeto",
+   "gamrWarning": "Ainda sem registro na GAMR: {names}. Cada membro da equipe precisa estar registrado antes da gravação.",
+   "name": "Nome",
+   "phone": "Telefone",
+   "gamr": "GAMR",
+   "id": "Documento de identidade ou iqama",
+   "remove": "Remover",
+   "empty": "Ninguém foi adicionado ainda.",
+   "add": "Adicionar da sua equipe",
+   "addButton": "Adicionar ao projeto",
+   "directory": "Abrir o diretório da equipe",
+   "gamrStatus": {
+    "registered": "Registrado",
+    "pending": "Pendente",
+    "not_registered": "Não registrado",
+    "unknown": "Não verificado"
+   }
+  },
+  "permits": {
+   "purpose": "Finalidade",
+   "dates": "Datas",
+   "locations": "Locações",
+   "region": "Região",
+   "city": "Cidade",
+   "place": "Local",
+   "public": "Local público",
+   "venue": "Autorização do local",
+   "yes": "Sim",
+   "no": "Não",
+   "venueNeeded": "Autorização por escrito necessária",
+   "drone": "Um drone é usado: são necessários uma licença de drone da GACA e um drone registrado.",
+   "checklist": "A preparar",
+   "savePdf": "Salvar a ficha de licenças como PDF",
+   "idNote": "Os nomes e as funções da equipe vêm da lista da equipe. Os números de identidade só são incluídos quando a ficha de licenças é exportada, e cada exportação é registrada."
+  },
+  "equipment": {
+   "department": "Departamento",
+   "item": "Item",
+   "qty": "Qtd.",
+   "notes": "Por quê"
+  },
+  "meeting": {
+   "client": "Presente pelo cliente",
+   "date": "Data",
+   "changes": "O que mudou na PPM",
+   "signed": "O cliente aprovou a PPM."
+  },
+  "schedule": {
+   "day": "Dia {n} de {total}",
+   "date": "Data",
+   "time": "Hora",
+   "set": "Cenário",
+   "scene": "Cena",
+   "intExt": "INT/EXT",
+   "dayNight": "Período do dia",
+   "shots": "Planos",
+   "cast": "Elenco",
+   "props": "Objetos de cena",
+   "prep": "Preparação"
+  },
+  "calls": {
+   "day": "Ordem do dia, dia {n} de {total}",
+   "savePdf": "Salvar como PDF",
+   "crewCall": "Chamada da equipe",
+   "clientCall": "Chegada do cliente",
+   "roll": "Primeiro take",
+   "meals": "Refeições",
+   "wrap": "Fim da gravação",
+   "sunrise": "Nascer do sol",
+   "sunset": "Pôr do sol",
+   "weather": "Tempo",
+   "location": "Locação",
+   "address": "Endereço",
+   "parking": "Estacionamento",
+   "contact": "Contato",
+   "hospital": "Hospital mais próximo",
+   "emergency": "Números de emergência",
+   "safety": "Segurança",
+   "crewNote": "O PDF lista a equipe do projeto por departamento com os horários de chamada."
+  },
+  "startsWhen": {
+   "20": "Começa quando você escreve a pré-produção.",
+   "27": "Montado quando os documentos estão escritos.",
+   "28": "Seu registro da aprovação do cliente."
+  }
+ },
+ "site": {
+  "nav": {
+   "product": "Produto",
+   "solutions": "Soluções",
+   "templates": "Modelos",
+   "pricing": "Preços",
+   "enterprise": "Empresas",
+   "blog": "Blog",
+   "login": "Entrar",
+   "signup": "Cadastrar",
+   "menu": "Menu",
+   "productItems": [
+    {
+     "name": "Briefing",
+     "note": "Fale ou digite seu briefing"
+    },
+    {
+     "name": "Criação",
+     "note": "Direções, roteiro e tratamento"
+    },
+    {
+     "name": "Look e personagens",
+     "note": "Personagens, locações e storyboard"
+    },
+    {
+     "name": "Pré-produção",
+     "note": "Orçamento, equipe, licenças e ordens do dia"
+    },
+    {
+     "name": "Gerar ou gravar",
+     "note": "Planos de IA, ou uma gravação real"
+    },
+    {
+     "name": "Edição",
+     "note": "Na próxima versão"
+    },
+    {
+     "name": "Entregar",
+     "note": "Todos os arquivos numa só exportação"
+    }
+   ],
+   "solutionItems": [
+    {
+     "name": "Produtoras",
+     "note": "A papelada a partir do plano"
+    },
+    {
+     "name": "Agências",
+     "note": "Direções e storyboards"
+    },
+    {
+     "name": "Marcas",
+     "note": "O custo antes de cada passo"
+    },
+    {
+     "name": "Criadores, e qualquer pessoa",
+     "note": "Vídeos sem equipe"
+    }
+   ]
+  },
+  "hero": {
+   "title": "O melhor vídeo vem dos passos certos, na ordem certa.",
+   "text": "O Menab leva um vídeo do briefing à entrega, feito com IA, gravado por uma produtora, ou os dois. Uma etapa na tela por vez, o preço antes de cada ação, e árabe e inglês em pé de igualdade.",
+   "start": "Começar",
+   "talk": "Falar com nossa equipe",
+   "newTag": "Novo",
+   "newText": "Atores digitais que falam",
+   "trusted": "Em uso privado com suas primeiras produtoras"
+  },
+  "intro": {
+   "label": "Menab em 42 segundos",
+   "play": "Reproduzir",
+   "pause": "Pausar",
+   "problem": {
+    "before": "Cansado de pagar de novo e de novo por",
+    "after": "?",
+    "variants": [
+     {
+      "word": "vídeos com IA",
+      "rows": [
+       {
+        "name": "Tentativa 1: o rosto mudou",
+        "value": "750 SAR"
+       },
+       {
+        "name": "Tentativa 2: o lugar mudou",
+        "value": "750 SAR"
+       },
+       {
+        "name": "Tentativa 3: a voz não ficou certa",
+        "value": "750 SAR"
+       }
+      ],
+      "total": "Total, e ainda sem vídeo",
+      "totalValue": "2.250 SAR"
+     },
+     {
+      "word": "gravações",
+      "rows": [
+       {
+        "name": "Dia de gravação",
+        "value": "45.000 SAR"
+       },
+       {
+        "name": "Regravação",
+        "value": "45.000 SAR"
+       },
+       {
+        "name": "Mais uma rodada de edição",
+        "value": "12.000 SAR"
+       }
+      ],
+      "total": "Total, por um vídeo",
+      "totalValue": "102.000 SAR"
+     },
+     {
+      "word": "vídeos híbridos",
+      "rows": [
+       {
+        "name": "Dia de gravação",
+        "value": "45.000 SAR"
+       },
+       {
+        "name": "Planos de IA que não combinam com a gravação",
+        "value": "1.500 SAR"
+       },
+       {
+        "name": "Regravação para combinar",
+        "value": "45.000 SAR"
+       }
+      ],
+      "total": "Total, por um vídeo",
+      "totalValue": "91.500 SAR"
+     }
+    ],
+    "note": "Sem um plano, cada mudança começa do zero de novo."
+   },
+   "steps": {
+    "title": "O Menab vai um passo de cada vez."
+   },
+   "approve": {
+    "title": "Você aprova cada passo, então nada é feito duas vezes.",
+    "doc": "Roteiro",
+    "button": "Aprovar",
+    "locked": "Aprovado e travado",
+    "next": "Storyboard",
+    "nextNote": "Abre em seguida"
+   },
+   "price": {
+    "title": "Você vê o preço antes de cada ação.",
+    "action": "Fazer 4 planos",
+    "cost": "280 créditos",
+    "balance": "Seu saldo",
+    "before": "500",
+    "after": "220",
+    "free": "Um plano que falha não custa nada."
+   },
+   "models": {
+    "title": "Escolha o modelo para cada tarefa, e pague pelo que escolher.",
+    "rows": [
+     {
+      "name": "Vídeo",
+      "options": [
+       "Kling 3.0",
+       "Seedance 2.5",
+       "Veo 3.1 Fast"
+      ],
+      "prices": [
+       "70 créditos",
+       "85 créditos",
+       "65 créditos"
+      ]
+     },
+     {
+      "name": "Voz",
+      "options": [
+       "Brian",
+       "Bella",
+       "Benjamin"
+      ]
+     },
+     {
+      "name": "Música",
+      "options": [
+       "Cinematográfica",
+       "Animada",
+       "Calma"
+      ]
+     }
+    ],
+    "note": "Troque o modelo quando quiser, plano a plano."
+   },
+   "close": {
+    "title": "Do briefing à entrega, passo a passo.",
+    "text": "Feito com IA, gravado de verdade, ou os dois."
+   }
+  },
+  "ways": {
+   "title": "Três jeitos de fazer",
+   "play": "Reproduzir",
+   "pause": "Pausar",
+   "steps": [
+    {
+     "name": "IA",
+     "text": "O Menab faz cada plano a partir do storyboard: os mesmos rostos, os mesmos lugares, voz e música incluídas."
+    },
+    {
+     "name": "Gravação",
+     "text": "Uma produtora grava. O Menab faz a criação e a papelada: orçamento, equipe, licenças, ordens do dia."
+    },
+    {
+     "name": "Híbrido",
+     "text": "Planos reais onde importa, IA onde economiza um dia. Troque plano a plano, a qualquer momento."
+    }
+   ],
+   "mock": {
+    "brief": "Briefing",
+    "briefText": "Um filme de lançamento de 30 segundos. Riad ao pôr do sol. Locução em árabe.",
+    "storyboard": "Storyboard",
+    "shot": "Plano",
+    "cost": "Custo",
+    "costValue": "48 créditos",
+    "making": "Fazendo",
+    "approved": "Aprovado",
+    "voice": "Voz",
+    "music": "Música",
+    "callSheet": "Ordem do dia, dia 1",
+    "crewCall": "Chamada da equipe",
+    "crewCallValue": "6h00",
+    "location": "Locação",
+    "locationValue": "Diriyah",
+    "crew": "Equipe",
+    "roles": [
+     "Diretor",
+     "Diretor de fotografia",
+     "Chefe de elétrica",
+     "Som"
+    ],
+    "registered": "Registrado na GAMR",
+    "permit": "Licença da locação",
+    "waiting": "Aguardando",
+    "schedule": "Plano de gravação",
+    "shotList": "Lista de planos",
+    "shots": [
+     "Aberto, a cidade ao amanhecer",
+     "Fechado, mãos no produto",
+     "Médio, a família no jantar",
+     "Aéreo, o caminho de casa"
+    ],
+    "ai": "IA",
+    "shoot": "Gravação",
+    "total": "2 com IA, 2 no set"
+   }
+  },
+  "how": {
+   "title": "Como funciona",
+   "text": "Sete etapas. O Menab AI escreve cada uma, você revisa, aprova, e a próxima abre."
+  }
+ }
+}

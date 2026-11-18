@@ -289,3 +289,10 @@ Measured on expo.dev in a browser on 18 Nov 2026, desktop and phone, dark and li
 - The first scene lasts 12 seconds and covers all three ways. It shows everything at once, then the word changes from "AI videos" to "shoots" to "hybrid videos", and the bills change with it: failed AI tries; a shoot day, a reshoot and another edit round; a shoot plus AI shots that do not match, then a reshoot. Without a plan, every change starts again from zero.
 - The last scene is words only: "From brief to delivery, step by step. Made with AI, shot for real, or both." The film is about 42 seconds.
 - The amounts in the first scene are examples, not quotes. The words can change after Ibrahim's talk with his manager.
+
+## B37. Languages are stored with the app (Ibrahim, 18 Nov 2026)
+
+- The 11 languages beyond English and Arabic are no longer translated by AI the first time someone picks one. Their translations are files in the app (`src/lib/i18n/locales`), so switching is instant everywhere, with no "about a minute" wait. The Kie.ai account was below zero, so the translations were written by Claude, not by Gemini.
+- Done in full: French, Spanish, German. Portuguese is half done. The others (Turkish, Indonesian, Russian, Chinese, Hindi, Urdu, Amharic) and the rest of Portuguese use the last AI translation saved in the database, then English for anything newer. The owner dashboard shows how many texts each language still has in English, and `npm run i18n:check` lists them.
+- New English text is not translated with each change. Ibrahim asks when to translate everything that is missing, in one go.
+- The globe language menu is on every page: the website, login and set password, the coming soon page, and the app. The old two-way English and Arabic button is gone.

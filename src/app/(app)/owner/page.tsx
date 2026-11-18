@@ -7,10 +7,10 @@ import { modelHealth } from "@/lib/ai/health";
 import { analyseIfStale } from "@/lib/dev";
 import { fill } from "@/lib/i18n/dictionaries";
 import { getI18n } from "@/lib/i18n/server";
-import { DICTIONARY_VERSION, MACHINE_LOCALES } from "@/lib/i18n/translate";
+import { MACHINE_LOCALES, missingCount } from "@/lib/i18n/translate";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { byModel, isPlatformAdmin, ownerOverview } from "@/lib/usage";
-import { CopyForClaude, ItemActions, PrepareLanguages, RuleActions, RuleForm, RunAnalysis } from "./owner-controls";
+import { CopyForClaude, ItemActions, RuleActions, RuleForm, RunAnalysis } from "./owner-controls";
 
 // The analysis and language preparation run from this page and can take a few minutes.
 export const maxDuration = 300;
@@ -285,23 +285,21 @@ async function Rules({ o, admin, card }: { o: O; admin: Admin; card: string }) {
 }
 
 async function Tools({ o, admin, card }: { o: O; admin: Admin; card: string }) {
-  const [{ data: ready }, { count }] = await Promise.all([
-    admin.from("translations").select("locale").eq("version", DICTIONARY_VERSION),
-    admin.from("memories").select("id", { count: "exact", head: true }),
-  ]);
-  const done = new Set((ready ?? []).map((r) => r.locale));
+  const { count } = await admin.from("memories").select("id", { count: "exact", head: true });
   return (
     <>
       <section className={card}>
         <h3 className="h3 m-0">{o.tools.languages}</h3>
         <div className="flex flex-wrap gap-2">
-          {Object.entries(MACHINE_LOCALES).map(([code, l]) => (
-            <span key={code} className={`mn-chip ${done.has(code) ? "mn-chip--ready" : "mn-chip--waiting"}`}>
-              {l.name} · {done.has(code) ? o.tools.ready : o.tools.notReady}
-            </span>
-          ))}
+          {Object.entries(MACHINE_LOCALES).map(([code, l]) => {
+            const missing = missingCount(code);
+            return (
+              <span key={code} className={`mn-chip ${missing ? "mn-chip--waiting" : "mn-chip--ready"}`}>
+                {l.name} · {missing ? fill(o.tools.missing, { n: missing }) : o.tools.ready}
+              </span>
+            );
+          })}
         </div>
-        <PrepareLanguages label={o.tools.prepare} busy={o.tools.preparing} />
       </section>
       <section className={card}>
         <h3 className="h3 m-0">{o.tools.memory}</h3>

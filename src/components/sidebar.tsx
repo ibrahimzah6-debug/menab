@@ -38,8 +38,6 @@ type Labels = Record<(typeof ITEMS)[number]["key"], string> & {
   closeMenu: string;
   workspaces: string;
   signOut: string;
-  langSwitch: string;
-  langSwitchLabel: string;
   viewerNote: string;
   owner: string;
   account: string;
