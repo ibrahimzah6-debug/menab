@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { browserClient } from "@/lib/supabase/client";
-import { approveClip, prepareUpload, saveActorToLibrary, saveReferenceLock } from "./actions";
+import { applyLibraryActor, approveClip, prepareUpload, saveActorToLibrary, saveReferenceLock } from "./actions";
 import { RunLine, useCreativeRun, type RunCopy } from "./creative-run";
 import { InlineText } from "./inline-doc";
 
@@ -23,6 +24,8 @@ export type GenData = {
   narrator: { voice: string; how: string; dialect: string; age: string; suggested: boolean };
   aspect: string;
   briefAspect: string;
+  skip: string[];
+  library: { id: string; name: string; voice: string }[];
   products: Product[];
   locations: { name: string; picture: string | null }[];
   outfits: { key: string; character: string; outfit: string }[];
@@ -64,12 +67,24 @@ function useLockSave(projectId: string) {
 }
 
 function Bar({ children, r, run }: { children: React.ReactNode; r: ReturnType<typeof useCreativeRun>; run: RunCopy }) {
+  // While it runs, the progress also shows in the bottom bar, so it stays in view while scrolling.
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => setSlot(document.getElementById("stage-run-slot")), []);
   return (
+    <>
+    {slot && r.busy && createPortal(
+      <div className="flex items-center gap-3">
+        <div className="grow min-w-0"><RunLine events={r.events} busy={r.busy} c={run} startedAt={r.startedAt} /></div>
+        <button type="button" className="mn-btn mn-btn--secondary mn-btn--sm" onClick={r.stop}>{run.steps.stop}</button>
+      </div>,
+      slot,
+    )}
     <div className="rounded-lg border border-line p-4 flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-3">{r.busy ? <button type="button" className="mn-btn mn-btn--secondary" onClick={r.stop}>{run.steps.stop}</button> : children}</div>
       {(r.busy || r.events.length > 0) && <RunLine events={r.events} busy={r.busy} c={run} startedAt={r.startedAt} />}
       {r.error && <p className="small m-0 px-3 py-2 rounded-md bg-tint-2" role="alert">{r.error}</p>}
     </div>
+    </>
   );
 }
 
@@ -225,9 +240,36 @@ function TalkingAvatar({ d, g, c, onModel, pending, go, busy }: { d: GenData; g:
   );
 }
 
+// A section that can be left out on purpose: a small "Skip" button, and when skipped, one line
+// with a button to add it back.
+function SkipHeader({ d, g, part, title, children }: { d: GenData; g: G; part: string; title: string; children?: React.ReactNode }) {
+  const { save, pending } = useLockSave(d.projectId);
+  const skipped = d.skip.includes(part);
+  const toggle = () => save({ skip: skipped ? d.skip.filter((x) => x !== part) : [...d.skip, part] });
+  if (skipped) {
+    return (
+      <div className="flex items-center gap-3 rounded-md border border-dashed border-line px-3 py-2">
+        <span className="small text-ink-muted grow">{fillIn(g.skipped, { name: title })}</span>
+        {d.editable && <button type="button" className="mn-btn mn-btn--ghost mn-btn--sm" disabled={pending} onClick={toggle}>{g.addBack}</button>}
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-2">
+      <h3 className="mn-label m-0 grow">{title}</h3>
+      {children}
+      {d.editable && (
+        <button type="button" className="mn-btn mn-btn--ghost mn-btn--sm" disabled={pending} onClick={toggle} aria-label={fillIn(g.skipLabel, { name: title })} title={fillIn(g.skipLabel, { name: title })}>
+          <span aria-hidden="true">✕</span> {g.skip}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // The products that must look the same in every shot: name, what it looks like, and photos of
 // the real thing. Photos go to the project's own storage first, then into the lock.
-function Products({ d, g, can }: { d: GenData; g: G; can: boolean }) {
+function Products({ d, g, can, go, busy }: { d: GenData; g: G; can: boolean; go: (b: Record<string, unknown>) => void; busy: boolean }) {
   const { save, pending, note, setNote } = useLockSave(d.projectId);
   const [list, setList] = useState<Product[]>(d.products);
   const [uploading, setUploading] = useState<number | null>(null);
@@ -255,9 +297,10 @@ function Products({ d, g, can }: { d: GenData; g: G; can: boolean }) {
     setUploading(null);
     if (added.length) store(list.map((p, j) => (j === i ? { ...p, photos: [...p.photos, ...added] } : p)));
   };
+  if (d.skip.includes("products")) return <SkipHeader d={d} g={g} part="products" title={g.productsTitle} />;
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="mn-label m-0">{g.productsTitle}</h3>
+      <SkipHeader d={d} g={g} part="products" title={g.productsTitle} />
       <p className="small text-ink-muted m-0">{g.productsNote}</p>
       <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}>
         {list.map((p, i) => (
@@ -306,6 +349,23 @@ function Products({ d, g, can }: { d: GenData; g: G; can: boolean }) {
                 ))}
               </div>
             )}
+            {p.name.trim() && (() => {
+              const pic = d.assets[`product:${key(p.name)}`];
+              return (
+                <div className="flex items-center gap-3 rounded-md bg-tint-2 p-2">
+                  <div className="w-[76px] shrink-0 rounded-md overflow-hidden border border-line"><Media a={pic} kind="image" alt={`${g.productPicture}: ${p.name}`} g={g} ratio="1 / 1" /></div>
+                  <div className="flex flex-col gap-1.5 min-w-0">
+                    <span className="text-[12px]">{g.productPicture}</span>
+                    <span className="text-[11px] text-ink-muted">{p.photos.length ? g.productPictureFromPhotos : g.productPictureDesigned}</span>
+                    {can && !busy && pic?.status !== "generating" && (
+                      <button type="button" className="mn-btn mn-btn--ghost mn-btn--sm self-start" disabled={pending} onClick={() => go({ kind: "product", name: p.name })}>
+                        {pic?.url ? g.remake : g.makeProductPicture}<span className="mn-btn__cost">{usd(d.prices.image)}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
             {can && (
               <div className="flex items-center gap-2">
                 {p.photos.length < 4 && (
@@ -407,6 +467,23 @@ export function ReferenceLockView({ d, g, run }: { d: GenData; g: G; run: RunCop
                       </button>
                     )}
                   </div>
+                  {can && isAi && d.library.length > 0 && (
+                    <label className="flex flex-col gap-1">
+                      <span className="text-[12px] text-ink-muted">{g.fromLibrary}</span>
+                      <select
+                        className="mn-select h-8"
+                        value=""
+                        disabled={pending || r.busy}
+                        onChange={(e) => {
+                          const id = e.target.value;
+                          if (id) start(async () => { const res = await applyLibraryActor(d.projectId, c.name, id); setNote(res.error); router.refresh(); });
+                        }}
+                      >
+                        <option value="">{g.fromLibraryPick}</option>
+                        {d.library.map((x) => <option key={x.id} value={x.id}>{x.voice ? `${x.name} · ${x.voice}` : x.name}</option>)}
+                      </select>
+                    </label>
+                  )}
                   <VoicePick
                     d={d}
                     g={g}
@@ -435,7 +512,7 @@ export function ReferenceLockView({ d, g, run }: { d: GenData; g: G; run: RunCop
         </div>
       </section>
 
-      <Products d={d} g={g} can={can} />
+      <Products d={d} g={g} can={can} go={go} busy={r.busy} />
 
       {d.outfits.length > 0 && (
         <section className="flex flex-col gap-3">
@@ -479,8 +556,8 @@ export function ReferenceLockView({ d, g, run }: { d: GenData; g: G; run: RunCop
 
       {d.lines.length > 0 && (
         <section className="flex flex-col gap-3 max-w-[420px]">
-          <h3 className="mn-label m-0">{g.narrator}</h3>
-          <VoicePick
+          <SkipHeader d={d} g={g} part="narrator" title={g.narrator} />
+          {!d.skip.includes("narrator") && <VoicePick
             d={d}
             g={g}
             who={null}
@@ -489,7 +566,7 @@ export function ReferenceLockView({ d, g, run }: { d: GenData; g: G; run: RunCop
             busy={r.busy}
             hear={() => go({ kind: "voicetry", who: null })}
             onSave={(v) => save(v.voice !== undefined ? { narrator: v.voice } : v.age !== undefined ? { narratorAge: v.age } : v.dialect !== undefined ? { narratorDialect: v.dialect } : { narratorStyle: v.how ?? "" })}
-          />
+          />}
         </section>
       )}
 
@@ -514,7 +591,10 @@ export function ReferenceLockView({ d, g, run }: { d: GenData; g: G; run: RunCop
 
 export function SoundView({ d, g, run }: { d: GenData; g: G; run: RunCopy }) {
   const { r, go } = useGen(d, run);
-  const missing = d.lines.filter((l) => !d.assets[`voice:${l.key}`]?.url && d.assets[`voice:${l.key}`]?.status !== "generating");
+  // A narrator left out in the reference lock has no lines to make.
+  const narratorOff = d.skip.includes("narrator");
+  const vo = narratorOff ? [] : d.lines;
+  const missing = vo.filter((l) => !d.assets[`voice:${l.key}`]?.url && d.assets[`voice:${l.key}`]?.status !== "generating");
   const missingDialogue = d.dialogue.filter((l) => !d.assets[`voice:${l.key}`]?.url && d.assets[`voice:${l.key}`]?.status !== "generating");
   const dlPrice = (i: number) => d.prices.dialogueLine[i] ?? 0.002;
   const linePrice = (i: number) => d.prices.voiceLine[i] ?? 0.002;
@@ -528,7 +608,7 @@ export function SoundView({ d, g, run }: { d: GenData; g: G; run: RunCopy }) {
         <Bar r={r} run={run}>
           {missing.length > 0 && (
             <button type="button" className="mn-btn mn-btn--primary" onClick={() => go({ kind: "voice", keys: missing.map((l) => l.key) })}>
-              {fillIn(g.makeVoice, { n: missing.length })}<span className="mn-btn__cost">{usd(missing.reduce((n, l) => n + linePrice(d.lines.indexOf(l)), 0))}</span>
+              {fillIn(g.makeVoice, { n: missing.length })}<span className="mn-btn__cost">{usd(missing.reduce((n, l) => n + linePrice(vo.indexOf(l)), 0))}</span>
             </button>
           )}
           {missingDialogue.length > 0 && (
@@ -539,11 +619,11 @@ export function SoundView({ d, g, run }: { d: GenData; g: G; run: RunCopy }) {
         </Bar>
       )}
       <section className="flex flex-col gap-2">
-        <h3 className="mn-label m-0">{g.narrator} · <span lang="en">{voiceName(d.narrator.voice)}</span></h3>
-        {d.lines.length === 0 && <p className="small text-ink-muted m-0">{g.noVoice}</p>}
-        {d.lines.length > 0 && (
+        <h3 className="mn-label m-0">{g.narrator}{!narratorOff && <> · <span lang="en">{voiceName(d.narrator.voice)}</span></>}</h3>
+        {narratorOff ? <p className="small text-ink-muted m-0">{fillIn(g.skipped, { name: g.narrator })}</p> : vo.length === 0 && <p className="small text-ink-muted m-0">{g.noVoice}</p>}
+        {vo.length > 0 && (
           <ul className="m-0 p-0 list-none flex flex-col border border-line rounded-lg">
-            {d.lines.map((l, i) => {
+            {vo.map((l, i) => {
               const a = d.assets[`voice:${l.key}`];
               return (
                 <li key={l.key} className={`grid gap-3 items-center px-4 py-3 ${i ? "border-t border-line" : ""}`} style={{ gridTemplateColumns: "40px 1fr 260px auto" }}>
@@ -736,8 +816,11 @@ export function ReviewView({ d, g, run }: { d: GenData; g: G; run: RunCopy }) {
     });
   return (
     <div className="flex flex-col gap-5">
+      {d.skip.includes("music") ? (
+        <SkipHeader d={d} g={g} part="music" title={g.music} />
+      ) : (
       <section className="flex flex-col gap-2">
-        <h3 className="mn-label m-0">{g.music}</h3>
+        <SkipHeader d={d} g={g} part="music" title={g.music} />
         <div className="flex flex-wrap items-center gap-3">
           <div className="w-full max-w-[480px]"><Media a={music} kind="audio" alt={g.music} g={g} /></div>
         </div>
@@ -751,6 +834,7 @@ export function ReviewView({ d, g, run }: { d: GenData; g: G; run: RunCopy }) {
           </Bar>
         )}
       </section>
+      )}
       <p className="small m-0"><span className="data">{fillIn(g.approvedCount, { n: approved, total: d.shots.length })}</span></p>
       <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${d.aspect === "9:16" ? 200 : 320}px, 1fr))` }}>
         {d.shots.map((s) => {

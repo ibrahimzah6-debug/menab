@@ -103,6 +103,8 @@ export function StageFooter({
   const { pending, error, run } = useRun();
   return (
     <footer className="shrink-0 sticky bottom-0 bg-surface border-t border-line px-5 py-3 flex flex-wrap gap-3 items-center z-10">
+      {/* AI work running on the page above shows its progress here, where it is always in view. */}
+      <div id="stage-run-slot" className="w-full empty:hidden" />
       <span className="small text-ink-muted" role="status">
         {pending && busyLabel ? <span className="mn-dots">{busyLabel}</span> : error ?? message}
       </span>

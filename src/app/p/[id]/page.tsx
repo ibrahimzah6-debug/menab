@@ -206,6 +206,8 @@ export default async function ProjectPage({
       }
     }
     const narrator = voiceFor(doc, null, brief.language);
+    // Actors saved in Libraries, to reuse for a character here.
+    const { data: saved } = await supabase.from("characters").select("id, name, voice, image_paths").eq("workspace_id", project.workspace_id).order("updated_at", { ascending: false }).limit(50);
     genData = {
       projectId: id,
       editable: canEdit && stage === 5,
@@ -225,6 +227,8 @@ export default async function ProjectPage({
       narrator: { voice: narrator.voice, how: narrator.how, dialect: narrator.dialect, age: narrator.age, suggested: narrator.suggested },
       aspect: projectAspect(doc.lock.aspect, brief),
       briefAspect: aspectFromBrief(brief),
+      skip: doc.lock.skip ?? [],
+      library: (saved ?? []).filter((x) => x.image_paths?.length).map((x) => ({ id: x.id, name: x.name, voice: x.voice ?? "" })),
       products: products.map((p) => ({ name: p.name, description: p.description ?? "", photos: (p.photos ?? []).map((path) => ({ path, url: productUrls.get(path) ?? null })) })),
       locations: doc.locations.map((l) => ({ name: l.name, picture: pics[`location:${lookKey(l.name)}`]?.url ?? null })),
       outfits: doc.outfits.map((o) => ({ key: `${lookKey(o.character)}|${lookKey(o.outfit)}`.slice(0, 200), character: o.character, outfit: o.outfit })),
