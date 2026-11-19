@@ -12,6 +12,7 @@ import { stageNumbersFor, type Path } from "@/lib/projects";
 import { isFailing } from "@/lib/ai/health";
 import { stagesFor } from "@/lib/stages";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getMemberships } from "@/lib/workspace";
 import { BriefChat } from "./brief-chat";
 import { BoardCanvas } from "./board-canvas";
@@ -27,8 +28,9 @@ import { PanelTabs } from "./panel-tabs";
 import { BoardCursor, TypeIn } from "./board-live";
 import { VideoTypePicker } from "./video-type-picker";
 import { hiddenOutputs } from "@/lib/video-types";
-import { DEFAULT_PICTURE_MODEL, PICTURE_MODELS, dialogueLines, genAssets, settlePending, stageFive } from "@/lib/generate";
-import { CLIP_MODELS, MUSIC_PRICE, VOICES, voicePreview, voicePrice } from "@/lib/ai/media";
+import { DEFAULT_PICTURE_MODEL, PICTURE_MODELS, clipPromptFor, dialogueLines, genAssets, scriptLines, settlePending, stageFive, voiceFor } from "@/lib/generate";
+import { CLIP_MODELS, DEFAULT_TALKING_MODEL, MUSIC_PRICE, VOICES, voicePrice } from "@/lib/ai/media";
+import { aspectFromBrief, projectAspect } from "@/lib/aspect";
 import { lookKey } from "@/lib/frames";
 import { ClipsView, KeyframesView, ReferenceLockView, ReviewView, SoundView, type GenData } from "./generate-docs";
 import { BudgetView, CallSheetsView, CrewView, EquipmentView, MeetingView as PpmMeetingView, PermitsView, PpmView, PreprodAssistant, PreprodFooter, PreprodTryAgain, ScheduleView, type CrewRow } from "./preprod-docs";
@@ -113,7 +115,8 @@ export default async function ProjectPage({
   // Steps the video type does not need stay in the list, crossed out as "Not needed", and are
   // not waited for at approval. Nothing written is deleted.
   const hidden = hiddenOutputs(brief as { video_type?: string; real_people?: string });
-  const list = showing === 1 ? stageOne.filter((x) => x.number !== 2) : outs.filter((x) => x.stage === showing);
+  const STAGE5_ORDER = [34, 37, 35, 36, 38];
+  const list = showing === 1 ? stageOne.filter((x) => x.number !== 2) : showing === 5 ? outs.filter((x) => x.stage === 5).sort((a, b) => STAGE5_ORDER.indexOf(a.number) - STAGE5_ORDER.indexOf(b.number)) : outs.filter((x) => x.stage === showing);
   const isReady = (n: number) => ["ready", "edited", "approved"].includes(outs.find((x) => x.number === n)?.status ?? "");
   const docsReady = [3, 4, 5, 6].every(isReady);
   const stageOneApproved = stageOne.length > 0 && stageOne.every((x) => x.status === "approved");
@@ -129,7 +132,7 @@ export default async function ProjectPage({
         : showing === 3
           ? asked >= 13 && asked <= 18 ? asked : isReady(18) && !hidden.has(17) ? 17 : ([13, 15, 16, 17, 18].find((n) => !hidden.has(n)) ?? 18)
           : showing === 5
-            ? asked >= 34 && asked <= 38 ? asked : !isReady(34) ? 34 : !isReady(35) ? 35 : !isReady(36) ? 36 : 38
+            ? asked >= 34 && asked <= 38 ? asked : !isReady(34) ? 34 : !isReady(37) ? 37 : !isReady(35) ? 35 : !isReady(36) ? 36 : 38
             : showing === 4
               ? stageFour.some((x) => x.number === asked) ? asked : !isReady(20) ? 20 : !isReady(28) ? 28 : 20
               : 0;
@@ -156,9 +159,13 @@ export default async function ProjectPage({
   const shotFrames = (content[17] as { frames?: { n: number }[] } | undefined)?.frames ?? [];
   const framesDrawn = shotFrames.filter((f) => (images[f.n]?.version ?? 0) > 0).length;
   const framesDone = hidden.has(17) || (shotFrames.length > 0 && framesDrawn === shotFrames.length);
-  const rawPictures = lookOn && showing === 3 && (open === 13 || open === 15) ? await lookImages(id, project.workspace_id, supabase) : {};
+  const rawPictures = lookOn && showing === 3 && (open === 13 || open === 15 || open === 17) ? await lookImages(id, project.workspace_id, supabase) : {};
   const pictures: Record<string, (typeof rawPictures)[string]> = {};
   for (const [k, x] of Object.entries(rawPictures)) pictures[k] = x.status === "generating" && new Date(x.updatedAt).getTime() < staleBefore ? { ...x, status: "failed" } : x;
+  // Frames drawn before the newest ready character or location picture: they may show an old face or place.
+  const lastPicture = Math.max(0, ...Object.values(rawPictures).filter((x) => x.url && x.status === "ready").map((x) => new Date(x.updatedAt).getTime()));
+  const staleFrames = Object.entries(rawImages).filter(([, x]) => x.url && lastPicture > new Date(x.updatedAt).getTime()).map(([n]) => Number(n));
+  const briefAspect = aspectFromBrief(brief);
   const drawing = Object.values(images).some((x) => x.status === "generating") || Object.values(pictures).some((x) => x.status === "generating");
   // Stage 5: collect jobs that finished on Kie.ai since the last look, then load everything made.
   const genOn = (showing === 5 || board) && outs.some((x) => x.stage === 5) && path !== "production";
@@ -183,26 +190,50 @@ export default async function ProjectPage({
     const doc = await stageFive(supabase, id);
     const pics = await lookImages(id, project.workspace_id, supabase);
     const frameMap = await frameImages(id, project.workspace_id, supabase);
-    const arabic = (brief.language ?? "").toLowerCase().includes("arab");
-    const lines = doc.script
-      .map((row, i) => ({ key: `vo-${i + 1}`, text: ((arabic ? row.vo_ar || row.vo_en : row.vo_en || row.vo_ar) ?? "").replace(/^\s*(VO|V\.O\.)\s*:\s*/i, "").trim() }))
-      .filter((l) => l.text);
+    const lines = scriptLines(doc, brief.language).map((l) => ({ key: l.key, text: l.text }));
+    const talkLines = dialogueLines(doc);
+    // The product to keep the same in every shot: saved in the reference lock, else the brief's.
+    const products = doc.lock.products ?? (brief.product ? [{ name: String(brief.product), description: "", photos: [] }] : []);
+    const productPaths = products.flatMap((p) => p.photos ?? []);
+    const productUrls = new Map<string, string>();
+    if (productPaths.length) {
+      // Paths were checked to be this project's own uploads when they were saved.
+      try {
+        const { data: signed } = await createAdminClient().storage.from("media").createSignedUrls(productPaths, 3600);
+        for (const s of signed ?? []) if (s.path && s.signedUrl) productUrls.set(s.path, s.signedUrl);
+      } catch {
+        // No storage access: the photos show as empty boxes.
+      }
+    }
+    const narrator = voiceFor(doc, null, brief.language);
     genData = {
       projectId: id,
       editable: canEdit && stage === 5,
       lang,
       assets: gen,
-      characters: doc.characters.map((c) => ({ name: c.name, role: c.role, made_with: c.made_with, picture: pics[`character:${lookKey(c.name)}`]?.url ?? null, library: Boolean(c.library_id) })),
+      characters: doc.characters.map((c) => {
+        const v = voiceFor(doc, c.name, brief.language);
+        const hasLines = talkLines.some((d) => lookKey(d.speaker) === lookKey(c.name));
+        return { name: c.name, role: c.role, made_with: c.made_with, picture: pics[`character:${lookKey(c.name)}`]?.url ?? null, library: Boolean(c.library_id), voice: v.voice, style: v.style, suggested: v.suggested, hasLines, speaks: hasLines && (doc.lock.speaks?.[lookKey(c.name)] ?? true) };
+      }),
+      narrator: { voice: narrator.voice, style: narrator.style, suggested: narrator.suggested },
+      aspect: projectAspect(doc.lock.aspect, brief),
+      products: products.map((p) => ({ name: p.name, description: p.description ?? "", photos: (p.photos ?? []).map((path) => ({ path, url: productUrls.get(path) ?? null })) })),
+      talkingModel: CLIP_MODELS.find((m) => m.id === DEFAULT_TALKING_MODEL)?.name ?? "",
       locations: doc.locations.map((l) => ({ name: l.name, picture: pics[`location:${lookKey(l.name)}`]?.url ?? null })),
       outfits: doc.outfits.map((o) => ({ key: `${lookKey(o.character)}|${lookKey(o.outfit)}`.slice(0, 200), character: o.character, outfit: o.outfit })),
-      shots: doc.shots.map((f) => ({ n: f.n, action: f.action, size: f.size, movement: f.movement, seconds: f.seconds, dialogue: f.dialogue, frame: frameMap[f.n]?.url ?? null })),
+      shots: doc.shots.map((f) => {
+        const line = talkLines.find((d) => d.n === f.n);
+        const speaks = Boolean(line && (doc.lock.speaks?.[lookKey(line.speaker)] ?? true));
+        return { n: f.n, action: f.action, size: f.size, movement: f.movement, seconds: f.seconds, dialogue: f.dialogue, frame: frameMap[f.n]?.url ?? null, speaks, speaker: line?.speaker ?? "", clipPrompt: clipPromptFor(doc, f, brief.language, false), talkPrompt: clipPromptFor(doc, f, brief.language, true) };
+      }),
       lines,
-      dialogue: dialogueLines(doc),
+      dialogue: talkLines,
       lock: doc.lock,
-      voices: VOICES.map((v) => ({ ...v, preview: voicePreview(v.id) })),
-      clipModels: CLIP_MODELS.map((m) => ({ id: m.id, name: m.name, perSecond: m.perSecond, fixedSeconds: m.fixedSeconds, talking: m.talking, note: m.note[locale] })),
+      voices: VOICES,
+      clipModels: CLIP_MODELS.map((m) => ({ id: m.id, name: m.name, perSecond: m.perSecond, min: m.min, max: m.max, fixedSeconds: m.fixedSeconds, talking: m.talking, note: m.note[locale] })),
       imageModels: PICTURE_MODELS.map((pid) => IMAGE_MODELS.find((m) => m.id === pid)).filter((m) => m !== undefined).map((m) => ({ id: m.id, name: m.name, price: m.priceFrom ?? 0, note: m.goodFor[locale] })),
-      prices: { image: IMAGE_MODELS.find((m) => m.id === (doc.lock.imageModel ?? DEFAULT_PICTURE_MODEL))?.priceFrom ?? 0.09, voiceLine: lines.map((l) => voicePrice(l.text)), dialogueLine: dialogueLines(doc).map((l) => voicePrice(l.text)), music: MUSIC_PRICE },
+      prices: { image: IMAGE_MODELS.find((m) => m.id === (doc.lock.imageModel ?? DEFAULT_PICTURE_MODEL))?.priceFrom ?? 0.09, voiceLine: lines.map((l) => voicePrice(l.text)), dialogueLine: talkLines.map((l) => voicePrice(l.text)), voiceTry: 0.002, music: MUSIC_PRICE },
     };
   }
   const missingFrames = shotFrames.filter((f) => !(images[f.n]?.version) && images[f.n]?.status !== "generating").map((f) => f.n);
@@ -559,6 +590,8 @@ export default async function ProjectPage({
                       model={imageModel}
                       style={lastStyle}
                       lang={lang}
+                      defaultAspect={briefAspect}
+                      staleFrames={staleFrames}
                       waitingFor={picturesWaiting.length ? fill(t.project.frames.picturesFirst, { names: picturesWaiting.join(", ") }) : undefined}
                     />
                   ) : (
@@ -632,7 +665,7 @@ export default async function ProjectPage({
                 ) : open === 37 ? (
                   <SoundView d={genData} g={t.generate} run={runCopy} />
                 ) : (
-                  <ReviewView d={genData} g={t.generate} />
+                  <ReviewView d={genData} g={t.generate} run={runCopy} />
                 )}
               </div>
             </section>
@@ -857,7 +890,7 @@ export default async function ProjectPage({
                       ? missingFrames.length && isReady(17) ? t.look.footerDraw : t.look.footer.draw
                       : t.look.footer.review
           }
-          draw={!stageThreeApproved && !picturesWaiting.length && !hidden.has(17) && isReady(17) && missingFrames.length > 0 && !stageThree.some((x) => x.status === "generating") ? { frames: missingFrames, model: imageModel, style: lastStyle, label: missingFrames.length === 1 ? t.look.frames.drawOne : fill(t.look.frames.drawMissing, { n: missingFrames.length }), cost: approx(imagePrice * missingFrames.length) } : null}
+          draw={!stageThreeApproved && !picturesWaiting.length && !hidden.has(17) && isReady(17) && missingFrames.length > 0 && !stageThree.some((x) => x.status === "generating") ? { frames: missingFrames, model: imageModel, style: lastStyle, aspect: briefAspect, label: missingFrames.length === 1 ? t.look.frames.drawOne : fill(t.look.frames.drawMissing, { n: missingFrames.length }), cost: approx(imagePrice * missingFrames.length) } : null}
           write={!stageThreeApproved && !content[13] && !content[15] && !stageThree.some((x) => x.status === "generating") ? { label: t.look.write, cost: approx(estimateUsd(model, "look")) } : null}
           approve={!stageThreeApproved && !picturesWaiting.length && [13, 14, 15, 16, 17, 18].filter((n) => !hidden.has(n)).every(isReady) && framesDone ? fill(t.stage.approve, { n: 3 }) : null}
         />

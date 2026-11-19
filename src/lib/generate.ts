@@ -1,7 +1,8 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { clipBackup, clipModel, clipRequest, clipSeconds, DEFAULT_CLIP_MODEL, DEFAULT_NARRATOR, musicRequest, voiceRequest } from "@/lib/ai/media";
-import { ASPECTS, imageBackup, imageModel, imageRequest, type Aspect } from "@/lib/ai/images";
+import { clipBackup, clipModel, clipRequest, clipSeconds, DEFAULT_CLIP_MODEL, DEFAULT_NARRATOR, DEFAULT_TALKING_MODEL, dialectFor, isVoice, musicRequest, suggestVoice, voiceBackupRequest, voiceRequest } from "@/lib/ai/media";
+import { projectAspect } from "@/lib/aspect";
+import { imageBackup, imageModel, imageRequest, type Aspect } from "@/lib/ai/images";
 import { createTask, getTask, KIE_USD_PER_CREDIT, KieError } from "@/lib/ai/kie";
 import { loadProject } from "@/lib/brief-turn";
 import { lookKey } from "@/lib/frames";
@@ -19,7 +20,7 @@ export const DEFAULT_PICTURE_MODEL = "nano-banana-pro";
 // Models offered for actor sheets, outfits and keyframes: the ones best at real people.
 export const PICTURE_MODELS = ["nano-banana-pro", "gpt-image-2", "seedream-5-pro", "nano-banana-2", "flux-2-pro"];
 
-export type GenKind = "sheet" | "outfit" | "keyframe" | "clip" | "voice" | "music";
+export type GenKind = "sheet" | "outfit" | "keyframe" | "clip" | "voice" | "music" | "voicetry";
 export type GenEvent =
   | { t: "genStart"; label: string; model: string }
   | { t: "genDone"; label: string }
@@ -43,6 +44,22 @@ const wait = (ms: number, signal?: AbortSignal) =>
 
 // ---------- What stage 5 works from ----------
 
+// A product that must look the same in every shot: its real photos (stored in our storage) and a
+// one-line description of how it looks.
+export type Product = { name: string; description?: string; photos?: string[] };
+export type Lock = {
+  locked?: boolean;
+  consent?: boolean;
+  narrator?: string;
+  narratorStyle?: string;
+  voices?: Record<string, string>;
+  styles?: Record<string, string>;
+  speaks?: Record<string, boolean>;
+  aspect?: string;
+  imageModel?: string;
+  products?: Product[];
+};
+
 export type Shot = { n: number; scene: string; size: string; angle: string; movement: string; lens: string; action: string; dialogue: string; seconds: number; cast: string[]; set: string; prompt: string };
 
 export async function stageFive(supabase: SupabaseClient, projectId: string) {
@@ -53,16 +70,18 @@ export async function stageFive(supabase: SupabaseClient, projectId: string) {
     const o = withV.find((x) => x.number === n);
     return o ? (versions?.find((v) => v.output_id === o.id && v.version === o.current_version)?.content as Record<string, unknown> | undefined) : undefined;
   };
-  const characters = ((content(13)?.characters as { name: string; role?: string; age?: string; look?: string; made_with?: string; library_id?: string | null }[] | undefined) ?? []).filter((c) => c.name?.trim());
+  const characters = ((content(13)?.characters as { name: string; role?: string; age?: string; look?: string; personality?: string; made_with?: string; library_id?: string | null }[] | undefined) ?? []).filter((c) => c.name?.trim());
   const wardrobe = (content(14)?.wardrobe as { character: string; scene: string; outfit: string }[] | undefined) ?? [];
   const locations = ((content(15)?.locations as { name: string; description?: string; int_ext?: string; library_id?: string | null }[] | undefined) ?? []).filter((l) => l.name?.trim());
   const shots = ((content(17)?.frames as Shot[] | undefined) ?? []).filter((f) => f.n);
   const script = (content(9)?.rows as { vo_ar?: string; vo_en?: string; seconds?: number }[] | undefined) ?? [];
   const mood = (content(11) ?? {}) as { look?: string; grade?: string; references?: string[] };
-  const lock = (content(34) ?? {}) as { locked?: boolean; consent?: boolean; narrator?: string; voices?: Record<string, string>; aspect?: string; imageModel?: string };
-  // Outfits that change between scenes need their own picture; one outfit is shown on the sheet.
-  const outfits = characters.flatMap((c) => {
-    const list = [...new Set(wardrobe.filter((w) => lookKey(w.character) === lookKey(c.name)).map((w) => w.outfit.trim()).filter(Boolean))];
+  const lock = (content(34) ?? {}) as Lock;
+  // Outfits that really change between scenes need their own picture; one outfit is shown on the
+  // sheet. A scene that says it keeps the same clothes ("same shirt as scene 1") is not a change.
+  const same = /^\s*(the\s+)?same\b|^\s*(نفس|ذات)\s/i;
+  const outfits = characters.filter((c) => c.made_with !== "cast").flatMap((c) => {
+    const list = [...new Set(wardrobe.filter((w) => lookKey(w.character) === lookKey(c.name)).map((w) => w.outfit.trim()).filter((o) => o && !same.test(o)))];
     return list.length > 1 ? list.map((o) => ({ character: c.name, outfit: o })) : [];
   });
   return { characters, wardrobe, locations, shots, script, mood, lock, outfits };
@@ -102,6 +121,47 @@ export function dialogueLines(doc: { shots: Shot[] }) {
   return doc.shots
     .map((s) => ({ n: s.n, key: `dl-${s.n}`, speaker: s.cast?.[0] ?? "", text: (s.dialogue ?? "").replace(/^\s*["“”']|["“”']\s*$/g, "").trim() }))
     .filter((d) => d.speaker && d.text && !/^\s*(VO|V\.O\.|voiceover|تعليق)/i.test(d.text));
+}
+
+// The voice and the way of speaking for a character, or for the narrator (name null). What was
+// picked in the reference lock, else a suggestion from the character and the project language.
+export function voiceFor(doc: { characters: { name: string; role?: string; look?: string; personality?: string; age?: string }[]; lock: Lock }, name: string | null, language?: string | null) {
+  if (!name) {
+    const voice = isVoice(doc.lock.narrator) ? doc.lock.narrator! : DEFAULT_NARRATOR;
+    const style = doc.lock.narratorStyle?.trim() || `A voiceover narrator for a commercial. Speak in ${dialectFor(language)}. Warm, clear and natural, not like a news reader.`;
+    return { voice, style, suggested: !isVoice(doc.lock.narrator) };
+  }
+  const c = doc.characters.find((x) => lookKey(x.name) === lookKey(name));
+  const picked = doc.lock.voices?.[lookKey(name)];
+  const voice = isVoice(picked) ? picked! : suggestVoice(c ?? { name });
+  const style = doc.lock.styles?.[lookKey(name)]?.trim() || [`${c?.role ?? name}${c?.age ? `, ${c.age}` : ""}.`, `Speak in ${dialectFor(language)}.`, c?.personality ? `Personality: ${c.personality}` : ""].filter(Boolean).join(" ");
+  return { voice, style, suggested: !isVoice(picked) };
+}
+
+// Whether a shot shows a product: it says so in its description.
+const PRODUCT_WORDS = /(product|pack|packag|jar|bottle|tube|box|cream|serum|logo|can\b|cup|منتج|عبوة|علبة|كريم|زجاجة|العبوة|المنتج|الكريم)/i;
+export function productsIn(doc: { lock: Lock }, s: { prompt?: string; action?: string }) {
+  const text = `${s.prompt ?? ""} ${s.action ?? ""}`;
+  return (doc.lock.products ?? []).filter((p) => p.name?.trim() && (PRODUCT_WORDS.test(text) || text.toLowerCase().includes(p.name.toLowerCase())));
+}
+
+// The full instructions for one video shot: what we see, what happens, the camera, the product
+// and what must stay the same. Written once here so the video model is never left guessing.
+export function clipPromptFor(doc: { lock: Lock; characters: { name: string }[] }, s: Shot, language?: string | null, talking = false) {
+  const products = productsIn(doc, s);
+  const speaker = s.cast?.[0];
+  const line = (s.dialogue ?? "").replace(/^\s*["“”']|["“”']\s*$/g, "").trim();
+  const voiceover = /^\s*(VO|V\.O\.|voiceover|تعليق)/i.test(line);
+  const camera = [s.size && `${s.size} shot`, s.angle, s.movement && `camera ${s.movement}`, s.lens && `${s.lens} lens`].filter(Boolean).join(", ");
+  const parts = [
+    s.prompt?.trim(),
+    s.action?.trim() ? `What happens in this shot: ${s.action.trim()}` : "",
+    camera ? `Camera: ${camera}.` : "",
+    line && speaker && !voiceover ? (talking ? `${speaker} says this line to the camera with natural lip movement: "${line}".` : `${speaker} is speaking (${dialectFor(language)}); her or his lips move naturally, no subtitles.`) : "",
+    ...products.map((p) => `The product is ${p.name}${p.description ? `: ${p.description}` : ""}. It must look exactly as in the first frame: same shape, colours and label.`),
+    "Keep every face, hairstyle, outfit, product and the place exactly as in the first frame. Smooth, natural, realistic motion. No text, captions or watermarks on screen.",
+  ];
+  return parts.filter(Boolean).join("\n").slice(0, 2400);
 }
 
 // ---------- Saving a finished job ----------
@@ -187,8 +247,9 @@ export type GenRequest =
   | { kind: "sheet"; names: string[]; model?: string }
   | { kind: "outfit"; keys: string[]; model?: string }
   | { kind: "keyframe"; shots: number[]; model?: string }
-  | { kind: "clip"; shots: number[]; model?: string; prompts?: Record<string, string> }
+  | { kind: "clip"; shots: number[]; model?: string; prompts?: Record<string, string>; auto?: boolean }
   | { kind: "voice"; keys: string[] }
+  | { kind: "voicetry"; who: string | null }
   | { kind: "music" };
 
 export async function runGenerate(projectId: string, req: GenRequest, emit: (e: GenEvent) => void, signal?: AbortSignal) {
@@ -198,8 +259,9 @@ export async function runGenerate(projectId: string, req: GenRequest, emit: (e: 
   const g = t.generate;
   const admin = createAdminClient();
   const doc = await stageFive(supabase, projectId);
-  const brief = (project.brief ?? {}) as { language?: string; feeling?: string };
-  const aspect: Aspect = ASPECTS.includes(doc.lock.aspect as Aspect) ? (doc.lock.aspect as Aspect) : "16:9";
+  const brief = (project.brief ?? {}) as { language?: string; feeling?: string; formats?: unknown; platforms?: unknown };
+  // The frame shape: picked in the reference lock, else from the brief (Instagram means 9:16).
+  const aspect: Aspect = projectAspect(doc.lock.aspect, brief);
   // Sheets, outfits and keyframes use the picture model picked in the reference lock; by default
   // the strongest model for keeping faces the same.
   const imgModel = imageModel(("model" in req && req.model) || doc.lock.imageModel || DEFAULT_PICTURE_MODEL).id;
@@ -241,55 +303,77 @@ export async function runGenerate(projectId: string, req: GenRequest, emit: (e: 
     }
   } else if (req.kind === "keyframe") {
     if (!doc.lock.locked) throw new Error(g.lockFirst);
+    // The approved storyboard frame gives the framing; the actor sheet, the location picture and
+    // the product photos give the faces, the place and the product.
+    const { data: drawn } = await supabase.from("frame_images").select("n, path, version").eq("project_id", projectId).eq("status", "ready").order("version", { ascending: false });
     for (const s of doc.shots.filter((x) => req.shots.includes(x.n))) {
       const refs: string[] = [];
+      const roles: string[] = [];
+      const add = (u: string | null, role: string) => {
+        if (u && refs.length < 6) {
+          refs.push(u);
+          roles.push(`Image ${refs.length}: ${role}`);
+        }
+      };
+      add(await sign(drawn?.find((f) => f.n === s.n)?.path), `the approved storyboard frame. Follow its framing, composition and the position of people and objects, adapted to a ${aspect} frame. Do not copy its drawing style.`);
       for (const name of s.cast ?? []) {
         const outfit = doc.wardrobe.find((w) => lookKey(w.character) === lookKey(name) && (w.scene === s.scene || w.scene.includes(s.scene)))?.outfit;
         const p = (outfit && (await assetPath("outfit", `${lookKey(name)}|${lookKey(outfit)}`.slice(0, 200)))) || (await assetPath("sheet", lookKey(name))) || lookPath("character", name);
-        const u = await sign(p);
-        if (u) refs.push(u);
+        add(await sign(p), `${name}. Keep this exact face, hair, body and clothes.`);
       }
-      if (s.set) {
-        const u = await sign(lookPath("location", s.set));
-        if (u) refs.push(u);
-      }
-      const prompt = `Final film frame. ${s.prompt}${refs.length ? "\nKeep every person, their clothes and the place exactly as in the reference photos." : ""}\n\n${PHOTO}`.slice(0, 5900);
-      jobs.push(imageJob(String(s.n), fill(g.shot, { n: s.n }), prompt, refs.slice(0, 4), aspect));
+      if (s.set) add(await sign(lookPath("location", s.set)), `the place, ${s.set}. Keep it exactly.`);
+      const products = productsIn(doc, s);
+      for (const p of products) for (const photo of (p.photos ?? []).slice(0, 2)) add(await sign(photo), `the real product, ${p.name}. Show exactly this product: same shape, colours, cap and label.`);
+      const productText = products.map((p) => `The product is ${p.name}${p.description ? `: ${p.description}` : ""}.`).join(" ");
+      const prompt = `Final film frame, ${aspect}. ${s.prompt}${productText ? `\n${productText}` : ""}${roles.length ? `\nReference images:\n${roles.join("\n")}` : ""}\n\n${PHOTO}`.slice(0, 5900);
+      jobs.push(imageJob(String(s.n), fill(g.shot, { n: s.n }), prompt, refs, aspect));
     }
   } else if (req.kind === "clip") {
-    const model = clipModel(req.model ?? DEFAULT_CLIP_MODEL).id;
+    const picked = clipModel(req.model ?? DEFAULT_CLIP_MODEL).id;
+    const lines = new Map(dialogueLines(doc).map((d) => [d.n, d]));
     for (const s of doc.shots.filter((x) => req.shots.includes(x.n))) {
       const kf = await sign(await assetPath("keyframe", String(s.n)));
       if (!kf) {
         emit({ t: "genFailed", label: fill(g.shot, { n: s.n }), reason: g.keyframeFirst });
         continue;
       }
-      // Talking (lip-sync) models need the shot's dialogue line in the speaker's voice.
-      const audio = clipModel(model).talking ? await sign(await assetPath("voice", `dl-${s.n}`)) : null;
-      if (clipModel(model).talking && !audio) {
+      // A shot where a character speaks on camera uses the talking model with her voice line,
+      // unless someone picked a model for it by hand.
+      const line = lines.get(s.n);
+      const speaks = Boolean(line && (doc.lock.speaks?.[lookKey(line.speaker)] ?? true));
+      const lineAudio = speaks ? await sign(await assetPath("voice", `dl-${s.n}`)) : null;
+      const model = clipModel(picked).talking ? picked : req.auto !== false && lineAudio ? DEFAULT_TALKING_MODEL : picked;
+      const talking = Boolean(clipModel(model).talking);
+      const audio = talking ? lineAudio ?? (await sign(await assetPath("voice", `dl-${s.n}`))) : null;
+      if (talking && !audio) {
         emit({ t: "genFailed", label: fill(g.shot, { n: s.n }), reason: g.dialogueFirst });
         continue;
       }
-      const prompt = (req.prompts?.[String(s.n)] ?? assets[`clip:${s.n}`]?.prompt ?? `${s.action}. Camera move: ${s.movement}. Shot size: ${s.size}, lens ${s.lens}. Natural, realistic motion; keep the faces, clothes and place exactly as in the first frame. No text on screen.`).slice(0, 2400);
+      const prompt = (req.prompts?.[String(s.n)]?.trim() || clipPromptFor(doc, s, brief.language, talking)).slice(0, 2400);
       jobs.push({
-        key: String(s.n), label: fill(g.shot, { n: s.n }), model, prompt, params: { seconds: s.seconds, aspect, talking: Boolean(audio) }, seconds: clipSeconds(model, s.seconds),
+        key: String(s.n), label: fill(g.shot, { n: s.n }), model, prompt, params: { seconds: s.seconds, aspect, talking }, seconds: clipSeconds(model, s.seconds),
         build: (m) => clipRequest(m, prompt, kf, s.seconds, aspect, audio), backup: clipBackup, modelName: (id) => clipModel(id).name,
       });
     }
-  } else if (req.kind === "voice") {
-    const arabic = (brief.language ?? "").toLowerCase().includes("arab");
-    const narrator = doc.lock.narrator ?? DEFAULT_NARRATOR;
-    doc.script.forEach((row, i) => {
-      const text = ((arabic ? row.vo_ar || row.vo_en : row.vo_en || row.vo_ar) ?? "").replace(/^\s*(VO|V\.O\.)\s*:\s*/i, "").trim();
-      const key = `vo-${i + 1}`;
-      if (!text || !req.keys.includes(key)) return;
-      jobs.push({ key, label: fill(g.line, { n: i + 1 }), model: "elevenlabs-multilingual-v2", prompt: text, params: { voice: narrator }, build: () => voiceRequest(text, narrator), backup: (m) => m, modelName: () => "ElevenLabs" });
-    });
-    // Dialogue spoken in a shot, in the speaker's own voice.
-    for (const d of dialogueLines(doc)) {
-      if (!req.keys.includes(d.key)) continue;
-      const voice = doc.lock.voices?.[lookKey(d.speaker)] ?? narrator;
-      jobs.push({ key: d.key, label: fill(g.dialogue, { n: d.n, name: d.speaker }), model: "elevenlabs-multilingual-v2", prompt: d.text, params: { voice, speaker: d.speaker }, build: () => voiceRequest(d.text, voice), backup: (m) => m, modelName: () => "ElevenLabs" });
+  } else if (req.kind === "voice" || req.kind === "voicetry") {
+    const voiceJob = (key: string, label: string, text: string, who: string | null): Job => {
+      const v = voiceFor(doc, who, brief.language);
+      return {
+        key, label, model: "gemini-3-8-tts", prompt: text, params: { voice: v.voice, style: v.style, speaker: who },
+        build: (m) => (m === "elevenlabs" ? voiceBackupRequest(text, v.voice) : voiceRequest(text, v.voice, v.style)),
+        backup: () => "elevenlabs", modelName: (id) => (id === "elevenlabs" ? "ElevenLabs" : `Gemini 3.8 voice (${v.voice})`),
+      };
+    };
+    const voLines = scriptLines(doc, brief.language);
+    if (req.kind === "voicetry") {
+      // A short try of a voice: the character's first line, or the narrator's first line.
+      const who = req.who;
+      const text = (who ? dialogueLines(doc).find((d) => lookKey(d.speaker) === lookKey(who))?.text : voLines[0]?.text) || (/(arab|عرب|saudi|سعود)/i.test(brief.language ?? "") ? "هلا والله، هذا صوتي. وش رايكم فيه؟" : "Hello, this is my voice. What do you think?");
+      jobs.push(voiceJob(`try-${who ? lookKey(who) : "narrator"}`.slice(0, 200), who ?? g.narrator, text.slice(0, 300), who));
+    } else {
+      for (const l of voLines) if (req.keys.includes(l.key)) jobs.push(voiceJob(l.key, fill(g.line, { n: l.n }), l.text, null));
+      // Dialogue spoken in a shot, in the speaker's own voice.
+      for (const d of dialogueLines(doc)) if (req.keys.includes(d.key)) jobs.push(voiceJob(d.key, fill(g.dialogue, { n: d.n, name: d.speaker }), d.text, d.speaker));
     }
   } else if (req.kind === "music") {
     const style = [brief.feeling, doc.mood.look, "cinematic score for a short film, instrumental, clean mix"].filter(Boolean).join("; ");
@@ -381,7 +465,7 @@ export async function runGenerate(projectId: string, req: GenRequest, emit: (e: 
   };
 
   const queue = [...jobs];
-  const atOnce = kind === "voice" ? 4 : 3;
+  const atOnce = kind === "voice" || kind === "voicetry" ? 4 : 3;
   await Promise.all(Array.from({ length: Math.min(atOnce, queue.length) }, async () => { while (queue.length) await runJob(queue.shift()!); }));
   await syncOutputs(admin, projectId);
 
@@ -390,6 +474,14 @@ export async function runGenerate(projectId: string, req: GenRequest, emit: (e: 
     throw new Error(t.project.frames.accountProblem);
   }
   if (failed && !signal?.aborted) await notify({ workspaceId: project.workspace_id, projectId, kind: "ai_failed", title: `${failed} generation${failed > 1 ? "s" : ""} failed`, body: "Nothing was charged for them. Try them again." });
+}
+
+// The voiceover lines of the script, in the project language.
+export function scriptLines(doc: { script: { vo_ar?: string; vo_en?: string }[] }, language?: string | null) {
+  const arabic = /(arab|عرب|saudi|سعود)/i.test(language ?? "");
+  return doc.script
+    .map((row, i) => ({ n: i + 1, key: `vo-${i + 1}`, text: ((arabic ? row.vo_ar || row.vo_en : row.vo_en || row.vo_ar) ?? "").replace(/^\s*(VO|V\.O\.)\s*:\s*/i, "").trim() }))
+    .filter((l) => l.text);
 }
 
 function fill(s: string, v: Record<string, string | number>) {

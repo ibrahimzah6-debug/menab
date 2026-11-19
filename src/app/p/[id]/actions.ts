@@ -463,7 +463,23 @@ export async function chooseVideoType(projectId: string, typeId: string): Promis
 
 // The reference lock (output 34): voices, frame shape, consent, and the lock itself. Once
 // locked, every keyframe and clip follows these references.
-export async function saveReferenceLock(projectId: string, patch: { narrator?: string; voices?: Record<string, string>; aspect?: string; consent?: boolean; locked?: boolean; imageModel?: string }): Promise<Result> {
+type LockPatch = {
+  narrator?: string;
+  narratorStyle?: string;
+  voices?: Record<string, string>;
+  styles?: Record<string, string>;
+  speaks?: Record<string, boolean>;
+  aspect?: string;
+  consent?: boolean;
+  locked?: boolean;
+  imageModel?: string;
+  products?: { name: string; description?: string; photos?: string[] }[];
+};
+
+// Settings that do not change any picture: they can change after the lock.
+const AFTER_LOCK = new Set(["imageModel", "narrator", "narratorStyle", "voices", "styles", "speaks"]);
+
+export async function saveReferenceLock(projectId: string, patch: LockPatch): Promise<Result> {
   const { t } = await getI18n();
   try {
     const { me, supabase, project } = await loadProject(projectId);
@@ -472,11 +488,24 @@ export async function saveReferenceLock(projectId: string, patch: { narrator?: s
     if (!o) return { error: "Step not found." };
     const { data: v } = o.current_version ? await supabase.from("versions").select("content").eq("output_id", o.id).eq("version", o.current_version).maybeSingle() : { data: null };
     const current = (v?.content ?? {}) as Record<string, unknown>;
-    // The picture model can change after the lock: it applies to the next pictures, like keyframes.
-    const onlyModel = Object.keys(patch).every((k) => k === "imageModel");
+    // Voices and the picture model can change after the lock; they never change a picture made.
+    const afterLock = Object.keys(patch).every((k) => AFTER_LOCK.has(k));
     if (patch.imageModel && !IMAGE_MODELS.some((m) => m.id === patch.imageModel)) return { error: "Unknown model." };
-    if (current.locked && !onlyModel && patch.locked !== false && patch.locked !== true) return { error: t.generate.lockedNote };
-    const next = { ...current, ...patch, voices: { ...((current.voices as object) ?? {}), ...(patch.voices ?? {}) } };
+    if (current.locked && !afterLock && patch.locked !== false && patch.locked !== true) return { error: t.generate.lockedNote };
+    // Product photos must be this project's own uploads.
+    if (patch.products) {
+      const mine = `${me.workspace.id}/projects/${projectId}/`;
+      patch.products = patch.products
+        .map((p) => ({ name: String(p.name ?? "").slice(0, 120), description: String(p.description ?? "").slice(0, 600), photos: (p.photos ?? []).filter((x) => typeof x === "string" && x.startsWith(mine) && !x.includes("..")).slice(0, 4) }))
+        .slice(0, 6);
+    }
+    const next = {
+      ...current,
+      ...patch,
+      voices: { ...((current.voices as object) ?? {}), ...(patch.voices ?? {}) },
+      styles: { ...((current.styles as object) ?? {}), ...(patch.styles ?? {}) },
+      speaks: { ...((current.speaks as object) ?? {}), ...(patch.speaks ?? {}) },
+    };
     if (patch.locked) {
       // Real people's photos need their written consent first (B27).
       const doc = await stageFive(supabase, projectId);
@@ -538,7 +567,7 @@ export async function saveActorToLibrary(projectId: string, name: string): Promi
     }
     if (!paths.length) return { error: "Could not copy the pictures." };
     const voiceId = doc.lock.voices?.[key];
-    const voice = voiceId ? `ElevenLabs ${VOICES.find((v) => v.id === voiceId)?.name ?? ""} (${voiceId})` : null;
+    const voice = voiceId ? `${VOICES.find((v) => v.id === voiceId)?.name ?? voiceId} (Gemini voice)` : null;
     const outfits = doc.wardrobe.filter((w) => w.character.trim().toLowerCase() === key).map((w) => `${w.scene}: ${w.outfit}`).join("\n");
     const row = { name: c.name.slice(0, 120), description: (c.role ?? "").slice(0, 4000), age: (c.age ?? "").slice(0, 60), look: (c.look ?? "").slice(0, 4000), wardrobe: outfits.slice(0, 4000), voice, image_paths: paths, updated_at: new Date().toISOString() };
     const { data: existing } = await supabase.from("characters").select("id").eq("workspace_id", project.workspace_id).eq("name", row.name).limit(1);

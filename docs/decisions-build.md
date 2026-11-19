@@ -314,3 +314,15 @@ Found while testing the Moringa cream project: the character picture in stage 3 
 
 - The daily development analysis (GPT 6.1 Sol through Kie.ai) is now recorded like every other AI call, with no workspace, as task "development". It counts in the owner dashboard's totals and under Models, has its own line "Menab development (daily analysis)" under Workspaces, and the Development section shows how many analyses ran in the last 30 days and what they cost. Workspace members never see these rows, and they never count in a client's credits. Earlier runs (5, 8 and 9 Nov, about $0.08 in all) were not recorded and cannot be added.
 - Characters and Locations in stage 3 have their own picture model menu, with the price per picture on each option and on the buttons. It starts on the project's last image model.
+
+## B40. Generate, Part 1: new order, product lock, Gemini voices, frame shape from the brief, more video models (Ibrahim, 19 Nov 2026)
+
+- Stage 5 runs in this order: Reference lock, Voice, Keyframes, Video shots, Music and review. Music moved into the last step.
+- Reference lock: picture model, frame shape (taken from the brief's formats until someone picks one), Digital actors (optional; no sheet for real people who are filmed), Product, outfits, locations and the narrator. Voices, how each one sounds, and "Speaks on camera" can still change after the lock, because they never change a picture.
+- Product: a name, what it looks like, and up to 4 photos of the real thing, stored in the project's own storage. Keyframes get the photos as references, and every clip prompt that shows the product describes it.
+- Keyframes use up to 6 references: the storyboard frame for the layout, the actor sheet (or outfit, or stage 3 picture) for the face, the location, and up to 2 product photos.
+- Clip prompts are written in full from the frame prompt, the action, the camera, the line and the product, with a "keep everything the same as the first frame" rule. A shot whose character speaks on camera, with the line ready, is made with the talking avatar model automatically. This can be turned off.
+- Voices: Gemini 3.8 Flash TTS on Kie.ai, 30 voices grouped by women and men, a suggested voice per character from its description, a dialect style per character (Najdi for Saudi Arabic), and "Hear the first line", which plays inside the app (about $0.002). ElevenLabs is the backup.
+- Video models added: Kling 4.0 and 4.0 Flash, Seedance 2.5 and 2.5 Flash, Veo 3.1 Fast and Veo 3.1, Gemini Omni Flash 1.2, Wan 3.0, Grok Imagine 1.5 and PixVerse V6, besides Kling 3.0 and the two talking avatars.
+- The storyboard starts on the brief's frame shape, and a frame drawn before a newer character or location picture is marked "Before a change".
+- Outfit pictures are only for AI characters, and outfits that say "same" are skipped.

@@ -305,6 +305,8 @@ export function StoryboardView({
   style: initialStyle,
   lang,
   waitingFor,
+  defaultAspect = "16:9",
+  staleFrames = [],
 }: {
   projectId: string;
   content: { frames: Frame[] };
@@ -317,26 +319,28 @@ export function StoryboardView({
   style: "sketch" | "photo";
   lang: "en" | "ar";
   waitingFor?: string;
+  defaultAspect?: string;
+  staleFrames?: number[];
 }) {
   const { save, note } = useSave(projectId, 17);
   const r = useCreativeRun(projectId, run);
   const f = c.frames;
   const [style, setStyle] = useState<"sketch" | "photo">(initialStyle);
   const [model, setModel] = useState(initialModel);
-  const [aspect, setAspect] = useState("16:9");
-  // The frame shape is a per-person preference.
+  // The frame shape comes from the brief's formats. A shape picked here is kept for this project.
+  const [aspect, setAspect] = useState(defaultAspect);
   useEffect(() => {
     try {
-      const a = localStorage.getItem("menab-frame-aspect");
+      const a = localStorage.getItem(`menab-frame-aspect:${projectId}`);
       if (a && ["16:9", "9:16", "1:1"].includes(a)) setAspect(a);
     } catch {
-      // No storage: keep 16:9.
+      // No storage: keep the brief's shape.
     }
-  }, []);
+  }, [projectId]);
   const pickAspect = (a: string) => {
     setAspect(a);
     try {
-      localStorage.setItem("menab-frame-aspect", a);
+      localStorage.setItem(`menab-frame-aspect:${projectId}`, a);
     } catch {
       // No storage.
     }
@@ -429,6 +433,7 @@ export function StoryboardView({
                   </span>
                 )}
                 {busy && img?.url && <span className="absolute top-2 end-2 mn-chip mn-chip--generating"><span className="mn-chip__icon" aria-hidden="true" />{f.drawing}</span>}
+                {!busy && img?.url && staleFrames.includes(x.n) && <span className="absolute top-2 end-2 mn-chip bg-surface" title={f.beforeChangeNote}>{f.beforeChange}</span>}
               </div>
               <div className="p-3 flex flex-col gap-2">
                 <div className="flex items-center gap-2">
@@ -482,7 +487,7 @@ export function LookFooter({
   message: string;
   write: { label: string; cost: string } | null;
   approve: string | null;
-  draw?: { frames: number[]; model: string; style: "sketch" | "photo"; label: string; cost: string } | null;
+  draw?: { frames: number[]; model: string; style: "sketch" | "photo"; aspect: string; label: string; cost: string } | null;
   run: RunCopy;
 }) {
   const r = useCreativeRun(projectId, run);
@@ -509,11 +514,11 @@ export function LookFooter({
           type="button"
           className="mn-btn mn-btn--primary"
           onClick={() => {
-            let aspect = "16:9";
+            let aspect = draw.aspect;
             try {
-              aspect = localStorage.getItem("menab-frame-aspect") || "16:9";
+              aspect = localStorage.getItem(`menab-frame-aspect:${projectId}`) || draw.aspect;
             } catch {
-              // No storage: 16:9.
+              // No storage: the brief's shape.
             }
             r.run({ kind: "frames", frames: draw.frames, style: draw.style, model: draw.model, aspect });
           }}
