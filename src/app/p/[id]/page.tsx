@@ -28,8 +28,8 @@ import { PanelTabs } from "./panel-tabs";
 import { BoardCursor, TypeIn } from "./board-live";
 import { VideoTypePicker } from "./video-type-picker";
 import { hiddenOutputs } from "@/lib/video-types";
-import { DEFAULT_PICTURE_MODEL, PICTURE_MODELS, clipPromptFor, dialogueLines, genAssets, scriptLines, settlePending, stageFive, voiceFor } from "@/lib/generate";
-import { CLIP_MODELS, DEFAULT_TALKING_MODEL, MUSIC_PRICE, VOICES, voicePrice } from "@/lib/ai/media";
+import { DEFAULT_PICTURE_MODEL, PICTURE_MODELS, clipPromptFor, dialogueLines, genAssets, scriptLines, settlePending, stageFive, talkModelFor, voiceFor } from "@/lib/generate";
+import { AGES, CLIP_MODELS, DIALECTS, MUSIC_PRICE, VOICES, voicePrice } from "@/lib/ai/media";
 import { aspectFromBrief, projectAspect } from "@/lib/aspect";
 import { lookKey } from "@/lib/frames";
 import { ClipsView, KeyframesView, ReferenceLockView, ReviewView, SoundView, type GenData } from "./generate-docs";
@@ -214,23 +214,31 @@ export default async function ProjectPage({
       characters: doc.characters.map((c) => {
         const v = voiceFor(doc, c.name, brief.language);
         const hasLines = talkLines.some((d) => lookKey(d.speaker) === lookKey(c.name));
-        return { name: c.name, role: c.role, made_with: c.made_with, picture: pics[`character:${lookKey(c.name)}`]?.url ?? null, library: Boolean(c.library_id), voice: v.voice, style: v.style, suggested: v.suggested, hasLines, speaks: hasLines && (doc.lock.speaks?.[lookKey(c.name)] ?? true) };
+        const firstLine = talkLines.find((d) => lookKey(d.speaker) === lookKey(c.name))?.text ?? "";
+        return {
+          name: c.name, role: c.role, made_with: c.made_with, picture: pics[`character:${lookKey(c.name)}`]?.url ?? null, library: Boolean(c.library_id),
+          voice: v.voice, how: v.how, dialect: v.dialect, age: v.age, suggested: v.suggested, hasLines,
+          talkModel: hasLines ? talkModelFor(doc, c.name) ?? "off" : "off",
+          lineSeconds: Math.max(3, Math.min(15, Math.round(firstLine.length / 14) || 5)),
+        };
       }),
-      narrator: { voice: narrator.voice, style: narrator.style, suggested: narrator.suggested },
+      narrator: { voice: narrator.voice, how: narrator.how, dialect: narrator.dialect, age: narrator.age, suggested: narrator.suggested },
       aspect: projectAspect(doc.lock.aspect, brief),
+      briefAspect: aspectFromBrief(brief),
       products: products.map((p) => ({ name: p.name, description: p.description ?? "", photos: (p.photos ?? []).map((path) => ({ path, url: productUrls.get(path) ?? null })) })),
-      talkingModel: CLIP_MODELS.find((m) => m.id === DEFAULT_TALKING_MODEL)?.name ?? "",
       locations: doc.locations.map((l) => ({ name: l.name, picture: pics[`location:${lookKey(l.name)}`]?.url ?? null })),
       outfits: doc.outfits.map((o) => ({ key: `${lookKey(o.character)}|${lookKey(o.outfit)}`.slice(0, 200), character: o.character, outfit: o.outfit })),
       shots: doc.shots.map((f) => {
         const line = talkLines.find((d) => d.n === f.n);
-        const speaks = Boolean(line && (doc.lock.speaks?.[lookKey(line.speaker)] ?? true));
-        return { n: f.n, action: f.action, size: f.size, movement: f.movement, seconds: f.seconds, dialogue: f.dialogue, frame: frameMap[f.n]?.url ?? null, speaks, speaker: line?.speaker ?? "", clipPrompt: clipPromptFor(doc, f, brief.language, false), talkPrompt: clipPromptFor(doc, f, brief.language, true) };
+        const talker = line ? talkModelFor(doc, line.speaker) : null;
+        return { n: f.n, action: f.action, size: f.size, movement: f.movement, seconds: f.seconds, dialogue: f.dialogue, frame: frameMap[f.n]?.url ?? null, speaks: Boolean(talker), talkModel: talker ?? "", speaker: line?.speaker ?? "", clipPrompt: clipPromptFor(doc, f, brief.language, false), talkPrompt: clipPromptFor(doc, f, brief.language, true) };
       }),
       lines,
       dialogue: talkLines,
       lock: doc.lock,
-      voices: VOICES,
+      voices: VOICES.map((x) => ({ id: x.id, name: x.name, gender: x.gender, desc: x.desc[lang] })),
+      dialects: DIALECTS.map((x) => ({ id: x.id, name: x[lang] })),
+      ages: AGES.map((x) => ({ id: x.id, name: x[lang] })),
       clipModels: CLIP_MODELS.map((m) => ({ id: m.id, name: m.name, perSecond: m.perSecond, min: m.min, max: m.max, fixedSeconds: m.fixedSeconds, talking: m.talking, note: m.note[locale] })),
       imageModels: PICTURE_MODELS.map((pid) => IMAGE_MODELS.find((m) => m.id === pid)).filter((m) => m !== undefined).map((m) => ({ id: m.id, name: m.name, price: m.priceFrom ?? 0, note: m.goodFor[locale] })),
       prices: { image: IMAGE_MODELS.find((m) => m.id === (doc.lock.imageModel ?? DEFAULT_PICTURE_MODEL))?.priceFrom ?? 0.09, voiceLine: lines.map((l) => voicePrice(l.text)), dialogueLine: talkLines.map((l) => voicePrice(l.text)), voiceTry: 0.002, music: MUSIC_PRICE },

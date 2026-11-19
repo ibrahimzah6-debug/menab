@@ -19,19 +19,21 @@ export type GenData = {
   editable: boolean;
   lang: "en" | "ar";
   assets: Record<string, GenAsset>;
-  characters: { name: string; role?: string; made_with?: string; picture: string | null; library: boolean; voice: string; style: string; suggested: boolean; hasLines: boolean; speaks: boolean }[];
-  narrator: { voice: string; style: string; suggested: boolean };
+  characters: { name: string; role?: string; made_with?: string; picture: string | null; library: boolean; voice: string; how: string; dialect: string; age: string; suggested: boolean; hasLines: boolean; talkModel: string; lineSeconds: number }[];
+  narrator: { voice: string; how: string; dialect: string; age: string; suggested: boolean };
   aspect: string;
+  briefAspect: string;
   products: Product[];
-  talkingModel: string;
   locations: { name: string; picture: string | null }[];
   outfits: { key: string; character: string; outfit: string }[];
-  shots: { n: number; action: string; size: string; movement: string; seconds: number; dialogue: string; frame: string | null; speaks: boolean; speaker: string; clipPrompt: string; talkPrompt: string }[];
+  shots: { n: number; action: string; size: string; movement: string; seconds: number; dialogue: string; frame: string | null; speaks: boolean; talkModel: string; speaker: string; clipPrompt: string; talkPrompt: string }[];
   lines: { key: string; text: string }[];
   dialogue: { key: string; n: number; speaker: string; text: string }[];
-  lock: { locked?: boolean; consent?: boolean; narrator?: string; narratorStyle?: string; voices?: Record<string, string>; styles?: Record<string, string>; speaks?: Record<string, boolean>; aspect?: string; imageModel?: string; products?: unknown[] };
+  lock: { locked?: boolean; consent?: boolean; aspect?: string; imageModel?: string };
   imageModels: { id: string; name: string; price: number; note: string }[];
-  voices: { id: string; name: string; gender: "m" | "f"; tone: string }[];
+  voices: { id: string; name: string; gender: "m" | "f"; desc: string }[];
+  dialects: { id: string; name: string }[];
+  ages: { id: string; name: string }[];
   clipModels: { id: string; name: string; perSecond: number; min: number; max: number; fixedSeconds?: number; talking?: boolean; note: string }[];
   prices: { image: number; voiceLine: number[]; dialogueLine: number[]; voiceTry: number; music: number };
 };
@@ -109,67 +111,116 @@ function Media({ a, kind, alt, g, ratio = "16 / 9" }: { a?: GenAsset; kind: "ima
   );
 }
 
-// A voice for one character (or the narrator): the voice list grouped by women and men, the
-// "Suggested" mark, how it sounds, and a button that plays the first line inside the app.
-// Voices can change after the lock: they never change a picture.
-function VoicePick({
-  d,
-  g,
-  who,
-  voice,
-  style,
-  suggested,
-  onSave,
-  pending,
-  hear,
-  busy,
-}: {
-  d: GenData;
-  g: G;
-  who: string | null;
-  voice: string;
-  style: string;
-  suggested: boolean;
-  onSave: (v: { voice?: string; style?: string }) => void;
-  pending: boolean;
-  hear: () => void;
-  busy: boolean;
-}) {
+// A voice for one character (or the narrator): the voice, described in plain words and grouped
+// by women and men, the age it should sound, the dialect, how it sounds, and a button that plays
+// the first line inside the app. Voices can change after the lock: they never change a picture.
+type VoiceValue = { voice: string; how: string; dialect: string; age: string; suggested: boolean };
+type VoicePatch = { voice?: string; how?: string; dialect?: string; age?: string };
+function VoicePick({ d, g, who, v, onSave, pending, hear, busy }: { d: GenData; g: G; who: string | null; v: VoiceValue; onSave: (p: VoicePatch) => void; pending: boolean; hear: () => void; busy: boolean }) {
   const sample = d.assets[`voicetry:try-${who ? key(who) : "narrator"}`];
   const can = d.editable && !pending;
-  const women = d.voices.filter((v) => v.gender === "f");
-  const men = d.voices.filter((v) => v.gender === "m");
+  const label = (x: GenData["voices"][number]) => `${x.name}: ${x.desc}${x.id === v.voice && v.suggested ? ` (${g.suggested})` : ""}`;
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2">
-        <select className="mn-select h-8 grow min-w-0" aria-label={g.voice} value={voice} disabled={!can} onChange={(e) => onSave({ voice: e.target.value })}>
-          <optgroup label={g.women}>{women.map((v) => <option key={v.id} value={v.id}>{`${v.name} · ${v.tone}`}</option>)}</optgroup>
-          <optgroup label={g.men}>{men.map((v) => <option key={v.id} value={v.id}>{`${v.name} · ${v.tone}`}</option>)}</optgroup>
+      <label className="flex flex-col gap-1">
+        <span className="text-[12px] text-ink-muted">{g.voice}</span>
+        <select className="mn-select h-8 min-w-0" value={v.voice} disabled={!can} onChange={(e) => onSave({ voice: e.target.value })}>
+          <optgroup label={g.women}>{d.voices.filter((x) => x.gender === "f").map((x) => <option key={x.id} value={x.id}>{label(x)}</option>)}</optgroup>
+          <optgroup label={g.men}>{d.voices.filter((x) => x.gender === "m").map((x) => <option key={x.id} value={x.id}>{label(x)}</option>)}</optgroup>
         </select>
-        {suggested && <span className="mn-chip shrink-0">{g.suggested}</span>}
+      </label>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-1 min-w-0">
+          <span className="text-[12px] text-ink-muted">{g.age}</span>
+          <select className="mn-select h-8 min-w-0" value={v.age} disabled={!can} onChange={(e) => onSave({ age: e.target.value })}>
+            {d.ages.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 min-w-0">
+          <span className="text-[12px] text-ink-muted">{g.dialect}</span>
+          <select className="mn-select h-8 min-w-0" value={v.dialect} disabled={!can} onChange={(e) => onSave({ dialect: e.target.value })}>
+            {d.dialects.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+          </select>
+        </label>
       </div>
       <label className="flex flex-col gap-1">
         <span className="text-[12px] text-ink-muted">{g.voiceStyle}</span>
         <input
-          key={style}
+          key={v.how}
           className="mn-input h-8 text-[13px]"
           dir="auto"
-          defaultValue={style}
+          defaultValue={v.how}
           disabled={!can}
           onBlur={(e) => {
-            const v = e.target.value.trim();
-            if (v !== style) onSave({ style: v });
+            const x = e.target.value.trim();
+            if (x !== v.how) onSave({ how: x });
           }}
         />
       </label>
       <div className="flex items-center gap-2">
         {d.editable && !busy && sample?.status !== "generating" && (
           <button type="button" className="mn-btn mn-btn--ghost mn-btn--sm shrink-0" onClick={hear}>
-            {g.hear}<span className="mn-btn__cost">{usd(d.prices.voiceTry)}</span>
+            {sample?.url ? g.hearAgain : g.hear}<span className="mn-btn__cost">{usd(d.prices.voiceTry)}</span>
           </button>
         )}
-        {(sample?.url || sample?.status === "generating") && <div className="grow min-w-0"><Media a={sample} kind="audio" alt={g.hear} g={g} /></div>}
+        {(sample?.url || sample?.status === "generating" || sample?.status === "failed") && <div className="grow min-w-0"><Media a={sample} kind="audio" alt={g.hear} g={g} /></div>}
       </div>
+    </div>
+  );
+}
+
+// The talking avatar of a character who speaks on camera: the lip-sync model (or none), the
+// talking picture, and a short test of that picture saying the first line in the chosen voice.
+function TalkingAvatar({ d, g, c, onModel, pending, go, busy }: { d: GenData; g: G; c: GenData["characters"][number]; onModel: (id: string) => void; pending: boolean; go: (b: Record<string, unknown>) => void; busy: boolean }) {
+  const k = key(c.name);
+  const portrait = d.assets[`portrait:${k}`];
+  const test = d.assets[`avatartry:${k}`];
+  const voiceReady = Boolean(d.assets[`voicetry:try-${k}`]?.url);
+  const talkers = d.clipModels.filter((x) => x.talking);
+  const m = talkers.find((x) => x.id === c.talkModel);
+  const ratio = ratioOf(d.aspect);
+  return (
+    <div className="rounded-md border border-line p-3 flex flex-col gap-2">
+      <span className="mn-label">{g.avatarTitle}</span>
+      <label className="flex flex-col gap-1">
+        <span className="text-[12px] text-ink-muted">{g.lipSync}</span>
+        <select className="mn-select h-8" value={c.talkModel} disabled={!d.editable || pending} onChange={(e) => onModel(e.target.value)}>
+          {talkers.map((x) => <option key={x.id} value={x.id}>{`${x.name} · ${usd(x.perSecond)}/s · ${x.note}`}</option>)}
+          <option value="off">{g.lipSyncOff}</option>
+        </select>
+      </label>
+      {m ? (
+        <>
+          <p className="text-[12px] text-ink-muted m-0">{g.avatarNote}</p>
+          <div className="grid grid-cols-2 gap-2">
+            <figure className="m-0 flex flex-col gap-1">
+              <Media a={portrait} kind="image" alt={`${g.talkingPicture}: ${c.name}`} g={g} ratio={ratio} />
+              <figcaption className="text-[11px] text-ink-muted">{g.talkingPicture}</figcaption>
+            </figure>
+            <figure className="m-0 flex flex-col gap-1">
+              <Media a={test} kind="video" alt={`${g.talkingTest}: ${c.name}`} g={g} ratio={ratio} />
+              <figcaption className="text-[11px] text-ink-muted">{g.talkingTest}</figcaption>
+            </figure>
+          </div>
+          {d.editable && !busy && (
+            <div className="flex flex-wrap items-center gap-2">
+              {portrait?.status !== "generating" && (
+                <button type="button" className="mn-btn mn-btn--ghost mn-btn--sm" onClick={() => go({ kind: "portrait", who: c.name })}>
+                  {portrait?.url ? g.remakePicture : g.makePicture}<span className="mn-btn__cost">{usd(d.prices.image)}</span>
+                </button>
+              )}
+              {portrait?.url && voiceReady && test?.status !== "generating" && (
+                <button type="button" className="mn-btn mn-btn--secondary mn-btn--sm" onClick={() => go({ kind: "avatartry", who: c.name })}>
+                  {test?.url ? g.remakeTest : g.makeTest}<span className="mn-btn__cost">{usd(m.perSecond * c.lineSeconds)}</span>
+                </button>
+              )}
+            </div>
+          )}
+          {portrait?.url && !voiceReady && <span className="text-[12px] text-ink-faint">{g.avatarFirst}</span>}
+        </>
+      ) : (
+        <p className="text-[12px] text-ink-muted m-0">{g.lipSyncOffNote}</p>
+      )}
     </div>
   );
 }
@@ -304,6 +355,7 @@ export function ReferenceLockView({ d, g, run }: { d: GenData; g: G; run: RunCop
             </div>
             {fromBrief && <span className="text-[12px] text-ink-muted">{g.fromBrief}</span>}
           </div>
+          {d.aspect !== d.briefAspect && <span className="text-[12px] px-2 py-1 rounded-md bg-tint-2" role="note">{fillIn(locked ? g.shapeDiffersLocked : g.shapeDiffers, { shape: iso(d.briefAspect) })}</span>}
         </div>
         <span className="grow" />
         {locked && (
@@ -355,27 +407,17 @@ export function ReferenceLockView({ d, g, run }: { d: GenData; g: G; run: RunCop
                       </button>
                     )}
                   </div>
-                  {c.hasLines && (
-                    <label className="flex items-start gap-2 small">
-                      <input type="checkbox" className="mt-1" checked={c.speaks} disabled={!d.editable || pending} onChange={(e) => save({ speaks: { [k]: e.target.checked } })} />
-                      <span className="flex flex-col">
-                        <span>{g.speaks}</span>
-                        <span className="text-[12px] text-ink-muted">{g.speaksNote}</span>
-                      </span>
-                    </label>
-                  )}
                   <VoicePick
                     d={d}
                     g={g}
                     who={c.name}
-                    voice={c.voice}
-                    style={c.style}
-                    suggested={c.suggested}
+                    v={c}
                     pending={pending}
                     busy={r.busy}
                     hear={() => go({ kind: "voicetry", who: c.name })}
-                    onSave={(v) => save(v.voice !== undefined ? { voices: { [k]: v.voice } } : { styles: { [k]: v.style ?? "" } })}
+                    onSave={(v) => save(v.voice !== undefined ? { voices: { [k]: v.voice } } : v.age !== undefined ? { ages: { [k]: v.age } } : v.dialect !== undefined ? { dialects: { [k]: v.dialect } } : { styles: { [k]: v.how ?? "" } })}
                   />
+                  {c.hasLines && <TalkingAvatar d={d} g={g} c={c} pending={pending} busy={r.busy} go={go} onModel={(id) => save({ talkModels: { [k]: id }, speaks: { [k]: id !== "off" } })} />}
                   {d.editable && (sheet?.url || c.picture) && (
                     <button
                       type="button"
@@ -442,13 +484,11 @@ export function ReferenceLockView({ d, g, run }: { d: GenData; g: G; run: RunCop
             d={d}
             g={g}
             who={null}
-            voice={d.narrator.voice}
-            style={d.narrator.style}
-            suggested={d.narrator.suggested}
+            v={d.narrator}
             pending={pending}
             busy={r.busy}
             hear={() => go({ kind: "voicetry", who: null })}
-            onSave={(v) => save(v.voice !== undefined ? { narrator: v.voice } : { narratorStyle: v.style ?? "" })}
+            onSave={(v) => save(v.voice !== undefined ? { narrator: v.voice } : v.age !== undefined ? { narratorAge: v.age } : v.dialect !== undefined ? { narratorDialect: v.dialect } : { narratorStyle: v.how ?? "" })}
           />
         </section>
       )}
@@ -602,22 +642,20 @@ export function KeyframesView({ d, g, run }: { d: GenData; g: G; run: RunCopy })
 
 export function ClipsView({ d, g, run }: { d: GenData; g: G; run: RunCopy }) {
   const { r, go } = useGen(d, run);
-  const [model, setModel] = useState(d.clipModels.find((x) => !x.talking)?.id ?? "kling-3-0");
-  const [auto, setAuto] = useState(true);
+  const videoModels = d.clipModels.filter((x) => !x.talking);
+  const [model, setModel] = useState(videoModels[0]?.id ?? "kling-3-0");
   const [prompts, setPrompts] = useState<Record<string, string>>({});
-  const m = d.clipModels.find((x) => x.id === model) ?? d.clipModels[0];
-  const talkM = d.clipModels.find((x) => x.talking && x.name === d.talkingModel);
+  const m = videoModels.find((x) => x.id === model) ?? videoModels[0];
   const hasLine = (n: number) => Boolean(d.assets[`voice:dl-${n}`]?.url);
-  // The model a shot is really made with: a talking avatar when its character speaks on camera
-  // and the line is ready, unless that is turned off or a talking model was picked by hand.
-  const modelFor = (s: GenData["shots"][number]) => (!m.talking && auto && s.speaks && hasLine(s.n) && talkM ? talkM : m);
+  // A shot whose character speaks on camera uses that character's talking avatar (chosen in the
+  // reference lock) once the line is made; every other shot uses the video model picked here.
+  const talkerOf = (s: GenData["shots"][number]) => (s.speaks ? d.clipModels.find((x) => x.id === s.talkModel) : undefined);
+  const modelFor = (s: GenData["shots"][number]) => { const tk = talkerOf(s); return tk && hasLine(s.n) ? tk : m; };
   const secs = (x: GenData["clipModels"][number], s: number) => x.fixedSeconds ?? Math.max(x.min, Math.min(x.max, Math.round(s || 5)));
   const price = (s: GenData["shots"][number]) => { const x = modelFor(s); return secs(x, s.seconds) * x.perSecond; };
   const promptFor = (s: GenData["shots"][number]) => prompts[String(s.n)] ?? (modelFor(s).talking ? s.talkPrompt : s.clipPrompt);
-  const ready = d.shots.filter((s) => d.assets[`keyframe:${s.n}`]?.url && (!m.talking || hasLine(s.n)));
-  const missing = ready.filter((s) => !d.assets[`clip:${s.n}`]?.url && d.assets[`clip:${s.n}`]?.status !== "generating");
+  const missing = d.shots.filter((s) => d.assets[`keyframe:${s.n}`]?.url && !d.assets[`clip:${s.n}`]?.url && d.assets[`clip:${s.n}`]?.status !== "generating");
   const ratio = ratioOf(d.aspect);
-  const anySpeaks = d.shots.some((s) => s.speaks);
   return (
     <div className="flex flex-col gap-4">
       {d.editable && (
@@ -625,36 +663,25 @@ export function ClipsView({ d, g, run }: { d: GenData; g: G; run: RunCopy }) {
           <label className="flex items-center gap-2 small">
             <span className="mn-label">{g.clipModel}</span>
             <select className="mn-select h-9 max-w-[420px]" value={model} onChange={(e) => setModel(e.target.value)}>
-              <optgroup label={g.videoGroup}>
-                {d.clipModels.filter((x) => !x.talking).map((x) => <option key={x.id} value={x.id}>{`${x.name} · ${usd(x.perSecond)}/s · ${x.note}`}</option>)}
-              </optgroup>
-              <optgroup label={g.talkingGroup}>
-                {d.clipModels.filter((x) => x.talking).map((x) => <option key={x.id} value={x.id}>{`${x.name} · ${usd(x.perSecond)}/s · ${x.note}`}</option>)}
-              </optgroup>
+              {videoModels.map((x) => <option key={x.id} value={x.id}>{`${x.name} · ${usd(x.perSecond)}/s · ${x.note}`}</option>)}
             </select>
           </label>
           <span className="grow" />
           {missing.length > 0 && (
-            <button type="button" className="mn-btn mn-btn--primary" onClick={() => go({ kind: "clip", shots: missing.map((s) => s.n), model, prompts, auto })}>
+            <button type="button" className="mn-btn mn-btn--primary" onClick={() => go({ kind: "clip", shots: missing.map((s) => s.n), model, prompts })}>
               {fillIn(g.makeClips, { n: missing.length })}<span className="mn-btn__cost">{usd(missing.reduce((n, s) => n + price(s), 0))}</span>
             </button>
           )}
         </Bar>
       )}
-      {anySpeaks && talkM && !m.talking && (
-        <label className="flex items-center gap-2 small">
-          <input type="checkbox" checked={auto} disabled={!d.editable} onChange={(e) => setAuto(e.target.checked)} />
-          <span>{fillIn(g.clipAuto, { model: talkM.name })}</span>
-        </label>
-      )}
-      {m.talking && <p className="small m-0 px-3 py-2 rounded-md bg-tint-2">{g.talkingNote}</p>}
+      {d.shots.some((s) => s.speaks) && <p className="small text-ink-muted m-0">{g.clipAuto}</p>}
       <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${d.aspect === "9:16" ? 220 : 300}px, 1fr))` }}>
         {d.shots.map((s) => {
           const a = d.assets[`clip:${s.n}`];
           const kf = d.assets[`keyframe:${s.n}`];
           const x = modelFor(s);
+          const tk = talkerOf(s);
           const text = promptFor(s);
-          const needsLine = (m.talking || (s.speaks && auto && talkM)) && !hasLine(s.n);
           return (
             <article key={s.n} className="rounded-lg border border-line overflow-hidden flex flex-col">
               {a?.url || a?.status === "generating" ? <Media a={a} kind="video" alt={fillIn(g.shot, { n: s.n })} g={g} ratio={ratio} /> : <Media a={kf} kind="image" alt={fillIn(g.shot, { n: s.n })} g={g} ratio={ratio} />}
@@ -664,19 +691,19 @@ export function ClipsView({ d, g, run }: { d: GenData; g: G; run: RunCopy }) {
                   <span className="text-[12px] text-ink-muted grow">{fillIn(g.seconds, { n: secs(x, s.seconds) })} · {a?.url ? a.model : x.name}</span>
                   {a?.approved && <span className="mn-chip mn-chip--approved">{g.approved}</span>}
                 </div>
-                {s.speaks && talkM && <span className="text-[12px]" dir="auto">{fillIn(g.speaksShot, { name: s.speaker, model: x.talking ? x.name : talkM.name })}</span>}
+                {tk && <span className="text-[12px]" dir="auto">{fillIn(g.speaksShot, { name: s.speaker, model: tk.name })}</span>}
                 <details className="text-[12px]">
                   <summary className="cursor-pointer text-ink-muted">{g.prompt}</summary>
                   <div className="mt-1.5" dir="ltr">
                     <InlineText label={g.prompt} value={text} editable={d.editable} onCommit={(v) => setPrompts((p) => ({ ...p, [String(s.n)]: v }))} />
                   </div>
                 </details>
-                {kf?.url && needsLine && <span className="text-[12px] text-ink-faint">{g.dialogueFirst}</span>}
-                {d.editable && kf?.url && (!m.talking || hasLine(s.n)) && !r.busy && a?.status !== "generating" && (
+                {kf?.url && tk && !hasLine(s.n) && <span className="text-[12px] text-ink-faint">{g.dialogueFirst}</span>}
+                {d.editable && kf?.url && !r.busy && a?.status !== "generating" && (
                   <button
                     type="button"
                     className="mn-btn mn-btn--ghost mn-btn--sm self-start"
-                    onClick={() => go({ kind: "clip", shots: [s.n], model, auto, prompts: prompts[String(s.n)] ? { [String(s.n)]: prompts[String(s.n)] } : {} })}
+                    onClick={() => go({ kind: "clip", shots: [s.n], model, prompts: prompts[String(s.n)] ? { [String(s.n)]: prompts[String(s.n)] } : {} })}
                   >
                     {a?.url ? g.remake : g.makeOne}<span className="mn-btn__cost">{usd(price(s))}</span>
                   </button>

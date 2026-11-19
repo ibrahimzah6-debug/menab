@@ -76,56 +76,105 @@ export function clipRequest(modelId: string, prompt: string, keyframe: string, s
 // with Saudi dialects, Amharic, Urdu, English, French ...), each line with a style written in
 // plain words ("a young Riyadh woman, Najdi dialect, warm and casual"). Tested 19 Nov 2026: a
 // natural Saudi accent and natural Amharic. These are its 30 voices with a known tone.
-export type Voice = { id: string; name: string; gender: "m" | "f"; tone: string };
+// Gemini 3.8 voices, each with a plain description so anyone can choose without knowing the names.
+export type Voice = { id: string; name: string; gender: "m" | "f"; tone: string; desc: { en: string; ar: string } };
+const v = (id: string, gender: "m" | "f", tone: string, en: string, ar: string): Voice => ({ id, name: id, gender, tone, desc: { en, ar } });
 export const VOICES: Voice[] = [
-  { id: "Sulafat", name: "Sulafat", gender: "f", tone: "Warm" },
-  { id: "Leda", name: "Leda", gender: "f", tone: "Youthful" },
-  { id: "Laomedeia", name: "Laomedeia", gender: "f", tone: "Upbeat" },
-  { id: "Aoede", name: "Aoede", gender: "f", tone: "Breezy" },
-  { id: "Callirrhoe", name: "Callirrhoe", gender: "f", tone: "Easy-going" },
-  { id: "Zephyr", name: "Zephyr", gender: "f", tone: "Bright" },
-  { id: "Autonoe", name: "Autonoe", gender: "f", tone: "Bright" },
-  { id: "Kore", name: "Kore", gender: "f", tone: "Firm" },
-  { id: "Despina", name: "Despina", gender: "f", tone: "Smooth" },
-  { id: "Erinome", name: "Erinome", gender: "f", tone: "Clear" },
-  { id: "Achernar", name: "Achernar", gender: "f", tone: "Soft" },
-  { id: "Vindemiatrix", name: "Vindemiatrix", gender: "f", tone: "Gentle" },
-  { id: "Gacrux", name: "Gacrux", gender: "f", tone: "Mature" },
-  { id: "Pulcherrima", name: "Pulcherrima", gender: "f", tone: "Forward" },
-  { id: "Achird", name: "Achird", gender: "m", tone: "Friendly" },
-  { id: "Puck", name: "Puck", gender: "m", tone: "Upbeat" },
-  { id: "Sadachbia", name: "Sadachbia", gender: "m", tone: "Lively" },
-  { id: "Fenrir", name: "Fenrir", gender: "m", tone: "Excitable" },
-  { id: "Zubenelgenubi", name: "Zubenelgenubi", gender: "m", tone: "Casual" },
-  { id: "Umbriel", name: "Umbriel", gender: "m", tone: "Easy-going" },
-  { id: "Algieba", name: "Algieba", gender: "m", tone: "Smooth" },
-  { id: "Iapetus", name: "Iapetus", gender: "m", tone: "Clear" },
-  { id: "Charon", name: "Charon", gender: "m", tone: "Informative" },
-  { id: "Rasalgethi", name: "Rasalgethi", gender: "m", tone: "Informative" },
-  { id: "Sadaltager", name: "Sadaltager", gender: "m", tone: "Knowledgeable" },
-  { id: "Schedar", name: "Schedar", gender: "m", tone: "Even" },
-  { id: "Orus", name: "Orus", gender: "m", tone: "Firm" },
-  { id: "Alnilam", name: "Alnilam", gender: "m", tone: "Firm" },
-  { id: "Enceladus", name: "Enceladus", gender: "m", tone: "Breathy" },
-  { id: "Algenib", name: "Algenib", gender: "m", tone: "Gravelly" },
+  v("Kore", "f", "Firm", "Confident young woman, clear. Good for content creators and ads", "شابة واثقة وواضحة. مناسبة لصانعات المحتوى والإعلانات"),
+  v("Leda", "f", "Youthful", "Young, light and fresh. Good for girls and young women", "صوت شبابي خفيف. مناسب للبنات والشابات"),
+  v("Laomedeia", "f", "Upbeat", "Cheerful and energetic. Good for lively ads", "مرحة ونشيطة. مناسبة للإعلانات الحماسية"),
+  v("Zephyr", "f", "Bright", "Bright and friendly. Good for brands and social posts", "مشرقة وودودة. مناسبة للعلامات والسوشال"),
+  v("Autonoe", "f", "Bright", "Bright and clear. Good for explaining a product", "مشرقة وواضحة. مناسبة لشرح منتج"),
+  v("Aoede", "f", "Breezy", "Relaxed and easy. Good for lifestyle and daily routines", "مرتاحة وسلسة. مناسبة لنمط الحياة والروتين"),
+  v("Callirrhoe", "f", "Easy-going", "Casual, like a friend talking. Good for UGC", "عفوية كأنها صديقة تتكلم. مناسبة لمحتوى المستخدمين"),
+  v("Sulafat", "f", "Warm", "Warm and caring. Good for mothers and family ads", "دافئة وحنونة. مناسبة للأمهات وإعلانات العائلة"),
+  v("Despina", "f", "Smooth", "Smooth and elegant. Good for beauty and luxury", "ناعمة وأنيقة. مناسبة للجمال والفخامة"),
+  v("Vindemiatrix", "f", "Gentle", "Gentle and calm. Good for care and wellness", "لطيفة وهادئة. مناسبة للعناية والصحة"),
+  v("Achernar", "f", "Soft", "Soft and quiet. Good for intimate, slow moments", "ناعمة وهادية. مناسبة للحظات الهادئة"),
+  v("Erinome", "f", "Clear", "Clear and steady. Good for instructions and narration", "واضحة وثابتة. مناسبة للشرح والتعليق"),
+  v("Pulcherrima", "f", "Forward", "Direct and bold. Good for strong calls to action", "مباشرة وجريئة. مناسبة للدعوة القوية للشراء"),
+  v("Gacrux", "f", "Mature", "Mature woman, 40s and up. Good for experts and older women", "امرأة ناضجة، أربعين وفوق. مناسبة للخبيرات والكبار"),
+  v("Puck", "m", "Upbeat", "Cheerful young man. Good for fun, lively ads", "شاب مرح. مناسب للإعلانات الخفيفة والحماسية"),
+  v("Sadachbia", "m", "Lively", "Young and lively. Good for boys and young men", "شبابي ونشيط. مناسب للأولاد والشباب"),
+  v("Fenrir", "m", "Excitable", "Excited and fast. Good for sports and offers", "متحمس وسريع. مناسب للرياضة والعروض"),
+  v("Achird", "m", "Friendly", "Friendly and open. Good for everyday characters", "ودود وقريب. مناسب للشخصيات اليومية"),
+  v("Zubenelgenubi", "m", "Casual", "Casual, like a friend talking. Good for UGC", "عفوي كأنه صديق يتكلم. مناسب لمحتوى المستخدمين"),
+  v("Umbriel", "m", "Easy-going", "Relaxed and calm. Good for lifestyle", "مرتاح وهادي. مناسب لنمط الحياة"),
+  v("Algieba", "m", "Smooth", "Smooth and warm. Good for premium brands", "ناعم ودافئ. مناسب للعلامات الراقية"),
+  v("Iapetus", "m", "Clear", "Clear and plain. Good for explaining", "واضح وبسيط. مناسب للشرح"),
+  v("Charon", "m", "Informative", "Trustworthy narrator. Good for voiceovers", "راوي موثوق. مناسب للتعليق الصوتي"),
+  v("Rasalgethi", "m", "Informative", "Informative and steady. Good for documentaries", "معلوماتي وثابت. مناسب للوثائقيات"),
+  v("Sadaltager", "m", "Knowledgeable", "Knowledgeable, like an expert. Good for doctors and specialists", "خبير ومطّلع. مناسب للأطباء والمختصين"),
+  v("Schedar", "m", "Even", "Even and balanced. Good for corporate films", "متزن وهادي. مناسب للأفلام المؤسسية"),
+  v("Orus", "m", "Firm", "Firm and confident man. Good for strong brands", "رجل حازم وواثق. مناسب للعلامات القوية"),
+  v("Alnilam", "m", "Firm", "Deep and firm. Good for serious messages", "عميق وحازم. مناسب للرسائل الجادة"),
+  v("Enceladus", "m", "Breathy", "Soft and breathy. Good for emotional moments", "ناعم وهامس. مناسب للحظات العاطفية"),
+  v("Algenib", "m", "Gravelly", "Older, rough voice. Good for fathers and grandfathers", "صوت أكبر وخشن. مناسب للآباء والأجداد"),
 ];
 export const DEFAULT_NARRATOR = "Charon";
-export const isVoice = (id: string | undefined) => Boolean(id && VOICES.some((v) => v.id === id));
+export const isVoice = (id: string | undefined) => Boolean(id && VOICES.some((x) => x.id === id));
+
+// How the person speaks: the dialect. Saudi first.
+export const DIALECTS = [
+  { id: "najdi", en: "Saudi, Najdi (Riyadh)", ar: "سعودي نجدي (الرياض)", prompt: "natural Saudi Najdi dialect as spoken in Riyadh, not Modern Standard Arabic, not Egyptian" },
+  { id: "hijazi", en: "Saudi, Hijazi (Jeddah)", ar: "سعودي حجازي (جدة)", prompt: "natural Saudi Hijazi dialect as spoken in Jeddah, not Modern Standard Arabic, not Egyptian" },
+  { id: "eastern", en: "Saudi, Eastern (Dammam)", ar: "سعودي شرقاوي (الدمام)", prompt: "natural Saudi Eastern Province dialect as spoken in Dammam, close to Gulf Arabic, not Modern Standard Arabic" },
+  { id: "southern", en: "Saudi, Southern (Abha)", ar: "سعودي جنوبي (أبها)", prompt: "natural southern Saudi dialect as spoken in Abha, not Modern Standard Arabic" },
+  { id: "gulf", en: "Gulf (UAE, Kuwait)", ar: "خليجي (الإمارات، الكويت)", prompt: "natural Gulf Arabic dialect, not Modern Standard Arabic" },
+  { id: "msa", en: "Modern Standard Arabic", ar: "فصحى", prompt: "clear Modern Standard Arabic (fusha), with a Saudi accent" },
+  { id: "egyptian", en: "Egyptian", ar: "مصري", prompt: "natural Egyptian Arabic as spoken in Cairo" },
+  { id: "levantine", en: "Levantine", ar: "شامي", prompt: "natural Levantine Arabic" },
+  { id: "english", en: "English", ar: "إنجليزي", prompt: "natural, clear English" },
+  { id: "saudi-english", en: "English, Saudi accent", ar: "إنجليزي بلكنة سعودية", prompt: "English with a light, natural Saudi accent" },
+  { id: "amharic", en: "Amharic", ar: "أمهري", prompt: "natural Ethiopian Amharic as spoken in Addis Ababa" },
+  { id: "urdu", en: "Urdu", ar: "أوردو", prompt: "natural Urdu" },
+  { id: "french", en: "French", ar: "فرنسي", prompt: "natural French" },
+];
+export const isDialect = (id: string | undefined) => Boolean(id && DIALECTS.some((d) => d.id === id));
+export function defaultDialect(language: string | null | undefined) {
+  const l = (language ?? "").toLowerCase();
+  if (l.includes("hijaz") || l.includes("حجاز")) return "hijazi";
+  if (l.includes("gulf") || l.includes("خليج")) return "gulf";
+  if (l.includes("egypt") || l.includes("مصر")) return "egyptian";
+  if (l.includes("saudi") || l.includes("سعود") || l.includes("arab") || l.includes("عرب")) return "najdi";
+  if (l.includes("amhar")) return "amharic";
+  if (l.includes("urdu")) return "urdu";
+  if (l.includes("french")) return "french";
+  return "english";
+}
+export const dialectPrompt = (id: string) => (DIALECTS.find((d) => d.id === id) ?? DIALECTS[0]).prompt;
+export function dialectFor(language: string | null | undefined) {
+  return dialectPrompt(defaultDialect(language));
+}
+
+// The age the voice should sound. Gemini voices are adult; a child or a teen is asked for in words.
+export const AGES = [
+  { id: "child", en: "Child (6 to 11)", ar: "طفل (٦ إلى ١١)", prompt: "a child about 8 years old, with a child's high, light voice" },
+  { id: "teen", en: "Teen (12 to 17)", ar: "مراهق (١٢ إلى ١٧)", prompt: "a teenager about 15 years old" },
+  { id: "young", en: "Young adult (18 to 30)", ar: "شاب (١٨ إلى ٣٠)", prompt: "a young adult in their twenties" },
+  { id: "adult", en: "Adult (30 to 50)", ar: "بالغ (٣٠ إلى ٥٠)", prompt: "an adult around 40" },
+  { id: "older", en: "Older (50 and up)", ar: "كبير (٥٠ وفوق)", prompt: "an older person in their sixties" },
+];
+export const isAge = (id: string | undefined) => Boolean(id && AGES.some((a) => a.id === id));
+export function guessAge(text: string | undefined) {
+  const s = (text ?? "").toLowerCase();
+  if (/(child|kid|boy\b|girl\b|طفل|طفلة|ولد صغير|بنت صغيرة)/.test(s)) return "child";
+  if (/(teen|مراهق|مراهقة)/.test(s)) return "teen";
+  if (/(old|elder|grand|senior|مسن|كبير في السن|جد|جدة)/.test(s)) return "older";
+  const n = Number(s.match(/\d{1,2}/)?.[0] ?? NaN);
+  if (n) return n < 12 ? "child" : n < 18 ? "teen" : n < 31 ? "young" : n < 51 ? "adult" : "older";
+  return "young";
+}
+
+// The full instruction Gemini reads before a line: who speaks, in which dialect, and how.
+export function voiceStyle(o: { female: boolean; age: string; dialect: string; how: string; narrator?: boolean }) {
+  const age = (AGES.find((a) => a.id === o.age) ?? AGES[2]).prompt;
+  const who = o.narrator ? `A ${o.female ? "female" : "male"} voiceover narrator, ${age}` : `A ${o.female ? "female" : "male"} speaker: ${age}`;
+  return `${who}. Speak in ${dialectPrompt(o.dialect)}. ${o.how}`.trim().slice(0, 600);
+}
 
 // About $0.002 for a short line (0.32 credits measured), more for long ones.
 export const voicePrice = (text: string) => Math.max(0.002, (Math.max(1, text.length) / 1000) * 0.012);
-
-// The dialect and manner a line is spoken in, from the project language.
-export function dialectFor(language: string | null | undefined) {
-  const l = (language ?? "").toLowerCase();
-  if (l.includes("saudi") || l.includes("سعود")) return "natural Saudi dialect as spoken in Riyadh (Najdi), not Modern Standard Arabic, not Egyptian";
-  if (l.includes("gulf") || l.includes("خليج")) return "natural Gulf Arabic dialect, not Modern Standard Arabic";
-  if (l.includes("arab") || l.includes("عرب")) return "natural Saudi Arabic as spoken in Riyadh, not Egyptian";
-  if (l.includes("amhar")) return "natural Ethiopian Amharic as spoken in Addis Ababa";
-  if (l.includes("urdu")) return "natural Urdu";
-  if (l.includes("french")) return "natural French";
-  return "natural, clear English";
-}
 
 // A voice that fits a character: women and men by the words that describe them, then the tone
 // by their personality. A suggestion only; anyone can pick another.
@@ -138,6 +187,7 @@ export function suggestVoice(c: { name?: string; role?: string; look?: string; p
   const female = maleRe.test(who) ? false : femaleRe.test(who) || /ة(\s|$)/.test(who) ? true : !maleRe.test(text) && femaleRe.test(text);
   const p = `${c.personality ?? ""} ${c.role ?? ""}`.toLowerCase();
   const pick = (list: string[]) => list.find((id) => isVoice(id)) ?? (female ? "Sulafat" : "Achird");
+  if (female && /(creator|influencer|blogger|ugc|صانعة|مؤثرة|بلوقر|مدونة)/.test(`${p} ${text}`)) return pick(["Kore"]);
   if (/(energ|excit|lively|حماس|نشيط|نشيطة)/.test(p)) return pick(female ? ["Laomedeia"] : ["Puck"]);
   if (/(young|youth|teen|شاب|شابة|مراهق)/.test(`${p} ${text}`)) return pick(female ? ["Leda"] : ["Sadachbia"]);
   if (/(calm|soft|gentle|هاد|هادئ|هادئة|ناعم)/.test(p)) return pick(female ? ["Vindemiatrix"] : ["Umbriel"]);
