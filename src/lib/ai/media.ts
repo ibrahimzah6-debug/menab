@@ -179,9 +179,25 @@ export function voiceStyle(o: { female: boolean; age: string; dialect: string; h
 // About $0.002 for a short line (0.32 credits measured), more for long ones.
 export const voicePrice = (text: string) => Math.max(0.002, (Math.max(1, text.length) / 1000) * 0.012);
 
+// Voices and manner by video type: a UGC ad sounds like a friend, a company profile sounds calm and
+// clear. A character's own description (a creator, an energetic person) comes first.
+const BY_TYPE: { types: string[]; f: string; m: string; narratorF: string; narratorM: string; how: string; narratorHow: string }[] = [
+  { types: ["ugc", "influencer", "affiliate", "series", "faceless"], f: "Callirrhoe", m: "Zubenelgenubi", narratorF: "Zephyr", narratorM: "Achird", how: "Casual and natural, like talking to friends on Instagram. Not like an announcer.", narratorHow: "Casual and friendly, like a creator talking to followers. Not like an announcer." },
+  { types: ["commercial", "occasion", "brand_film"], f: "Sulafat", m: "Algieba", narratorF: "Despina", narratorM: "Algieba", how: "Warm and natural, like a real person in a good TV advert.", narratorHow: "Warm, confident and emotional, like a premium TV advert. Not rushed." },
+  { types: ["product", "teaser"], f: "Laomedeia", m: "Puck", narratorF: "Laomedeia", narratorM: "Fenrir", how: "Lively and upbeat.", narratorHow: "Energetic and punchy, short and exciting." },
+  { types: ["profile", "recruitment", "training", "explainer", "tutorial", "app_demo"], f: "Erinome", m: "Iapetus", narratorF: "Erinome", narratorM: "Schedar", how: "Clear, calm and friendly.", narratorHow: "Clear, calm and professional, easy to follow." },
+  { types: ["documentary", "tourism", "real_estate", "testimonial", "film", "drama_series"], f: "Vindemiatrix", m: "Rasalgethi", narratorF: "Despina", narratorM: "Charon", how: "Natural and sincere, like a real conversation.", narratorHow: "Calm, thoughtful storytelling with natural pauses." },
+];
+const typeVoices = (videoType: string | null | undefined) => BY_TYPE.find((x) => x.types.includes(videoType ?? ""));
+export const suggestNarrator = (videoType?: string | null) => typeVoices(videoType)?.narratorM ?? DEFAULT_NARRATOR;
+export const defaultHow = (videoType?: string | null, narrator = false) => {
+  const x = typeVoices(videoType);
+  return narrator ? x?.narratorHow ?? "A commercial voiceover. Warm, clear and natural, not like a news reader." : x?.how ?? "Warm, natural and casual, like talking to a friend. Not like an announcer.";
+};
+
 // A voice that fits a character: women and men by the words that describe them, then the tone
 // by their personality. A suggestion only; anyone can pick another.
-export function suggestVoice(c: { name?: string; role?: string; look?: string; personality?: string; age?: string }): string {
+export function suggestVoice(c: { name?: string; role?: string; look?: string; personality?: string; age?: string }, videoType?: string | null): string {
   const text = `${c.name ?? ""} ${c.role ?? ""} ${c.look ?? ""} ${c.age ?? ""}`.toLowerCase();
   // Name and role first ("Abu Faisal", "father"), then the look. Whole words only, so "father" never reads as "her".
   const who = `${c.name ?? ""} ${c.role ?? ""}`.toLowerCase();
@@ -196,6 +212,8 @@ export function suggestVoice(c: { name?: string; role?: string; look?: string; p
   if (/(calm|soft|gentle|هاد|هادئ|هادئة|ناعم)/.test(p)) return pick(female ? ["Vindemiatrix"] : ["Umbriel"]);
   if (/(serious|expert|doctor|professional|جاد|خبير|دكتور|طبيب|مهني)/.test(p)) return pick(female ? ["Kore"] : ["Charon"]);
   if (/(casual|friend|عفوي|عفوية|صديق|قريب|قريبة)/.test(p)) return pick(female ? ["Callirrhoe"] : ["Zubenelgenubi"]);
+  const byType = typeVoices(videoType);
+  if (byType) return female ? byType.f : byType.m;
   return female ? "Sulafat" : "Achird";
 }
 

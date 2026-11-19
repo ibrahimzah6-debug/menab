@@ -342,3 +342,8 @@ Found while testing the Moringa cream project: the character picture in stage 3 
 - The narrator voice, the product and the music can be skipped with a small "Skip" button, and added back. A skipped narrator does not hold up the Voice step.
 - "Use a saved actor" on each AI character copies the actor sheet saved in Libraries and its Gemini voice. The lock then asks for consent, as with any real person's photos.
 - Product picture: one button per product makes a clean studio picture from the photos, or designs the product from the description when there are no photos. Keyframes use it when there are fewer than 2 photos.
+
+## B43. Part 2: a character that looks like a real person; voices by video type (Ibrahim, 19 Nov 2026)
+
+- Stage 3, Characters: every AI character has "Look like a real person (optional)". You add 1 to 3 photos of the person's face and tick that you have their written consent. Only then are the photos used: as references when the character picture is drawn, and when the digital actor sheet is made in stage 5. Without consent the photos are kept but ignored. The photos stay in the project's own storage.
+- Voice suggestions follow the video type: UGC, influencer and affiliate videos get casual voices; commercials and occasion campaigns warm ones; product and teaser videos lively ones; company profiles, training and explainers clear, calm ones; documentaries, tourism and testimonials sincere ones. The default "how it sounds" text and the narrator follow the same type. A character's own description (a creator, an energetic person) still comes first.
