@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { ChoiceField } from "@/components/choice-field";
 import { findTerm, type TermKind } from "@/lib/film-terms";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
-import { approveStage, saveOutputEdit } from "./actions";
+import { browserClient } from "@/lib/supabase/client";
+import { approveStage, prepareUpload, saveOutputEdit } from "./actions";
 import { ChangeBox } from "./editors";
 import { RunLine, useCreativeRun, type RunCopy } from "./creative-run";
 import { InlineText } from "./inline-doc";
@@ -13,14 +14,14 @@ import { InlineText } from "./inline-doc";
 // Stage 3, Look and characters: the six documents, the storyboard frames and their drawing.
 
 type L = Dictionary["look"];
-type Character = { name: string; role: string; age: string; look: string; personality: string; made_with: "ai" | "cast"; plan_a: string; plan_b: string; library_id: string | null };
+type Character = { name: string; role: string; age: string; look: string; personality: string; made_with: "ai" | "cast"; plan_a: string; plan_b: string; library_id: string | null; photos?: string[]; photo_consent?: boolean };
 type Outfit = { character: string; scene: string; outfit: string; continuity: string };
 type Location = { name: string; int_ext: "INT" | "EXT"; description: string; made_with: "ai" | "real"; options: string[]; library_id: string | null };
 type Art = { set: string; dressing: string; props: string[] };
 type Shot = { n: number; scene: string; int_ext: string; day_night: string; size: string; angle: string; movement: string; lens: string; action: string; dialogue: string; seconds: number; cast: string[]; props: string[]; set: string };
 type Frame = { n: number; scene: string; size: string; angle: string; movement: string; lens: string; action: string; dialogue: string; seconds: number; cast: string[]; set: string; prompt: string };
 export type LookPicture = { status: string; url: string | null; model: string; cost: number | null; error: string | null; version: number };
-type Draw = { model: string; price: number; run: RunCopy; pictures: Record<string, LookPicture>; lang: "en" | "ar"; models: ModelOption[] };
+type Draw = { model: string; price: number; run: RunCopy; pictures: Record<string, LookPicture>; lang: "en" | "ar"; models: ModelOption[]; photoUrls?: Record<string, string> };
 const key = (name: string) => name.trim().toLowerCase().slice(0, 200);
 const termText = (kind: TermKind, v: string, lang: "en" | "ar") => findTerm(kind, v)?.[lang] ?? v;
 export type FrameImage = { status: string; url: string | null; model: string; style: string; cost: number | null; error: string | null; version: number };
@@ -155,12 +156,86 @@ export function CharactersView({ projectId, content, editable, c, d }: { project
             <Field label={k.age}><InlineText label={k.age} value={x.age} editable={editable} multiline={false} onCommit={(v) => set(i, { age: v })} /></Field>
             <Field label={k.look}><InlineText label={k.look} value={x.look} editable={editable} onCommit={(v) => set(i, { look: v })} /></Field>
             <Field label={k.personality}><InlineText label={k.personality} value={x.personality} editable={editable} onCommit={(v) => set(i, { personality: v })} /></Field>
+            {x.made_with !== "cast" && <PersonPhotos projectId={projectId} x={x} urls={d.photoUrls ?? {}} editable={editable} c={c} onChange={(patch) => set(i, patch)} />}
             <Field label={k.planA}><InlineText label={k.planA} value={x.plan_a} editable={editable} onCommit={(v) => set(i, { plan_a: v })} /></Field>
             <Field label={k.planB}><InlineText label={k.planB} value={x.plan_b} editable={editable} onCommit={(v) => set(i, { plan_b: v })} /></Field>
           </article>
         ))}
       </div>
       <Note note={note} />
+    </div>
+  );
+}
+
+// Optional: photos of a real person, so the AI character looks like them. Written consent from
+// that person is required before any photo is used; without it the photos are kept but ignored.
+function PersonPhotos({ projectId, x, urls, editable, c, onChange }: { projectId: string; x: Character; urls: Record<string, string>; editable: boolean; c: L; onChange: (patch: Partial<Character>) => void }) {
+  const k = c.characters;
+  const photos = x.photos ?? [];
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | undefined>();
+  const [local, setLocal] = useState<Record<string, string>>({});
+  const upload = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setBusy(true);
+    const added: string[] = [];
+    const previews: Record<string, string> = {};
+    for (const file of Array.from(files).slice(0, 3 - photos.length)) {
+      const prep = await prepareUpload(projectId, "file", file.name, file.type, file.size);
+      if (!prep.path || !prep.token) {
+        setNote(prep.error);
+        continue;
+      }
+      const { error } = await browserClient().storage.from("media").uploadToSignedUrl(prep.path, prep.token, file, { contentType: file.type });
+      if (error) {
+        setNote(error.message);
+        continue;
+      }
+      added.push(prep.path);
+      previews[prep.path] = URL.createObjectURL(file);
+    }
+    setBusy(false);
+    setLocal((l) => ({ ...l, ...previews }));
+    if (added.length) onChange({ photos: [...photos, ...added] });
+  };
+  if (!editable && !photos.length) return null;
+  return (
+    <div className="rounded-md border border-line p-3 flex flex-col gap-2">
+      <h3 className="mn-label m-0">{k.likeTitle}</h3>
+      <p className="text-[12px] text-ink-muted m-0">{k.likeNote}</p>
+      {photos.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {photos.map((p) => (
+            <figure key={p} className="m-0 relative w-[64px] h-[64px] rounded-md overflow-hidden bg-ground-deep border border-line">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {(local[p] ?? urls[p]) && <img src={local[p] ?? urls[p]} alt={x.name} className="absolute inset-0 w-full h-full object-cover" />}
+              {editable && (
+                <button type="button" className="absolute top-0.5 end-0.5 bg-surface/90 rounded-sm px-1 text-[11px]" aria-label={k.likeRemove} title={k.likeRemove} onClick={() => onChange({ photos: photos.filter((y) => y !== p) })}>
+                  ✕
+                </button>
+              )}
+            </figure>
+          ))}
+        </div>
+      )}
+      {editable && (
+        <>
+          {photos.length < 3 && (
+            <label className={`mn-btn mn-btn--secondary mn-btn--sm self-start ${busy ? "opacity-60 pointer-events-none" : "cursor-pointer"}`}>
+              {busy ? k.likeUploading : k.likeAdd}
+              <input type="file" accept="image/png,image/jpeg,image/webp" multiple className="sr-only" onChange={(e) => upload(e.target.files)} />
+            </label>
+          )}
+          {photos.length > 0 && (
+            <label className="flex items-start gap-2 text-[12px]">
+              <input type="checkbox" className="mt-0.5" checked={Boolean(x.photo_consent)} onChange={(e) => onChange({ photo_consent: e.target.checked })} />
+              <span>{k.likeConsent}</span>
+            </label>
+          )}
+          {photos.length > 0 && !x.photo_consent && <span className="text-[12px] text-ink-muted">{k.likeNeedsConsent}</span>}
+        </>
+      )}
+      {note && <span className="text-[12px]" role="alert">{note}</span>}
     </div>
   );
 }

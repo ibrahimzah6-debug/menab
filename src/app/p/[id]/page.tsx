@@ -166,6 +166,19 @@ export default async function ProjectPage({
   const lastPicture = Math.max(0, ...Object.values(rawPictures).filter((x) => x.url && x.status === "ready").map((x) => new Date(x.updatedAt).getTime()));
   const staleFrames = Object.entries(rawImages).filter(([, x]) => x.url && lastPicture > new Date(x.updatedAt).getTime()).map(([n]) => Number(n));
   const briefAspect = aspectFromBrief(brief);
+  // Photos of real people that AI characters are based on (stage 3, with consent).
+  const personPhotos: Record<string, string> = {};
+  if (lookOn && showing === 3 && open === 13) {
+    const paths = ((content[13] as { characters?: { photos?: string[] }[] } | undefined)?.characters ?? []).flatMap((c) => c.photos ?? []).filter((p) => p.startsWith(`${project.workspace_id}/projects/${id}/`) && !p.includes(".."));
+    if (paths.length) {
+      try {
+        const { data: signed } = await createAdminClient().storage.from("media").createSignedUrls(paths, 3600);
+        for (const s of signed ?? []) if (s.path && s.signedUrl) personPhotos[s.path] = s.signedUrl;
+      } catch {
+        // No storage access: the photos show as empty boxes.
+      }
+    }
+  }
   const drawing = Object.values(images).some((x) => x.status === "generating") || Object.values(pictures).some((x) => x.status === "generating");
   // Stage 5: collect jobs that finished on Kie.ai since the last look, then load everything made.
   const genOn = (showing === 5 || board) && outs.some((x) => x.stage === 5) && path !== "production";
@@ -205,7 +218,7 @@ export default async function ProjectPage({
         // No storage access: the photos show as empty boxes.
       }
     }
-    const narrator = voiceFor(doc, null, brief.language);
+    const narrator = voiceFor(doc, null, brief.language, brief.video_type);
     // Actors saved in Libraries, to reuse for a character here.
     const { data: saved } = await supabase.from("characters").select("id, name, voice, image_paths").eq("workspace_id", project.workspace_id).order("updated_at", { ascending: false }).limit(50);
     genData = {
@@ -214,7 +227,7 @@ export default async function ProjectPage({
       lang,
       assets: gen,
       characters: doc.characters.map((c) => {
-        const v = voiceFor(doc, c.name, brief.language);
+        const v = voiceFor(doc, c.name, brief.language, brief.video_type);
         const hasLines = talkLines.some((d) => lookKey(d.speaker) === lookKey(c.name));
         const firstLine = talkLines.find((d) => lookKey(d.speaker) === lookKey(c.name))?.text ?? "";
         return {
@@ -583,7 +596,7 @@ export default async function ProjectPage({
                 {hidden.has(open) && <p className="small m-0 px-3 py-2 rounded-md bg-tint-2 max-w-[760px]">{p.videoType.notNeededNote}</p>}
                 {content[open] ? (
                   open === 13 ? (
-                    <CharactersView projectId={id} content={content[13] as never} editable={editableHere && statusOf(13) !== "generating"} c={t.look} d={{ model: imageModel, price: imagePrice, run: runCopy, pictures, lang, models: imageOptions }} />
+                    <CharactersView projectId={id} content={content[13] as never} editable={editableHere && statusOf(13) !== "generating"} c={t.look} d={{ model: imageModel, price: imagePrice, run: runCopy, pictures, lang, models: imageOptions, photoUrls: personPhotos }} />
                   ) : open === 14 ? (
                     <WardrobeView projectId={id} content={content[14] as never} editable={editableHere && statusOf(14) !== "generating"} c={t.look} />
                   ) : open === 15 ? (

@@ -23,7 +23,7 @@ export type FrameEvent =
   | { t: "drawRefFailed"; name: string; reason: string };
 
 type Frame = { n: number; prompt: string; cast?: string[]; set?: string };
-type Character = { name: string; role?: string; age?: string; look?: string; library_id?: string | null; made_with?: string };
+type Character = { name: string; role?: string; age?: string; look?: string; library_id?: string | null; made_with?: string; photos?: string[]; photo_consent?: boolean };
 type Location = { name: string; int_ext?: string; description?: string; library_id?: string | null; made_with?: string };
 type Outfit = { character: string; outfit: string };
 type Admin = ReturnType<typeof createAdminClient>;
@@ -320,10 +320,14 @@ export async function runRefs(
   let failed = 0;
   await inBatches(todo, async (x) => {
     const key = lookKey(x.name);
-    // A library photo of the same character or place keeps the face or the place.
+    // A library photo of the same character or place keeps the face or the place. Photos of a
+    // real person, uploaded with their written consent, make the character look like them.
     const lib = await urlFor(req.kind, x.name, true);
-    const refs = lib ? [lib] : [];
-    const prompt = `${x.prompt}${refs.length ? " Keep them looking like the reference photo." : ""}\n\n${REF_STYLE}`.slice(0, 3900);
+    const person = req.kind === "character" ? doc.characters.find((c) => lookKey(c.name) === key) : undefined;
+    const own = person?.photo_consent ? (person.photos ?? []).filter((p) => p.startsWith(`${project.workspace_id}/projects/${projectId}/`) && !p.includes("..")).slice(0, 3) : [];
+    const signed = (await Promise.all(own.map(async (p) => (await admin.storage.from("media").createSignedUrl(p, 3600)).data?.signedUrl ?? null))).filter((u): u is string => Boolean(u));
+    const refs = [...signed, ...(lib ? [lib] : [])].slice(0, 4);
+    const prompt = `${x.prompt}${signed.length ? " The character must look like the person in the reference photos: same face, features, skin tone and hair. Keep the clothes from the description." : refs.length ? " Keep them looking like the reference photo." : ""}\n\n${REF_STYLE}`.slice(0, 3900);
     const version = Math.max(0, ...(rows ?? []).filter((r) => r.key === key).map((r) => r.version)) + 1;
     const { data: row, error } = await admin
       .from("look_images")

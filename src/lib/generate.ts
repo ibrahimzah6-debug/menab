@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { CLIP_MODELS, clipBackup, clipModel, clipRequest, clipSeconds, DEFAULT_CLIP_MODEL, DEFAULT_NARRATOR, DEFAULT_TALKING_MODEL, defaultDialect, dialectFor, guessAge, isAge, isDialect, isVoice, musicRequest, suggestVoice, VOICES, voiceBackupRequest, voiceRequest, voiceStyle } from "@/lib/ai/media";
+import { CLIP_MODELS, clipBackup, clipModel, clipRequest, clipSeconds, DEFAULT_CLIP_MODEL, DEFAULT_NARRATOR, DEFAULT_TALKING_MODEL, defaultDialect, defaultHow, suggestNarrator, dialectFor, guessAge, isAge, isDialect, isVoice, musicRequest, suggestVoice, VOICES, voiceBackupRequest, voiceRequest, voiceStyle } from "@/lib/ai/media";
 import { projectAspect } from "@/lib/aspect";
 import { imageBackup, imageModel, imageRequest, type Aspect } from "@/lib/ai/images";
 import { createTask, getTask, KIE_USD_PER_CREDIT, KieError } from "@/lib/ai/kie";
@@ -80,7 +80,7 @@ export async function stageFive(supabase: SupabaseClient, projectId: string) {
     const o = withV.find((x) => x.number === n);
     return o ? (versions?.find((v) => v.output_id === o.id && v.version === o.current_version)?.content as Record<string, unknown> | undefined) : undefined;
   };
-  const characters = ((content(13)?.characters as { name: string; role?: string; age?: string; look?: string; personality?: string; made_with?: string; library_id?: string | null }[] | undefined) ?? []).filter((c) => c.name?.trim());
+  const characters = ((content(13)?.characters as { name: string; role?: string; age?: string; look?: string; personality?: string; made_with?: string; library_id?: string | null; photos?: string[]; photo_consent?: boolean }[] | undefined) ?? []).filter((c) => c.name?.trim());
   const wardrobe = (content(14)?.wardrobe as { character: string; scene: string; outfit: string }[] | undefined) ?? [];
   const locations = ((content(15)?.locations as { name: string; description?: string; int_ext?: string; library_id?: string | null }[] | undefined) ?? []).filter((l) => l.name?.trim());
   const shots = ((content(17)?.frames as Shot[] | undefined) ?? []).filter((f) => f.n);
@@ -136,22 +136,22 @@ export function dialogueLines(doc: { shots: Shot[] }) {
 // The voice and the way of speaking for a character, or for the narrator (name null). What was
 // picked in the reference lock, else a suggestion from the character and the project language.
 // "how" is the short manner the person edits; "instruction" is everything Gemini reads.
-export function voiceFor(doc: { characters: { name: string; role?: string; look?: string; personality?: string; age?: string }[]; lock: Lock }, name: string | null, language?: string | null) {
+export function voiceFor(doc: { characters: { name: string; role?: string; look?: string; personality?: string; age?: string }[]; lock: Lock }, name: string | null, language?: string | null, videoType?: string | null) {
   const female = (id: string) => VOICES.find((x) => x.id === id)?.gender === "f";
   if (!name) {
-    const voice = isVoice(doc.lock.narrator) ? doc.lock.narrator! : DEFAULT_NARRATOR;
+    const voice = isVoice(doc.lock.narrator) ? doc.lock.narrator! : suggestNarrator(videoType);
     const dialect = isDialect(doc.lock.narratorDialect) ? doc.lock.narratorDialect! : defaultDialect(language);
     const age = isAge(doc.lock.narratorAge) ? doc.lock.narratorAge! : "adult";
-    const how = doc.lock.narratorStyle?.trim() || "A commercial voiceover. Warm, clear and natural, not like a news reader.";
+    const how = doc.lock.narratorStyle?.trim() || defaultHow(videoType, true);
     return { voice, how, dialect, age, suggested: !isVoice(doc.lock.narrator), instruction: voiceStyle({ female: female(voice), age, dialect, how, narrator: true }) };
   }
   const k = lookKey(name);
   const c = doc.characters.find((x) => lookKey(x.name) === k);
   const picked = doc.lock.voices?.[k];
-  const voice = isVoice(picked) ? picked! : suggestVoice(c ?? { name });
+  const voice = isVoice(picked) ? picked! : suggestVoice(c ?? { name }, videoType);
   const dialect = isDialect(doc.lock.dialects?.[k]) ? doc.lock.dialects![k] : defaultDialect(language);
   const age = isAge(doc.lock.ages?.[k]) ? doc.lock.ages![k] : guessAge(`${c?.age ?? ""} ${c?.role ?? ""}`);
-  const how = doc.lock.styles?.[k]?.trim() || "Warm, natural and casual, like talking to a friend. Not like an announcer.";
+  const how = doc.lock.styles?.[k]?.trim() || defaultHow(videoType);
   return { voice, how, dialect, age, suggested: !isVoice(picked), instruction: voiceStyle({ female: female(voice), age, dialect, how }) };
 }
 
@@ -292,7 +292,7 @@ export async function runGenerate(projectId: string, req: GenRequest, emit: (e: 
   const g = t.generate;
   const admin = createAdminClient();
   const doc = await stageFive(supabase, projectId);
-  const brief = (project.brief ?? {}) as { language?: string; feeling?: string; formats?: unknown; platforms?: unknown; product?: string };
+  const brief = (project.brief ?? {}) as { language?: string; feeling?: string; formats?: unknown; platforms?: unknown; product?: string; video_type?: string };
   // The frame shape: picked in the reference lock, else from the brief (Instagram means 9:16).
   const aspect: Aspect = projectAspect(doc.lock.aspect, brief);
   // Sheets, outfits and keyframes use the picture model picked in the reference lock; by default
@@ -323,9 +323,11 @@ export async function runGenerate(projectId: string, req: GenRequest, emit: (e: 
     if (doc.lock.locked) throw new Error(g.lockedNote);
     for (const c of doc.characters.filter((x) => req.names.map(lookKey).includes(lookKey(x.name)))) {
       const ref = await sign(lookPath("character", c.name));
+      // Photos of the real person this character is based on, uploaded with consent in stage 3.
+      const own = c.photo_consent ? (await Promise.all((c.photos ?? []).filter((p) => p.startsWith(`${project.workspace_id}/projects/${projectId}/`)).slice(0, 2).map((p) => sign(p)))).filter((u): u is string => Boolean(u)) : [];
       const outfit = doc.wardrobe.find((w) => lookKey(w.character) === lookKey(c.name))?.outfit;
       const prompt = `Digital actor reference sheet for a film, all in one image: ${c.name}${c.role ? `, ${c.role}` : ""}. Age: ${c.age ?? ""}. ${c.look ?? ""}${outfit ? ` Wearing: ${outfit}.` : ""} Left: full body from the front. Middle: full body from the side. Right: four head-and-shoulders close-ups with the expressions neutral, smiling, serious and surprised. Plain light grey studio background, even soft light. No words, titles or labels anywhere in the image.${ref ? " Keep the face exactly as in the reference photo." : ""}\n\n${PHOTO}`;
-      jobs.push(imageJob(lookKey(c.name), c.name, prompt, ref ? [ref] : [], "16:9"));
+      jobs.push(imageJob(lookKey(c.name), c.name, `${prompt}${own.length ? `\nThe last ${own.length === 1 ? "image is a photo" : `${own.length} images are photos`} of the real person: keep this exact face.` : ""}`, [...(ref ? [ref] : []), ...own], "16:9"));
     }
   } else if (req.kind === "outfit") {
     if (doc.lock.locked) throw new Error(g.lockedNote);
@@ -432,7 +434,7 @@ export async function runGenerate(projectId: string, req: GenRequest, emit: (e: 
     });
   } else if (req.kind === "voice" || req.kind === "voicetry") {
     const voiceJob = (key: string, label: string, text: string, who: string | null): Job => {
-      const v = voiceFor(doc, who, brief.language);
+      const v = voiceFor(doc, who, brief.language, brief.video_type);
       return {
         key, label, model: "gemini-3-8-tts", prompt: text, params: { voice: v.voice, style: v.instruction, speaker: who },
         build: (m) => (m === "elevenlabs" ? voiceBackupRequest(text, v.voice) : voiceRequest(text, v.voice, v.instruction)),
