@@ -474,6 +474,8 @@ type LockPatch = {
   talkModels?: Record<string, string>;
   narratorDialect?: string;
   narratorAge?: string;
+  skip?: string[];
+  libraryActors?: Record<string, string>;
   aspect?: string;
   consent?: boolean;
   locked?: boolean;
@@ -482,7 +484,8 @@ type LockPatch = {
 };
 
 // Settings that do not change any picture: they can change after the lock.
-const AFTER_LOCK = new Set(["imageModel", "narrator", "narratorStyle", "narratorDialect", "narratorAge", "voices", "styles", "speaks", "dialects", "ages", "talkModels"]);
+const AFTER_LOCK = new Set(["imageModel", "narrator", "narratorStyle", "narratorDialect", "narratorAge", "voices", "styles", "speaks", "dialects", "ages", "talkModels", "skip"]);
+const SKIPPABLE = new Set(["narrator", "music", "products"]);
 
 export async function saveReferenceLock(projectId: string, patch: LockPatch): Promise<Result> {
   const { t } = await getI18n();
@@ -497,6 +500,7 @@ export async function saveReferenceLock(projectId: string, patch: LockPatch): Pr
     const afterLock = Object.keys(patch).every((k) => AFTER_LOCK.has(k));
     if (patch.imageModel && !IMAGE_MODELS.some((m) => m.id === patch.imageModel)) return { error: "Unknown model." };
     if (current.locked && !afterLock && patch.locked !== false && patch.locked !== true) return { error: t.generate.lockedNote };
+    if (patch.skip) patch.skip = [...new Set(patch.skip.filter((x) => SKIPPABLE.has(x)))];
     // Product photos must be this project's own uploads.
     if (patch.products) {
       const mine = `${me.workspace.id}/projects/${projectId}/`;
@@ -513,11 +517,12 @@ export async function saveReferenceLock(projectId: string, patch: LockPatch): Pr
       dialects: { ...((current.dialects as object) ?? {}), ...(patch.dialects ?? {}) },
       ages: { ...((current.ages as object) ?? {}), ...(patch.ages ?? {}) },
       talkModels: { ...((current.talkModels as object) ?? {}), ...(patch.talkModels ?? {}) },
+      libraryActors: { ...((current.libraryActors as object) ?? {}), ...(patch.libraryActors ?? {}) },
     };
     if (patch.locked) {
       // Real people's photos need their written consent first (B27).
       const doc = await stageFive(supabase, projectId);
-      if (doc.characters.some((c) => c.library_id) && !next.consent) return { error: t.generate.consentFirst };
+      if ((doc.characters.some((c) => c.library_id) || Object.keys(doc.lock.libraryActors ?? {}).length > 0) && !next.consent) return { error: t.generate.consentFirst };
     }
     await saveVersion(supabase, o, next, "edit", me.userId, null, next.locked ? "ready" : "edited");
     // The step is done only when locked.
@@ -588,5 +593,40 @@ export async function saveActorToLibrary(projectId: string, name: string): Promi
   }
   revalidatePath(`/p/${projectId}`);
   revalidatePath("/libraries");
+  return {};
+}
+
+// Uses an actor saved in Libraries for a character of this project: the saved actor sheet becomes
+// this character's sheet, and the saved Gemini voice becomes its voice. Only before the lock.
+export async function applyLibraryActor(projectId: string, name: string, libraryId: string): Promise<Result> {
+  const { t } = await getI18n();
+  try {
+    const { me, supabase, project } = await loadProject(projectId);
+    const doc = await stageFive(supabase, projectId);
+    if (doc.lock.locked) return { error: t.generate.lockedNote };
+    const c = doc.characters.find((x) => x.name.trim().toLowerCase() === name.trim().toLowerCase());
+    if (!c) return { error: "Character not found." };
+    const key = c.name.trim().toLowerCase().slice(0, 200);
+    const { data: actor } = await supabase.from("characters").select("id, name, voice, image_paths").eq("id", libraryId).eq("workspace_id", project.workspace_id).maybeSingle();
+    const from = actor?.image_paths?.[0];
+    if (!actor || !from || !from.startsWith(`${project.workspace_id}/library/`) || from.includes("..")) return { error: t.generate.noPicture };
+    const admin = createAdminClient();
+    const to = `${project.workspace_id}/projects/${projectId}/generate/sheet-library-${Date.now()}.${from.split(".").pop() ?? "jpg"}`;
+    const { error: copyError } = await admin.storage.from("media").copy(from, to);
+    if (copyError) return { error: "Could not copy the picture." };
+    const { data: last } = await admin.from("gen_assets").select("version").eq("project_id", projectId).eq("kind", "sheet").eq("key", key).order("version", { ascending: false }).limit(1);
+    const { error } = await admin.from("gen_assets").insert({
+      workspace_id: project.workspace_id, project_id: projectId, kind: "sheet", key, version: (last?.[0]?.version ?? 0) + 1,
+      model: "library", prompt: `From Libraries: ${actor.name}`, params: { library: actor.id }, status: "ready", path: to, cost_usd: 0, created_by: me.userId,
+    });
+    if (error) return { error: error.message };
+    // The saved voice reads like "Kore (Gemini voice)".
+    const voice = VOICES.find((v) => (actor.voice ?? "").startsWith(v.name))?.id;
+    const res = await saveReferenceLock(projectId, { libraryActors: { [key]: actor.id }, ...(voice ? { voices: { [key]: voice } } : {}) });
+    if (res.error) return res;
+  } catch (e) {
+    return { error: errText(e) };
+  }
+  revalidatePath(`/p/${projectId}`);
   return {};
 }

@@ -20,15 +20,18 @@ export const CLIP_MODELS: ClipModel[] = [
   { id: "wan-3-0", name: "Wan 3.0", perSecond: 0.08, min: 2, max: 30, note: { en: "Good value, 720p", ar: "سعر مناسب، 720p" } },
   { id: "grok-imagine-1-5", name: "Grok Imagine 1.5", perSecond: 0.03, min: 1, max: 15, note: { en: "Cheap quick ideas", ar: "أفكار سريعة ورخيصة" } },
   { id: "pixverse-v6", name: "PixVerse V6", perSecond: 0.04, min: 1, max: 15, note: { en: "Stylised, uses the frame as a reference", ar: "طابع فني، يستخدم الصورة كمرجع" } },
-  { id: "kling-avatar", name: "Kling AI Avatar Pro", perSecond: 0.0505, min: 1, max: 60, talking: true, note: { en: "Talking to camera, lip-sync", ar: "يتكلم للكاميرا، مزامنة الشفايف" } },
-  { id: "infinitalk", name: "Infinitalk", perSecond: 0.015, min: 1, max: 60, talking: true, note: { en: "Cheaper lip-sync, 480p", ar: "مزامنة شفايف أرخص، 480p" } },
+  // Kie.ai: Pro is 1080p at 20.2 credits a second, Standard is 720p at 10.1. Tested 19 Nov 2026:
+  // Pro made a 6.6 second talking clip in about 4 minutes. Infinitalk failed on Kie's side
+  // (it could not fetch even Kie's own example files), so it is not offered.
+  { id: "kling-avatar", name: "Kling AI Avatar Pro", perSecond: 0.101, min: 1, max: 60, talking: true, note: { en: "Best lip-sync, 1080p", ar: "أفضل مزامنة شفايف، 1080p" } },
+  { id: "kling-avatar-std", name: "Kling AI Avatar Standard", perSecond: 0.0505, min: 1, max: 60, talking: true, note: { en: "Same lip-sync, 720p, half the price", ar: "نفس المزامنة، 720p، بنص السعر" } },
 ];
 export const DEFAULT_CLIP_MODEL = "kling-3-0";
 // Shots where a character speaks on camera use this, with the shot's dialogue line.
 export const DEFAULT_TALKING_MODEL = "kling-avatar";
 export const clipModel = (id: string) => CLIP_MODELS.find((m) => m.id === id) ?? CLIP_MODELS[0];
 export const clipBackup = (id: string) =>
-  id === "kling-avatar" ? "infinitalk" : id === "infinitalk" ? "kling-avatar" : id === "kling-3-0" ? "kling-4-0-flash" : "kling-3-0";
+  id === "kling-avatar" ? "kling-avatar-std" : id === "kling-avatar-std" ? "kling-avatar" : id === "kling-3-0" ? "kling-4-0-flash" : "kling-3-0";
 
 export const clipSeconds = (modelId: string, seconds: number) => {
   const m = clipModel(modelId);
@@ -43,8 +46,8 @@ export function clipRequest(modelId: string, prompt: string, keyframe: string, s
   switch (modelId) {
     case "kling-avatar":
       return audio ? { kieModel: "kling/ai-avatar-pro", input: { image_url: keyframe, audio_url: audio, prompt } } : null;
-    case "infinitalk":
-      return audio ? { kieModel: "infinitalk/from-audio", input: { image_url: keyframe, audio_url: audio, prompt, resolution: "480p", seed: Math.floor(Math.random() * 1_000_000) } } : null;
+    case "kling-avatar-std":
+      return audio ? { kieModel: "kling/ai-avatar-standard", input: { image_url: keyframe, audio_url: audio, prompt } } : null;
     case "kling-4-0":
       return { kieModel: "kling-4.0/keyframe-to-video", input: { prompt: `${prompt}\n\nREFERENCES: @first_frame is the exact opening frame.`, first_frame_url: keyframe, duration: d, resolution: "720p" } };
     case "kling-4-0-flash":

@@ -333,3 +333,12 @@ Found while testing the Moringa cream project: the character picture in stage 3 
 - Voices have a plain description ("Confident young woman, clear. Good for content creators and ads"), an age menu (child, teen, young adult, adult, older) and a dialect menu (Najdi, Hijazi, Eastern, Southern, Gulf, Fusha, Egyptian, Levantine, English, English with a Saudi accent, Amharic, Urdu, French). A child's voice is asked for in words, since the Gemini voices are adult.
 - What Gemini reads is now short and in English, built from the age, dialect and "how it sounds". The old default pasted the Arabic character description, which made the voice sound wrong.
 - When the locked frame shape differs from the brief, the reference lock says so and asks to unlock.
+
+## B42. Avatar fix, skip, saved actors, product picture (Ibrahim, 19 Nov 2026)
+
+- Infinitalk is removed: on Kie.ai it failed with "connection timed out" even on Kie's own example files. Kling AI Avatar Pro was tested and works (a 6.6 second clip in about 4 minutes). Its real price is $0.101 a second (1080p); Kling AI Avatar Standard (720p, $0.0505 a second) is added as its backup.
+- The talking avatar box says plainly that it is two steps: a still picture, then a talking video.
+- While AI work runs in stage 5, its progress also shows in the bottom bar, so it stays in view.
+- The narrator voice, the product and the music can be skipped with a small "Skip" button, and added back. A skipped narrator does not hold up the Voice step.
+- "Use a saved actor" on each AI character copies the actor sheet saved in Libraries and its Gemini voice. The lock then asks for consent, as with any real person's photos.
+- Product picture: one button per product makes a clean studio picture from the photos, or designs the product from the description when there are no photos. Keyframes use it when there are fewer than 2 photos.

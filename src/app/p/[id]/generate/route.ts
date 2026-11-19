@@ -5,7 +5,7 @@ import { runGenerate, type GenEvent, type GenRequest } from "@/lib/generate";
 // Stop ends the waiting; jobs already started on Kie.ai are collected when the page loads.
 export const maxDuration = 300;
 
-const KINDS = new Set(["sheet", "outfit", "keyframe", "clip", "voice", "voicetry", "portrait", "avatartry", "music"]);
+const KINDS = new Set(["sheet", "outfit", "keyframe", "clip", "voice", "voicetry", "portrait", "avatartry", "product", "music"]);
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -33,6 +33,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           : kind === "clip" ? { kind, shots: numbers(body?.shots), model: body?.model ? String(body.model) : undefined, prompts, auto: body?.auto !== false }
           : kind === "voice" ? { kind, keys: strings(body?.keys) }
           : kind === "voicetry" ? { kind, who: body?.who ? String(body.who).slice(0, 200) : null }
+          : kind === "product" ? { kind, name: String(body?.name ?? "").slice(0, 200) }
           : kind === "portrait" || kind === "avatartry" ? { kind, who: String(body?.who ?? "").slice(0, 200) }
           : { kind: "music" };
         await runGenerate(id, request, emit, req.signal);

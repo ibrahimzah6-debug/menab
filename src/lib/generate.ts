@@ -20,7 +20,7 @@ export const DEFAULT_PICTURE_MODEL = "nano-banana-pro";
 // Models offered for actor sheets, outfits and keyframes: the ones best at real people.
 export const PICTURE_MODELS = ["nano-banana-pro", "gpt-image-2", "seedream-5-pro", "nano-banana-2", "flux-2-pro"];
 
-export type GenKind = "sheet" | "outfit" | "keyframe" | "clip" | "voice" | "music" | "voicetry" | "portrait" | "avatartry";
+export type GenKind = "sheet" | "outfit" | "keyframe" | "clip" | "voice" | "music" | "voicetry" | "portrait" | "avatartry" | "product";
 export type GenEvent =
   | { t: "genStart"; label: string; model: string }
   | { t: "genDone"; label: string }
@@ -61,6 +61,10 @@ export type Lock = {
   talkModels?: Record<string, string>;
   narratorDialect?: string;
   narratorAge?: string;
+  // Optional parts left out on purpose: "narrator", "music", "products".
+  skip?: string[];
+  // Characters that use an actor saved in Libraries (character key: library id).
+  libraryActors?: Record<string, string>;
   aspect?: string;
   imageModel?: string;
   products?: Product[];
@@ -163,6 +167,7 @@ export function talkModelFor(doc: { lock: Lock }, name: string) {
 const PRODUCT_WORDS = /(product|pack|packag|jar|bottle|tube|box|cream|serum|logo|can\b|cup|منتج|عبوة|علبة|كريم|زجاجة|العبوة|المنتج|الكريم)/i;
 export function productsIn(doc: { lock: Lock }, s: { prompt?: string; action?: string }) {
   const text = `${s.prompt ?? ""} ${s.action ?? ""}`;
+  if (doc.lock.skip?.includes("products")) return [];
   return (doc.lock.products ?? []).filter((p) => p.name?.trim() && (PRODUCT_WORDS.test(text) || text.toLowerCase().includes(p.name.toLowerCase())));
 }
 
@@ -252,11 +257,15 @@ export async function syncOutputs(admin: Admin, projectId: string) {
     return o.status === status ? null : admin.from("outputs").update({ status, updated_at: new Date().toISOString() }).eq("id", o.id);
   };
   const all = (set: Set<string>) => shots.length > 0 && shots.every((n) => set.has(n));
+  // A narrator left out on purpose does not hold up the voice step.
+  const lockOut = (outs ?? []).find((o) => o.number === 34);
+  const { data: lv } = lockOut?.current_version ? await admin.from("versions").select("content").eq("output_id", lockOut.id).eq("version", lockOut.current_version).maybeSingle() : { data: null };
+  const skipped = ((lv?.content as { skip?: string[] } | null)?.skip ?? []);
   await Promise.all(
     [
       state(35, all(ready("keyframe")), generating("keyframe")),
       state(36, all(ready("clip")), generating("clip")),
-      state(37, ready("voice").size > 0 || ready("music").size > 0, generating("voice") || generating("music")),
+      state(37, ready("voice").size > 0 || ready("music").size > 0 || skipped.includes("narrator"), generating("voice") || generating("music")),
       state(38, all(approved), false),
     ].filter(Boolean),
   );
@@ -272,6 +281,7 @@ export type GenRequest =
   | { kind: "voice"; keys: string[] }
   | { kind: "voicetry"; who: string | null }
   | { kind: "portrait"; who: string }
+  | { kind: "product"; name: string }
   | { kind: "avatartry"; who: string }
   | { kind: "music" };
 
@@ -282,7 +292,7 @@ export async function runGenerate(projectId: string, req: GenRequest, emit: (e: 
   const g = t.generate;
   const admin = createAdminClient();
   const doc = await stageFive(supabase, projectId);
-  const brief = (project.brief ?? {}) as { language?: string; feeling?: string; formats?: unknown; platforms?: unknown };
+  const brief = (project.brief ?? {}) as { language?: string; feeling?: string; formats?: unknown; platforms?: unknown; product?: string };
   // The frame shape: picked in the reference lock, else from the brief (Instagram means 9:16).
   const aspect: Aspect = projectAspect(doc.lock.aspect, brief);
   // Sheets, outfits and keyframes use the picture model picked in the reference lock; by default
@@ -346,7 +356,11 @@ export async function runGenerate(projectId: string, req: GenRequest, emit: (e: 
       }
       if (s.set) add(await sign(lookPath("location", s.set)), `the place, ${s.set}. Keep it exactly.`);
       const products = productsIn(doc, s);
-      for (const p of products) for (const photo of (p.photos ?? []).slice(0, 2)) add(await sign(photo), `the real product, ${p.name}. Show exactly this product: same shape, colours, cap and label.`);
+      for (const p of products) {
+        for (const photo of (p.photos ?? []).slice(0, 2)) add(await sign(photo), `the real product, ${p.name}. Show exactly this product: same shape, colours, cap and label.`);
+        // The product picture made by AI: the only reference when there are no photos.
+        if ((p.photos ?? []).length < 2) add(await sign(await assetPath("product", lookKey(p.name))), `the product, ${p.name}. Show exactly this product: same shape, colours, cap and label.`);
+      }
       const productText = products.map((p) => `The product is ${p.name}${p.description ? `: ${p.description}` : ""}.`).join(" ");
       const prompt = `Final film frame, ${aspect}. ${s.prompt}${productText ? `\n${productText}` : ""}${roles.length ? `\nReference images:\n${roles.join("\n")}` : ""}\n\n${PHOTO}`.slice(0, 5900);
       jobs.push(imageJob(String(s.n), fill(g.shot, { n: s.n }), prompt, refs, aspect));
@@ -391,6 +405,17 @@ export async function runGenerate(projectId: string, req: GenRequest, emit: (e: 
     if (place) refs.push(place);
     const prompt = `${c.name}, chest-up portrait looking straight into the camera, about to speak, natural relaxed expression, mouth closed, face well lit and sharp, ${aspect} frame.${first?.set ? ` Background: ${first.set}, softly out of focus.` : " Soft, plain background."}${face ? " Keep the face, hair and clothes exactly as in image 1." : ""}${place ? " Image 2 is the place." : ""} One person only. No words or labels.\n\n${PHOTO}`;
     jobs.push(imageJob(lookKey(c.name), c.name, prompt, refs, aspect));
+  } else if (req.kind === "product") {
+    // A clean product picture: from the real photos when there are some, else designed from the
+    // description (for ideas that do not exist yet). Keyframes then show this exact product.
+    if (doc.lock.locked) throw new Error(g.lockedNote);
+    const p = (doc.lock.products ?? (brief.product ? [{ name: String(brief.product) }] : [])).find((x) => lookKey(x.name) === lookKey(req.name));
+    if (!p?.name?.trim()) throw new Error(g.nothing);
+    const refs = (await Promise.all((p.photos ?? []).slice(0, 4).map((x) => sign(x)))).filter((x): x is string => Boolean(x));
+    const prompt = refs.length
+      ? `Professional studio product photo of ${p.name}${p.description ? `: ${p.description}` : ""}. Exactly the product in the reference photos: same shape, colours, cap, label and text. Centered, front view, clean light background, soft natural shadow, sharp focus, true colours. No hands, no extra objects, no added words.\n\n${PHOTO}`
+      : `Design a realistic product for an advert: ${p.name}${p.description ? `: ${p.description}` : ""}. Professional studio product photo, centered, front view, clean light background, soft natural shadow, sharp focus. Make the pack, colours and label clear and believable. No hands, no extra objects.\n\n${PHOTO}`;
+    jobs.push(imageJob(lookKey(p.name), p.name, prompt, refs, "1:1"));
   } else if (req.kind === "avatartry") {
     // A short lip-sync test: the talking picture says the voice try line.
     const name = req.who;
