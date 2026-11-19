@@ -326,3 +326,10 @@ Found while testing the Moringa cream project: the character picture in stage 3 
 - Video models added: Kling 4.0 and 4.0 Flash, Seedance 2.5 and 2.5 Flash, Veo 3.1 Fast and Veo 3.1, Gemini Omni Flash 1.2, Wan 3.0, Grok Imagine 1.5 and PixVerse V6, besides Kling 3.0 and the two talking avatars.
 - The storyboard starts on the brief's frame shape, and a frame drawn before a newer character or location picture is marked "Before a change".
 - Outfit pictures are only for AI characters, and outfits that say "same" are skipped.
+
+## B41. Talking avatar in the reference lock; dialect, age and plain voice descriptions (Ibrahim, 19 Nov 2026)
+
+- Each character who speaks on camera has a "Talking avatar" box in the reference lock. You choose the lip-sync model there (Kling AI Avatar Pro, Infinitalk, or off), then make the talking picture and a talking test of it saying the first line in the chosen voice. Video shots no longer lists talking models; a speaking shot uses its character's avatar.
+- Voices have a plain description ("Confident young woman, clear. Good for content creators and ads"), an age menu (child, teen, young adult, adult, older) and a dialect menu (Najdi, Hijazi, Eastern, Southern, Gulf, Fusha, Egyptian, Levantine, English, English with a Saudi accent, Amharic, Urdu, French). A child's voice is asked for in words, since the Gemini voices are adult.
+- What Gemini reads is now short and in English, built from the age, dialect and "how it sounds". The old default pasted the Arabic character description, which made the voice sound wrong.
+- When the locked frame shape differs from the brief, the reference lock says so and asks to unlock.

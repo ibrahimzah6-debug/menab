@@ -469,6 +469,11 @@ type LockPatch = {
   voices?: Record<string, string>;
   styles?: Record<string, string>;
   speaks?: Record<string, boolean>;
+  dialects?: Record<string, string>;
+  ages?: Record<string, string>;
+  talkModels?: Record<string, string>;
+  narratorDialect?: string;
+  narratorAge?: string;
   aspect?: string;
   consent?: boolean;
   locked?: boolean;
@@ -477,7 +482,7 @@ type LockPatch = {
 };
 
 // Settings that do not change any picture: they can change after the lock.
-const AFTER_LOCK = new Set(["imageModel", "narrator", "narratorStyle", "voices", "styles", "speaks"]);
+const AFTER_LOCK = new Set(["imageModel", "narrator", "narratorStyle", "narratorDialect", "narratorAge", "voices", "styles", "speaks", "dialects", "ages", "talkModels"]);
 
 export async function saveReferenceLock(projectId: string, patch: LockPatch): Promise<Result> {
   const { t } = await getI18n();
@@ -505,6 +510,9 @@ export async function saveReferenceLock(projectId: string, patch: LockPatch): Pr
       voices: { ...((current.voices as object) ?? {}), ...(patch.voices ?? {}) },
       styles: { ...((current.styles as object) ?? {}), ...(patch.styles ?? {}) },
       speaks: { ...((current.speaks as object) ?? {}), ...(patch.speaks ?? {}) },
+      dialects: { ...((current.dialects as object) ?? {}), ...(patch.dialects ?? {}) },
+      ages: { ...((current.ages as object) ?? {}), ...(patch.ages ?? {}) },
+      talkModels: { ...((current.talkModels as object) ?? {}), ...(patch.talkModels ?? {}) },
     };
     if (patch.locked) {
       // Real people's photos need their written consent first (B27).

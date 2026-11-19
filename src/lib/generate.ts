@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { clipBackup, clipModel, clipRequest, clipSeconds, DEFAULT_CLIP_MODEL, DEFAULT_NARRATOR, DEFAULT_TALKING_MODEL, dialectFor, isVoice, musicRequest, suggestVoice, voiceBackupRequest, voiceRequest } from "@/lib/ai/media";
+import { CLIP_MODELS, clipBackup, clipModel, clipRequest, clipSeconds, DEFAULT_CLIP_MODEL, DEFAULT_NARRATOR, DEFAULT_TALKING_MODEL, defaultDialect, dialectFor, guessAge, isAge, isDialect, isVoice, musicRequest, suggestVoice, VOICES, voiceBackupRequest, voiceRequest, voiceStyle } from "@/lib/ai/media";
 import { projectAspect } from "@/lib/aspect";
 import { imageBackup, imageModel, imageRequest, type Aspect } from "@/lib/ai/images";
 import { createTask, getTask, KIE_USD_PER_CREDIT, KieError } from "@/lib/ai/kie";
@@ -20,7 +20,7 @@ export const DEFAULT_PICTURE_MODEL = "nano-banana-pro";
 // Models offered for actor sheets, outfits and keyframes: the ones best at real people.
 export const PICTURE_MODELS = ["nano-banana-pro", "gpt-image-2", "seedream-5-pro", "nano-banana-2", "flux-2-pro"];
 
-export type GenKind = "sheet" | "outfit" | "keyframe" | "clip" | "voice" | "music" | "voicetry";
+export type GenKind = "sheet" | "outfit" | "keyframe" | "clip" | "voice" | "music" | "voicetry" | "portrait" | "avatartry";
 export type GenEvent =
   | { t: "genStart"; label: string; model: string }
   | { t: "genDone"; label: string }
@@ -55,6 +55,12 @@ export type Lock = {
   voices?: Record<string, string>;
   styles?: Record<string, string>;
   speaks?: Record<string, boolean>;
+  // Per character: the dialect, the age the voice sounds, and the lip-sync model ("off" for none).
+  dialects?: Record<string, string>;
+  ages?: Record<string, string>;
+  talkModels?: Record<string, string>;
+  narratorDialect?: string;
+  narratorAge?: string;
   aspect?: string;
   imageModel?: string;
   products?: Product[];
@@ -125,17 +131,32 @@ export function dialogueLines(doc: { shots: Shot[] }) {
 
 // The voice and the way of speaking for a character, or for the narrator (name null). What was
 // picked in the reference lock, else a suggestion from the character and the project language.
+// "how" is the short manner the person edits; "instruction" is everything Gemini reads.
 export function voiceFor(doc: { characters: { name: string; role?: string; look?: string; personality?: string; age?: string }[]; lock: Lock }, name: string | null, language?: string | null) {
+  const female = (id: string) => VOICES.find((x) => x.id === id)?.gender === "f";
   if (!name) {
     const voice = isVoice(doc.lock.narrator) ? doc.lock.narrator! : DEFAULT_NARRATOR;
-    const style = doc.lock.narratorStyle?.trim() || `A voiceover narrator for a commercial. Speak in ${dialectFor(language)}. Warm, clear and natural, not like a news reader.`;
-    return { voice, style, suggested: !isVoice(doc.lock.narrator) };
+    const dialect = isDialect(doc.lock.narratorDialect) ? doc.lock.narratorDialect! : defaultDialect(language);
+    const age = isAge(doc.lock.narratorAge) ? doc.lock.narratorAge! : "adult";
+    const how = doc.lock.narratorStyle?.trim() || "A commercial voiceover. Warm, clear and natural, not like a news reader.";
+    return { voice, how, dialect, age, suggested: !isVoice(doc.lock.narrator), instruction: voiceStyle({ female: female(voice), age, dialect, how, narrator: true }) };
   }
-  const c = doc.characters.find((x) => lookKey(x.name) === lookKey(name));
-  const picked = doc.lock.voices?.[lookKey(name)];
+  const k = lookKey(name);
+  const c = doc.characters.find((x) => lookKey(x.name) === k);
+  const picked = doc.lock.voices?.[k];
   const voice = isVoice(picked) ? picked! : suggestVoice(c ?? { name });
-  const style = doc.lock.styles?.[lookKey(name)]?.trim() || [`${c?.role ?? name}${c?.age ? `, ${c.age}` : ""}.`, `Speak in ${dialectFor(language)}.`, c?.personality ? `Personality: ${c.personality}` : ""].filter(Boolean).join(" ");
-  return { voice, style, suggested: !isVoice(picked) };
+  const dialect = isDialect(doc.lock.dialects?.[k]) ? doc.lock.dialects![k] : defaultDialect(language);
+  const age = isAge(doc.lock.ages?.[k]) ? doc.lock.ages![k] : guessAge(`${c?.age ?? ""} ${c?.role ?? ""}`);
+  const how = doc.lock.styles?.[k]?.trim() || "Warm, natural and casual, like talking to a friend. Not like an announcer.";
+  return { voice, how, dialect, age, suggested: !isVoice(picked), instruction: voiceStyle({ female: female(voice), age, dialect, how }) };
+}
+
+// The lip-sync model for a character who speaks on camera, or null when lip sync is off.
+export function talkModelFor(doc: { lock: Lock }, name: string) {
+  const k = lookKey(name);
+  const id = doc.lock.talkModels?.[k];
+  if (id === "off" || doc.lock.speaks?.[k] === false) return null;
+  return CLIP_MODELS.some((m) => m.id === id && m.talking) ? id! : DEFAULT_TALKING_MODEL;
 }
 
 // Whether a shot shows a product: it says so in its description.
@@ -250,6 +271,8 @@ export type GenRequest =
   | { kind: "clip"; shots: number[]; model?: string; prompts?: Record<string, string>; auto?: boolean }
   | { kind: "voice"; keys: string[] }
   | { kind: "voicetry"; who: string | null }
+  | { kind: "portrait"; who: string }
+  | { kind: "avatartry"; who: string }
   | { kind: "music" };
 
 export async function runGenerate(projectId: string, req: GenRequest, emit: (e: GenEvent) => void, signal?: AbortSignal) {
@@ -340,9 +363,9 @@ export async function runGenerate(projectId: string, req: GenRequest, emit: (e: 
       // A shot where a character speaks on camera uses the talking model with her voice line,
       // unless someone picked a model for it by hand.
       const line = lines.get(s.n);
-      const speaks = Boolean(line && (doc.lock.speaks?.[lookKey(line.speaker)] ?? true));
-      const lineAudio = speaks ? await sign(await assetPath("voice", `dl-${s.n}`)) : null;
-      const model = clipModel(picked).talking ? picked : req.auto !== false && lineAudio ? DEFAULT_TALKING_MODEL : picked;
+      const talker = line ? talkModelFor(doc, line.speaker) : null;
+      const lineAudio = talker ? await sign(await assetPath("voice", `dl-${s.n}`)) : null;
+      const model = clipModel(picked).talking ? picked : req.auto !== false && lineAudio && talker ? talker : picked;
       const talking = Boolean(clipModel(model).talking);
       const audio = talking ? lineAudio ?? (await sign(await assetPath("voice", `dl-${s.n}`))) : null;
       if (talking && !audio) {
@@ -355,12 +378,39 @@ export async function runGenerate(projectId: string, req: GenRequest, emit: (e: 
         build: (m) => clipRequest(m, prompt, kf, s.seconds, aspect, audio), backup: clipBackup, modelName: (id) => clipModel(id).name,
       });
     }
+  } else if (req.kind === "portrait") {
+    // The talking picture: the character looking at the camera, chest up, in the project's frame
+    // shape and in the place of her first speaking shot. Lip-sync models animate this picture.
+    const c = doc.characters.find((x) => lookKey(x.name) === lookKey(req.who));
+    if (!c) throw new Error(g.nothing);
+    const first = doc.shots.find((s) => s.dialogue?.trim() && lookKey(s.cast?.[0] ?? "") === lookKey(c.name));
+    const refs: string[] = [];
+    const face = (await sign(await assetPath("sheet", lookKey(c.name)))) ?? (await sign(lookPath("character", c.name)));
+    if (face) refs.push(face);
+    const place = first?.set ? await sign(lookPath("location", first.set)) : null;
+    if (place) refs.push(place);
+    const prompt = `${c.name}, chest-up portrait looking straight into the camera, about to speak, natural relaxed expression, mouth closed, face well lit and sharp, ${aspect} frame.${first?.set ? ` Background: ${first.set}, softly out of focus.` : " Soft, plain background."}${face ? " Keep the face, hair and clothes exactly as in image 1." : ""}${place ? " Image 2 is the place." : ""} One person only. No words or labels.\n\n${PHOTO}`;
+    jobs.push(imageJob(lookKey(c.name), c.name, prompt, refs, aspect));
+  } else if (req.kind === "avatartry") {
+    // A short lip-sync test: the talking picture says the voice try line.
+    const name = req.who;
+    const model = talkModelFor(doc, name) ?? DEFAULT_TALKING_MODEL;
+    const pic = await sign(await assetPath("portrait", lookKey(name)));
+    const audio = await sign(await assetPath("voicetry", `try-${lookKey(name)}`.slice(0, 200)));
+    if (!pic || !audio) throw new Error(g.avatarFirst);
+    const text = dialogueLines(doc).find((d) => lookKey(d.speaker) === lookKey(name))?.text ?? "";
+    const secs = Math.max(3, Math.min(15, Math.round(text.length / 14) || 5));
+    const prompt = `${name} talks to the camera naturally, with small head movements and natural blinking. Lips match the audio exactly.`;
+    jobs.push({
+      key: lookKey(name), label: name, model, prompt, params: { talking: true }, seconds: secs,
+      build: (m) => clipRequest(m, prompt, pic, secs, aspect, audio), backup: clipBackup, modelName: (id) => clipModel(id).name,
+    });
   } else if (req.kind === "voice" || req.kind === "voicetry") {
     const voiceJob = (key: string, label: string, text: string, who: string | null): Job => {
       const v = voiceFor(doc, who, brief.language);
       return {
-        key, label, model: "gemini-3-8-tts", prompt: text, params: { voice: v.voice, style: v.style, speaker: who },
-        build: (m) => (m === "elevenlabs" ? voiceBackupRequest(text, v.voice) : voiceRequest(text, v.voice, v.style)),
+        key, label, model: "gemini-3-8-tts", prompt: text, params: { voice: v.voice, style: v.instruction, speaker: who },
+        build: (m) => (m === "elevenlabs" ? voiceBackupRequest(text, v.voice) : voiceRequest(text, v.voice, v.instruction)),
         backup: () => "elevenlabs", modelName: (id) => (id === "elevenlabs" ? "ElevenLabs" : `Gemini 3.8 voice (${v.voice})`),
       };
     };
