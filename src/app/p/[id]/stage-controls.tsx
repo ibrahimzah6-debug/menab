@@ -104,7 +104,7 @@ export function StageFooter({
   return (
     <footer className="shrink-0 sticky bottom-0 bg-surface border-t border-line px-5 py-3 flex flex-wrap gap-3 items-center z-10">
       {/* AI work running on the page above shows its progress here, where it is always in view. */}
-      <div id="stage-run-slot" className="w-full empty:hidden" />
+      <div id="stage-run-slot" className="flex-1 min-w-0 flex items-center gap-2 empty:hidden" />
       <span className="small text-ink-muted" role="status">
         {pending && busyLabel ? <span className="mn-dots">{busyLabel}</span> : error ?? message}
       </span>

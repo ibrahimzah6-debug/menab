@@ -238,3 +238,13 @@ export const MUSIC_PRICE = 0.06;
 export function musicRequest(style: string, title: string, avoid?: string) {
   return { kieModel: "ai-music-api/generate", input: { custom_mode: true, instrumental: true, model: "V6", style: style.slice(0, 1000), title: title.slice(0, 80), ...(avoid ? { negative_tags: avoid.slice(0, 200) } : {}) } };
 }
+
+// Up to three voices to suggest for a character (or the narrator, with no character): the best
+// match first, then the video type's choice, then a safe default of the same kind.
+export function suggestVoices(c: { name?: string; role?: string; look?: string; personality?: string; age?: string } | null, videoType?: string | null): string[] {
+  const byType = typeVoices(videoType);
+  if (!c) return [...new Set([suggestNarrator(videoType), byType?.narratorF ?? "Despina", DEFAULT_NARRATOR, "Erinome"])].slice(0, 3);
+  const first = suggestVoice(c, videoType);
+  const female = VOICES.find((v) => v.id === first)?.gender === "f";
+  return [...new Set([first, female ? byType?.f ?? "Sulafat" : byType?.m ?? "Achird", female ? "Sulafat" : "Achird", female ? "Kore" : "Charon"])].slice(0, 3);
+}

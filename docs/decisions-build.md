@@ -347,3 +347,11 @@ Found while testing the Moringa cream project: the character picture in stage 3 
 
 - Stage 3, Characters: every AI character has "Look like a real person (optional)". You add 1 to 3 photos of the person's face and tick that you have their written consent. Only then are the photos used: as references when the character picture is drawn, and when the digital actor sheet is made in stage 5. Without consent the photos are kept but ignored. The photos stay in the project's own storage.
 - Voice suggestions follow the video type: UGC, influencer and affiliate videos get casual voices; commercials and occasion campaigns warm ones; product and teaser videos lively ones; company profiles, training and explainers clear, calm ones; documentaries, tourism and testimonials sincere ones. The default "how it sounds" text and the narrator follow the same type. A character's own description (a creator, an energetic person) still comes first.
+
+## B44. Smaller progress line, faster skip, saved actors in stage 3, visible voice suggestions (Ibrahim, 22 Nov 2026)
+
+- In stage 5 the running AI work shows on the same line as the bottom bar message (the message moves to the right), with a small Stop button, instead of a new line above it.
+- Skip shows at once and saves in the background. Saving a reference lock setting no longer refreshes the page twice, which made it take about 3 seconds.
+- The talking avatar has its own Skip and Add it back.
+- "Use a saved actor" moved to stage 3, Characters, where a character is first made. It sets the character's look and age from the saved actor; the saved sheet guides the character picture and, in stage 5, the actor sheet; the saved voice becomes the default voice. The lock asks for consent, as before.
+- Every voice menu shows up to three suggested voices as buttons under it (marked with a star in the menu too), so the suggestion is visible even after another voice was picked.
