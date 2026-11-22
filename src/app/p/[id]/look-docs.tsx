@@ -21,7 +21,7 @@ type Art = { set: string; dressing: string; props: string[] };
 type Shot = { n: number; scene: string; int_ext: string; day_night: string; size: string; angle: string; movement: string; lens: string; action: string; dialogue: string; seconds: number; cast: string[]; props: string[]; set: string };
 type Frame = { n: number; scene: string; size: string; angle: string; movement: string; lens: string; action: string; dialogue: string; seconds: number; cast: string[]; set: string; prompt: string };
 export type LookPicture = { status: string; url: string | null; model: string; cost: number | null; error: string | null; version: number };
-type Draw = { model: string; price: number; run: RunCopy; pictures: Record<string, LookPicture>; lang: "en" | "ar"; models: ModelOption[]; photoUrls?: Record<string, string> };
+type Draw = { model: string; price: number; run: RunCopy; pictures: Record<string, LookPicture>; lang: "en" | "ar"; models: ModelOption[]; photoUrls?: Record<string, string>; library?: { id: string; name: string; age: string; look: string; voice: string }[] };
 const key = (name: string) => name.trim().toLowerCase().slice(0, 200);
 const termText = (kind: TermKind, v: string, lang: "en" | "ar") => findTerm(kind, v)?.[lang] ?? v;
 export type FrameImage = { status: string; url: string | null; model: string; style: string; cost: number | null; error: string | null; version: number };
@@ -156,7 +156,24 @@ export function CharactersView({ projectId, content, editable, c, d }: { project
             <Field label={k.age}><InlineText label={k.age} value={x.age} editable={editable} multiline={false} onCommit={(v) => set(i, { age: v })} /></Field>
             <Field label={k.look}><InlineText label={k.look} value={x.look} editable={editable} onCommit={(v) => set(i, { look: v })} /></Field>
             <Field label={k.personality}><InlineText label={k.personality} value={x.personality} editable={editable} onCommit={(v) => set(i, { personality: v })} /></Field>
-            {x.made_with !== "cast" && <PersonPhotos projectId={projectId} x={x} urls={d.photoUrls ?? {}} editable={editable} c={c} onChange={(patch) => set(i, patch)} />}
+            {editable && (d.library?.length ?? 0) > 0 && (
+              <label className="flex flex-col gap-1">
+                <span className="mn-label">{k.savedActor}</span>
+                <select
+                  className="mn-select h-8"
+                  value={x.library_id ?? ""}
+                  onChange={(e) => {
+                    const a = d.library?.find((y) => y.id === e.target.value);
+                    // A saved actor brings their face (the saved sheet guides the picture), look, age and voice.
+                    set(i, a ? { library_id: a.id, made_with: "ai", look: a.look || x.look, age: a.age || x.age } : { library_id: null });
+                  }}
+                >
+                  <option value="">{k.savedActorNone}</option>
+                  {d.library?.map((a) => <option key={a.id} value={a.id}>{a.voice ? `${a.name} · ${a.voice}` : a.name}</option>)}
+                </select>
+              </label>
+            )}
+            {x.made_with !== "cast" && !x.library_id && <PersonPhotos projectId={projectId} x={x} urls={d.photoUrls ?? {}} editable={editable} c={c} onChange={(patch) => set(i, patch)} />}
             <Field label={k.planA}><InlineText label={k.planA} value={x.plan_a} editable={editable} onCommit={(v) => set(i, { plan_a: v })} /></Field>
             <Field label={k.planB}><InlineText label={k.planB} value={x.plan_b} editable={editable} onCommit={(v) => set(i, { plan_b: v })} /></Field>
           </article>

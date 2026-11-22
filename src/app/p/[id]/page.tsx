@@ -166,8 +166,10 @@ export default async function ProjectPage({
   const lastPicture = Math.max(0, ...Object.values(rawPictures).filter((x) => x.url && x.status === "ready").map((x) => new Date(x.updatedAt).getTime()));
   const staleFrames = Object.entries(rawImages).filter(([, x]) => x.url && lastPicture > new Date(x.updatedAt).getTime()).map(([n]) => Number(n));
   const briefAspect = aspectFromBrief(brief);
-  // Photos of real people that AI characters are based on (stage 3, with consent).
+  // Photos of real people that AI characters are based on (stage 3, with consent), and the actors
+  // saved in Libraries that a character can reuse.
   const personPhotos: Record<string, string> = {};
+  const savedActors = lookOn && showing === 3 && open === 13 ? ((await supabase.from("characters").select("id, name, age, look, voice, image_paths").eq("workspace_id", project.workspace_id).order("updated_at", { ascending: false }).limit(50)).data ?? []).filter((x) => x.image_paths?.length).map((x) => ({ id: x.id, name: x.name, age: x.age ?? "", look: x.look ?? "", voice: x.voice ?? "" })) : [];
   if (lookOn && showing === 3 && open === 13) {
     const paths = ((content[13] as { characters?: { photos?: string[] }[] } | undefined)?.characters ?? []).flatMap((c) => c.photos ?? []).filter((p) => p.startsWith(`${project.workspace_id}/projects/${id}/`) && !p.includes(".."));
     if (paths.length) {
@@ -219,8 +221,6 @@ export default async function ProjectPage({
       }
     }
     const narrator = voiceFor(doc, null, brief.language, brief.video_type);
-    // Actors saved in Libraries, to reuse for a character here.
-    const { data: saved } = await supabase.from("characters").select("id, name, voice, image_paths").eq("workspace_id", project.workspace_id).order("updated_at", { ascending: false }).limit(50);
     genData = {
       projectId: id,
       editable: canEdit && stage === 5,
@@ -232,16 +232,15 @@ export default async function ProjectPage({
         const firstLine = talkLines.find((d) => lookKey(d.speaker) === lookKey(c.name))?.text ?? "";
         return {
           name: c.name, role: c.role, made_with: c.made_with, picture: pics[`character:${lookKey(c.name)}`]?.url ?? null, library: Boolean(c.library_id),
-          voice: v.voice, how: v.how, dialect: v.dialect, age: v.age, suggested: v.suggested, hasLines,
+          voice: v.voice, how: v.how, dialect: v.dialect, age: v.age, suggested: v.suggested, suggestions: v.suggestions, hasLines,
           talkModel: hasLines ? talkModelFor(doc, c.name) ?? "off" : "off",
           lineSeconds: Math.max(3, Math.min(15, Math.round(firstLine.length / 14) || 5)),
         };
       }),
-      narrator: { voice: narrator.voice, how: narrator.how, dialect: narrator.dialect, age: narrator.age, suggested: narrator.suggested },
+      narrator: { voice: narrator.voice, how: narrator.how, dialect: narrator.dialect, age: narrator.age, suggested: narrator.suggested, suggestions: narrator.suggestions },
       aspect: projectAspect(doc.lock.aspect, brief),
       briefAspect: aspectFromBrief(brief),
       skip: doc.lock.skip ?? [],
-      library: (saved ?? []).filter((x) => x.image_paths?.length).map((x) => ({ id: x.id, name: x.name, voice: x.voice ?? "" })),
       products: products.map((p) => ({ name: p.name, description: p.description ?? "", photos: (p.photos ?? []).map((path) => ({ path, url: productUrls.get(path) ?? null })) })),
       locations: doc.locations.map((l) => ({ name: l.name, picture: pics[`location:${lookKey(l.name)}`]?.url ?? null })),
       outfits: doc.outfits.map((o) => ({ key: `${lookKey(o.character)}|${lookKey(o.outfit)}`.slice(0, 200), character: o.character, outfit: o.outfit })),
@@ -596,7 +595,7 @@ export default async function ProjectPage({
                 {hidden.has(open) && <p className="small m-0 px-3 py-2 rounded-md bg-tint-2 max-w-[760px]">{p.videoType.notNeededNote}</p>}
                 {content[open] ? (
                   open === 13 ? (
-                    <CharactersView projectId={id} content={content[13] as never} editable={editableHere && statusOf(13) !== "generating"} c={t.look} d={{ model: imageModel, price: imagePrice, run: runCopy, pictures, lang, models: imageOptions, photoUrls: personPhotos }} />
+                    <CharactersView projectId={id} content={content[13] as never} editable={editableHere && statusOf(13) !== "generating"} c={t.look} d={{ model: imageModel, price: imagePrice, run: runCopy, pictures, lang, models: imageOptions, photoUrls: personPhotos, library: savedActors }} />
                   ) : open === 14 ? (
                     <WardrobeView projectId={id} content={content[14] as never} editable={editableHere && statusOf(14) !== "generating"} c={t.look} />
                   ) : open === 15 ? (

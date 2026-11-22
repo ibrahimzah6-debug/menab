@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { createContext, useContext, useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { browserClient } from "@/lib/supabase/client";
-import { applyLibraryActor, approveClip, prepareUpload, saveActorToLibrary, saveReferenceLock } from "./actions";
+import { approveClip, prepareUpload, saveActorToLibrary, saveReferenceLock } from "./actions";
 import { RunLine, useCreativeRun, type RunCopy } from "./creative-run";
 import { InlineText } from "./inline-doc";
 
@@ -20,12 +20,11 @@ export type GenData = {
   editable: boolean;
   lang: "en" | "ar";
   assets: Record<string, GenAsset>;
-  characters: { name: string; role?: string; made_with?: string; picture: string | null; library: boolean; voice: string; how: string; dialect: string; age: string; suggested: boolean; hasLines: boolean; talkModel: string; lineSeconds: number }[];
-  narrator: { voice: string; how: string; dialect: string; age: string; suggested: boolean };
+  characters: { name: string; role?: string; made_with?: string; picture: string | null; library: boolean; voice: string; how: string; dialect: string; age: string; suggested: boolean; suggestions: string[]; hasLines: boolean; talkModel: string; lineSeconds: number }[];
+  narrator: { voice: string; how: string; dialect: string; age: string; suggested: boolean; suggestions: string[] };
   aspect: string;
   briefAspect: string;
   skip: string[];
-  library: { id: string; name: string; voice: string }[];
   products: Product[];
   locations: { name: string; picture: string | null }[];
   outfits: { key: string; character: string; outfit: string }[];
@@ -59,9 +58,9 @@ function useLockSave(projectId: string) {
   const [note, setNote] = useState<string | undefined>();
   const save = (patch: Parameters<typeof saveReferenceLock>[1]) =>
     start(async () => {
+      // The action refreshes the page itself (revalidatePath); a second refresh only slows it.
       const res = await saveReferenceLock(projectId, patch);
       setNote(res.error);
-      router.refresh();
     });
   return { save, pending, note, setNote, start, router };
 }
@@ -73,10 +72,10 @@ function Bar({ children, r, run }: { children: React.ReactNode; r: ReturnType<ty
   return (
     <>
     {slot && r.busy && createPortal(
-      <div className="flex items-center gap-3">
-        <div className="grow min-w-0"><RunLine events={r.events} busy={r.busy} c={run} startedAt={r.startedAt} /></div>
-        <button type="button" className="mn-btn mn-btn--secondary mn-btn--sm" onClick={r.stop}>{run.steps.stop}</button>
-      </div>,
+      <>
+        <div className="min-w-0 truncate"><RunLine events={r.events} busy={r.busy} c={run} startedAt={r.startedAt} /></div>
+        <button type="button" className="mn-btn mn-btn--ghost mn-btn--sm shrink-0" onClick={r.stop}>{run.steps.stop}</button>
+      </>,
       slot,
     )}
     <div className="rounded-lg border border-line p-4 flex flex-col gap-2">
@@ -129,21 +128,40 @@ function Media({ a, kind, alt, g, ratio = "16 / 9" }: { a?: GenAsset; kind: "ima
 // A voice for one character (or the narrator): the voice, described in plain words and grouped
 // by women and men, the age it should sound, the dialect, how it sounds, and a button that plays
 // the first line inside the app. Voices can change after the lock: they never change a picture.
-type VoiceValue = { voice: string; how: string; dialect: string; age: string; suggested: boolean };
+type VoiceValue = { voice: string; how: string; dialect: string; age: string; suggested: boolean; suggestions: string[] };
 type VoicePatch = { voice?: string; how?: string; dialect?: string; age?: string };
 function VoicePick({ d, g, who, v, onSave, pending, hear, busy }: { d: GenData; g: G; who: string | null; v: VoiceValue; onSave: (p: VoicePatch) => void; pending: boolean; hear: () => void; busy: boolean }) {
   const sample = d.assets[`voicetry:try-${who ? key(who) : "narrator"}`];
   const can = d.editable && !pending;
-  const label = (x: GenData["voices"][number]) => `${x.name}: ${x.desc}${x.id === v.voice && v.suggested ? ` (${g.suggested})` : ""}`;
+  // The choice shows at once; the save follows.
+  const [voice, setVoice] = useState(v.voice);
+  useEffect(() => setVoice(v.voice), [v.voice]);
+  const pick = (id: string) => {
+    setVoice(id);
+    onSave({ voice: id });
+  };
+  const label = (x: GenData["voices"][number]) => `${v.suggestions.includes(x.id) ? "★ " : ""}${x.name}: ${x.desc}`;
   return (
     <div className="flex flex-col gap-2">
       <label className="flex flex-col gap-1">
         <span className="text-[12px] text-ink-muted">{g.voice}</span>
-        <select className="mn-select h-8 min-w-0" value={v.voice} disabled={!can} onChange={(e) => onSave({ voice: e.target.value })}>
+        <select className="mn-select h-8 min-w-0" value={voice} disabled={!can} onChange={(e) => pick(e.target.value)}>
           <optgroup label={g.women}>{d.voices.filter((x) => x.gender === "f").map((x) => <option key={x.id} value={x.id}>{label(x)}</option>)}</optgroup>
           <optgroup label={g.men}>{d.voices.filter((x) => x.gender === "m").map((x) => <option key={x.id} value={x.id}>{label(x)}</option>)}</optgroup>
         </select>
       </label>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[12px] text-ink-muted">★ {g.suggested}:</span>
+        {v.suggestions.map((id) => {
+          const x = d.voices.find((y) => y.id === id);
+          if (!x) return null;
+          return (
+            <button key={id} type="button" className={`mn-chip ${voice === id ? "mn-chip--approved" : ""}`} aria-pressed={voice === id} title={x.desc} disabled={!can} onClick={() => pick(id)}>
+              {voice === id && <span aria-hidden="true">✓ </span>}{x.name}
+            </button>
+          );
+        })}
+      </div>
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-1 min-w-0">
           <span className="text-[12px] text-ink-muted">{g.age}</span>
@@ -192,16 +210,23 @@ function TalkingAvatar({ d, g, c, onModel, pending, go, busy }: { d: GenData; g:
   const test = d.assets[`avatartry:${k}`];
   const voiceReady = Boolean(d.assets[`voicetry:try-${k}`]?.url);
   const talkers = d.clipModels.filter((x) => x.talking);
-  const m = talkers.find((x) => x.id === c.talkModel);
+  // The choice shows at once; the save follows.
+  const [model, setModel] = useState(c.talkModel);
+  useEffect(() => setModel(c.talkModel), [c.talkModel]);
+  const pick = (id: string) => {
+    setModel(id);
+    onModel(id);
+  };
+  const m = talkers.find((x) => x.id === model);
   const ratio = ratioOf(d.aspect);
+  if (!m) return <SkipLine skipped onToggle={() => pick(talkers[0]?.id ?? "kling-avatar")} title={g.avatarTitle} editable={d.editable} g={g} />;
   return (
     <div className="rounded-md border border-line p-3 flex flex-col gap-2">
-      <span className="mn-label">{g.avatarTitle}</span>
+      <SkipLine skipped={false} onToggle={() => pick("off")} title={g.avatarTitle} editable={d.editable} g={g} />
       <label className="flex flex-col gap-1">
         <span className="text-[12px] text-ink-muted">{g.lipSync}</span>
-        <select className="mn-select h-8" value={c.talkModel} disabled={!d.editable || pending} onChange={(e) => onModel(e.target.value)}>
+        <select className="mn-select h-8" value={model} disabled={!d.editable || pending} onChange={(e) => pick(e.target.value)}>
           {talkers.map((x) => <option key={x.id} value={x.id}>{`${x.name} · ${usd(x.perSecond)}/s · ${x.note}`}</option>)}
-          <option value="off">{g.lipSyncOff}</option>
         </select>
       </label>
       {m ? (
@@ -240,17 +265,29 @@ function TalkingAvatar({ d, g, c, onModel, pending, go, busy }: { d: GenData; g:
   );
 }
 
-// A section that can be left out on purpose: a small "Skip" button, and when skipped, one line
-// with a button to add it back.
-function SkipHeader({ d, g, part, title, children }: { d: GenData; g: G; part: string; title: string; children?: React.ReactNode }) {
-  const { save, pending } = useLockSave(d.projectId);
-  const skipped = d.skip.includes(part);
-  const toggle = () => save({ skip: skipped ? d.skip.filter((x) => x !== part) : [...d.skip, part] });
+// Parts left out on purpose. The screen changes at once; the save follows in the background.
+const SkipCtx = createContext<{ skips: string[]; toggle: (part: string) => void } | null>(null);
+function SkipProvider({ d, children }: { d: GenData; children: React.ReactNode }) {
+  const { save } = useLockSave(d.projectId);
+  const [skips, setSkips] = useState(d.skip);
+  const saved = d.skip.join("|");
+  useEffect(() => setSkips(saved ? saved.split("|") : []), [saved]);
+  const toggle = (part: string) => {
+    const next = skips.includes(part) ? skips.filter((x) => x !== part) : [...skips, part];
+    setSkips(next);
+    save({ skip: next });
+  };
+  return <SkipCtx.Provider value={{ skips, toggle }}>{children}</SkipCtx.Provider>;
+}
+const useSkip = (d: GenData) => useContext(SkipCtx) ?? { skips: d.skip, toggle: () => {} };
+
+// One line for a skipped part, with a button to add it back; or the part's title with "Skip".
+function SkipLine({ skipped, onToggle, title, editable, g, children }: { skipped: boolean; onToggle: () => void; title: string; editable: boolean; g: G; children?: React.ReactNode }) {
   if (skipped) {
     return (
       <div className="flex items-center gap-3 rounded-md border border-dashed border-line px-3 py-2">
         <span className="small text-ink-muted grow">{fillIn(g.skipped, { name: title })}</span>
-        {d.editable && <button type="button" className="mn-btn mn-btn--ghost mn-btn--sm" disabled={pending} onClick={toggle}>{g.addBack}</button>}
+        {editable && <button type="button" className="mn-btn mn-btn--ghost mn-btn--sm" onClick={onToggle}>{g.addBack}</button>}
       </div>
     );
   }
@@ -258,8 +295,8 @@ function SkipHeader({ d, g, part, title, children }: { d: GenData; g: G; part: s
     <div className="flex items-center gap-2">
       <h3 className="mn-label m-0 grow">{title}</h3>
       {children}
-      {d.editable && (
-        <button type="button" className="mn-btn mn-btn--ghost mn-btn--sm" disabled={pending} onClick={toggle} aria-label={fillIn(g.skipLabel, { name: title })} title={fillIn(g.skipLabel, { name: title })}>
+      {editable && (
+        <button type="button" className="mn-btn mn-btn--ghost mn-btn--sm" onClick={onToggle} aria-label={fillIn(g.skipLabel, { name: title })} title={fillIn(g.skipLabel, { name: title })}>
           <span aria-hidden="true">✕</span> {g.skip}
         </button>
       )}
@@ -267,9 +304,15 @@ function SkipHeader({ d, g, part, title, children }: { d: GenData; g: G; part: s
   );
 }
 
+function SkipHeader({ d, g, part, title, children }: { d: GenData; g: G; part: string; title: string; children?: React.ReactNode }) {
+  const { skips, toggle } = useSkip(d);
+  return <SkipLine skipped={skips.includes(part)} onToggle={() => toggle(part)} title={title} editable={d.editable} g={g}>{children}</SkipLine>;
+}
+
 // The products that must look the same in every shot: name, what it looks like, and photos of
 // the real thing. Photos go to the project's own storage first, then into the lock.
 function Products({ d, g, can, go, busy }: { d: GenData; g: G; can: boolean; go: (b: Record<string, unknown>) => void; busy: boolean }) {
+  const { skips } = useSkip(d);
   const { save, pending, note, setNote } = useLockSave(d.projectId);
   const [list, setList] = useState<Product[]>(d.products);
   const [uploading, setUploading] = useState<number | null>(null);
@@ -297,7 +340,7 @@ function Products({ d, g, can, go, busy }: { d: GenData; g: G; can: boolean; go:
     setUploading(null);
     if (added.length) store(list.map((p, j) => (j === i ? { ...p, photos: [...p.photos, ...added] } : p)));
   };
-  if (d.skip.includes("products")) return <SkipHeader d={d} g={g} part="products" title={g.productsTitle} />;
+  if (skips.includes("products")) return <SkipHeader d={d} g={g} part="products" title={g.productsTitle} />;
   return (
     <section className="flex flex-col gap-3">
       <SkipHeader d={d} g={g} part="products" title={g.productsTitle} />
@@ -391,7 +434,12 @@ function Products({ d, g, can, go, busy }: { d: GenData; g: G; can: boolean; go:
 
 // ---------- 34. Reference lock ----------
 
-export function ReferenceLockView({ d, g, run }: { d: GenData; g: G; run: RunCopy }) {
+export function ReferenceLockView(props: { d: GenData; g: G; run: RunCopy }) {
+  return <SkipProvider d={props.d}><ReferenceLock {...props} /></SkipProvider>;
+}
+
+function ReferenceLock({ d, g, run }: { d: GenData; g: G; run: RunCopy }) {
+  const skipsNow = useSkip(d).skips;
   const { r, go } = useGen(d, run);
   const { save, pending, note, setNote, start, router } = useLockSave(d.projectId);
   const locked = Boolean(d.lock.locked);
@@ -467,23 +515,6 @@ export function ReferenceLockView({ d, g, run }: { d: GenData; g: G; run: RunCop
                       </button>
                     )}
                   </div>
-                  {can && isAi && d.library.length > 0 && (
-                    <label className="flex flex-col gap-1">
-                      <span className="text-[12px] text-ink-muted">{g.fromLibrary}</span>
-                      <select
-                        className="mn-select h-8"
-                        value=""
-                        disabled={pending || r.busy}
-                        onChange={(e) => {
-                          const id = e.target.value;
-                          if (id) start(async () => { const res = await applyLibraryActor(d.projectId, c.name, id); setNote(res.error); router.refresh(); });
-                        }}
-                      >
-                        <option value="">{g.fromLibraryPick}</option>
-                        {d.library.map((x) => <option key={x.id} value={x.id}>{x.voice ? `${x.name} · ${x.voice}` : x.name}</option>)}
-                      </select>
-                    </label>
-                  )}
                   <VoicePick
                     d={d}
                     g={g}
@@ -557,7 +588,7 @@ export function ReferenceLockView({ d, g, run }: { d: GenData; g: G; run: RunCop
       {d.lines.length > 0 && (
         <section className="flex flex-col gap-3 max-w-[420px]">
           <SkipHeader d={d} g={g} part="narrator" title={g.narrator} />
-          {!d.skip.includes("narrator") && <VoicePick
+          {!skipsNow.includes("narrator") && <VoicePick
             d={d}
             g={g}
             who={null}
@@ -592,7 +623,7 @@ export function ReferenceLockView({ d, g, run }: { d: GenData; g: G; run: RunCop
 export function SoundView({ d, g, run }: { d: GenData; g: G; run: RunCopy }) {
   const { r, go } = useGen(d, run);
   // A narrator left out in the reference lock has no lines to make.
-  const narratorOff = d.skip.includes("narrator");
+  const narratorOff = useSkip(d).skips.includes("narrator");
   const vo = narratorOff ? [] : d.lines;
   const missing = vo.filter((l) => !d.assets[`voice:${l.key}`]?.url && d.assets[`voice:${l.key}`]?.status !== "generating");
   const missingDialogue = d.dialogue.filter((l) => !d.assets[`voice:${l.key}`]?.url && d.assets[`voice:${l.key}`]?.status !== "generating");
@@ -800,7 +831,12 @@ export function ClipsView({ d, g, run }: { d: GenData; g: G; run: RunCopy }) {
 
 // ---------- 38. Music and review ----------
 
-export function ReviewView({ d, g, run }: { d: GenData; g: G; run: RunCopy }) {
+export function ReviewView(props: { d: GenData; g: G; run: RunCopy }) {
+  return <SkipProvider d={props.d}><Review {...props} /></SkipProvider>;
+}
+
+function Review({ d, g, run }: { d: GenData; g: G; run: RunCopy }) {
+  const skipsNow = useSkip(d).skips;
   const { r, go } = useGen(d, run);
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -816,7 +852,7 @@ export function ReviewView({ d, g, run }: { d: GenData; g: G; run: RunCopy }) {
     });
   return (
     <div className="flex flex-col gap-5">
-      {d.skip.includes("music") ? (
+      {skipsNow.includes("music") ? (
         <SkipHeader d={d} g={g} part="music" title={g.music} />
       ) : (
       <section className="flex flex-col gap-2">

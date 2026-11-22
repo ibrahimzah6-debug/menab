@@ -595,38 +595,3 @@ export async function saveActorToLibrary(projectId: string, name: string): Promi
   revalidatePath("/libraries");
   return {};
 }
-
-// Uses an actor saved in Libraries for a character of this project: the saved actor sheet becomes
-// this character's sheet, and the saved Gemini voice becomes its voice. Only before the lock.
-export async function applyLibraryActor(projectId: string, name: string, libraryId: string): Promise<Result> {
-  const { t } = await getI18n();
-  try {
-    const { me, supabase, project } = await loadProject(projectId);
-    const doc = await stageFive(supabase, projectId);
-    if (doc.lock.locked) return { error: t.generate.lockedNote };
-    const c = doc.characters.find((x) => x.name.trim().toLowerCase() === name.trim().toLowerCase());
-    if (!c) return { error: "Character not found." };
-    const key = c.name.trim().toLowerCase().slice(0, 200);
-    const { data: actor } = await supabase.from("characters").select("id, name, voice, image_paths").eq("id", libraryId).eq("workspace_id", project.workspace_id).maybeSingle();
-    const from = actor?.image_paths?.[0];
-    if (!actor || !from || !from.startsWith(`${project.workspace_id}/library/`) || from.includes("..")) return { error: t.generate.noPicture };
-    const admin = createAdminClient();
-    const to = `${project.workspace_id}/projects/${projectId}/generate/sheet-library-${Date.now()}.${from.split(".").pop() ?? "jpg"}`;
-    const { error: copyError } = await admin.storage.from("media").copy(from, to);
-    if (copyError) return { error: "Could not copy the picture." };
-    const { data: last } = await admin.from("gen_assets").select("version").eq("project_id", projectId).eq("kind", "sheet").eq("key", key).order("version", { ascending: false }).limit(1);
-    const { error } = await admin.from("gen_assets").insert({
-      workspace_id: project.workspace_id, project_id: projectId, kind: "sheet", key, version: (last?.[0]?.version ?? 0) + 1,
-      model: "library", prompt: `From Libraries: ${actor.name}`, params: { library: actor.id }, status: "ready", path: to, cost_usd: 0, created_by: me.userId,
-    });
-    if (error) return { error: error.message };
-    // The saved voice reads like "Kore (Gemini voice)".
-    const voice = VOICES.find((v) => (actor.voice ?? "").startsWith(v.name))?.id;
-    const res = await saveReferenceLock(projectId, { libraryActors: { [key]: actor.id }, ...(voice ? { voices: { [key]: voice } } : {}) });
-    if (res.error) return res;
-  } catch (e) {
-    return { error: errText(e) };
-  }
-  revalidatePath(`/p/${projectId}`);
-  return {};
-}
