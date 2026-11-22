@@ -1,3 +1,5 @@
+import { stepFiles } from "@/lib/ai/brain-core";
+import { loadStepFiles, stepFilesFrom, withFileNames } from "@/lib/brief-turn";
 import { revalidatePath } from "next/cache";
 import type { CreativeEvent } from "@/lib/creative-run";
 import { runLook } from "@/lib/look-run";
@@ -7,7 +9,9 @@ export const maxDuration = 300;
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const body = (await req.json().catch(() => null)) as { kind?: string; n?: number; instruction?: string } | null;
+  const body = (await req.json().catch(() => null)) as { kind?: string; n?: number; instruction?: string; files?: unknown } | null;
+  // Photos and PDFs attached in the step's assistant box.
+  const files = stepFilesFrom(body?.files);
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
@@ -23,10 +27,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const action =
           kind === "write" ? ({ kind } as const)
           : kind === "redo" && body?.n ? ({ kind, n: Number(body.n) } as const)
-          : kind === "revise" && body?.n && body.instruction?.trim() ? ({ kind, n: Number(body.n), instruction: body.instruction.trim().slice(0, 2000) } as const)
+          : kind === "revise" && body?.n && (body.instruction?.trim() || files.length) ? ({ kind, n: Number(body.n), instruction: withFileNames(body.instruction ?? "", files) } as const)
           : null;
         if (!action) throw new Error("Nothing to do.");
-        await runLook(id, action, emit, req.signal);
+        const attached = await loadStepFiles(id, files);
+        await stepFiles.run(attached, () => runLook(id, action, emit, req.signal));
         revalidatePath(`/p/${id}`);
         emit({ t: "done" });
       } catch (e) {

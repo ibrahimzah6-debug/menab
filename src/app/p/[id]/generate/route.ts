@@ -29,7 +29,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const request: GenRequest =
           kind === "sheet" ? { kind, names: strings(body?.names) }
           : kind === "outfit" ? { kind, keys: strings(body?.keys) }
-          : kind === "keyframe" ? { kind, shots: numbers(body?.shots), model: body?.model ? String(body.model) : undefined }
+          : kind === "keyframe" ? { kind, shots: numbers(body?.shots), model: body?.model ? String(body.model) : undefined, notes: body?.notes && typeof body.notes === "object" ? Object.fromEntries(Object.entries(body.notes as Record<string, unknown>).slice(0, 60).map(([k, v]) => [k.slice(0, 10), String(v).slice(0, 600)])) : undefined }
           : kind === "clip" ? { kind, shots: numbers(body?.shots), model: body?.model ? String(body.model) : undefined, prompts, auto: body?.auto !== false }
           : kind === "voice" ? { kind, keys: strings(body?.keys) }
           : kind === "voicetry" ? { kind, who: body?.who ? String(body.who).slice(0, 200) : null }

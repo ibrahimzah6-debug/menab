@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { DEPARTMENTS, department } from "@/lib/crew";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { approveStage, saveOutputEdit } from "./actions";
-import { ChangeBox } from "./editors";
+import { ChangeBox, type StepBox } from "./editors";
 import { RunLine, useCreativeRun, type RunCopy } from "./creative-run";
 import { InlineText } from "./inline-doc";
 
@@ -401,11 +401,11 @@ export function PreprodTryAgain({ projectId, n, failed, cost, run, c }: { projec
   );
 }
 
-export function PreprodAssistant({ projectId, n, copy, cost, mic, run, rewriteLabel }: { projectId: string; n: number; copy: { label: string; placeholder: string; apply: string; working: string }; cost: string; mic: { start: string; stop: string; working: string; blocked: string }; run: RunCopy; rewriteLabel: string }) {
+export function PreprodAssistant({ projectId, n, copy, cost, mic, run, rewriteLabel, box }: { box?: StepBox; projectId: string; n: number; copy: { label: string; placeholder: string; apply: string; working: string }; cost: string; mic: { start: string; stop: string; working: string; blocked: string }; run: RunCopy; rewriteLabel: string }) {
   const r = useCreativeRun(projectId, run);
   return (
     <div className="flex flex-col gap-2">
-      <ChangeBox projectId={projectId} copy={copy} cost={cost} mic={mic} disabled={r.busy} onApply={(text) => r.run({ kind: "preprod", action: { kind: "revise", n, instruction: text } })} />
+      <ChangeBox projectId={projectId} copy={copy} cost={cost} mic={mic} disabled={r.busy} tips={box?.tips} attach={box?.attach} onApply={(text, files) => r.run({ kind: "preprod", action: { kind: "revise", n, instruction: text, files } })} />
       <button type="button" className="mn-btn mn-btn--ghost mn-btn--sm justify-between w-full" disabled={r.busy} onClick={() => r.run({ kind: "preprod", action: { kind: "redo", n } })}>
         <span>{rewriteLabel}</span><span className="mn-btn__cost">{cost}</span>
       </button>

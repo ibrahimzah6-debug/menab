@@ -11,11 +11,16 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember, getMemberships } from "@/lib/workspace";
 import { hiddenOutputs, videoType } from "@/lib/video-types";
-import { stageFive, syncOutputs } from "@/lib/generate";
+import { DEFAULT_PICTURE_MODEL, dialogueLines, genAssets, scriptLines, stageFive, syncOutputs, talkModelFor, voiceFor } from "@/lib/generate";
 import { missingPictures } from "@/lib/frames";
 import { fill } from "@/lib/i18n/dictionaries";
-import { VOICES } from "@/lib/ai/media";
-import { FILE_TYPES, loadProject, ownPath, runBriefMessage, type BriefPayload } from "@/lib/brief-turn";
+import { AGES, clipPrice, DEFAULT_CLIP_MODEL, DIALECTS, MUSIC_PRICE, VOICES, voicePrice } from "@/lib/ai/media";
+import { planGenerate, type GenPlan } from "@/lib/ai/gen-plan";
+import { textModel } from "@/lib/ai/catalog";
+import { projectAspect } from "@/lib/aspect";
+import { lookKey } from "@/lib/frames";
+import type { StepFile } from "./creative-run";
+import { FILE_TYPES, loadProject, loadStepFiles, ownPath, runBriefMessage, stepFilesFrom, type BriefPayload } from "@/lib/brief-turn";
 
 export type Result = { error?: string };
 
@@ -594,4 +599,72 @@ export async function saveActorToLibrary(projectId: string, name: string): Promi
   revalidatePath(`/p/${projectId}`);
   revalidatePath("/libraries");
   return {};
+}
+
+// Stage 5 assistant: the AI reads the producer's request (and attached photos) and proposes a list
+// of actions with a price each. Nothing is made here; the producer presses Apply to run them.
+export type PlannedAction = GenPlan["actions"][number] & { price: number };
+// Tested 22 Nov 2026: a correct plan in about 13 seconds for under $0.001.
+const PLAN_MODEL = "gpt-6-1-terra";
+export async function planGenerateChange(projectId: string, request: string, files: StepFile[]): Promise<{ reply?: string; actions?: PlannedAction[]; error?: string }> {
+  const { t, uiLocale } = await getI18n();
+  try {
+    const { me, supabase, project } = await loadProject(projectId);
+    if (project.current_stage !== 5) return { error: t.project.notCurrentStage };
+    const list = stepFilesFrom(files);
+    if (!request.trim() && !list.length) return { error: t.generate.nothing };
+    const brief = (project.brief ?? {}) as { language?: string; video_type?: string; formats?: unknown; platforms?: unknown };
+    const doc = await stageFive(supabase, projectId);
+    const assets = await genAssets(supabase, projectId, project.workspace_id);
+    const lines = dialogueLines(doc);
+    const vo = scriptLines(doc, brief.language);
+    const made = (k: string) => (assets[k]?.url ? "made" : "not made");
+    const state = {
+      locked: Boolean(doc.lock.locked),
+      aspect: projectAspect(doc.lock.aspect, brief),
+      skipped: doc.lock.skip ?? [],
+      voices: VOICES.map((v) => ({ id: v.id, gender: v.gender, about: v.desc.en })),
+      dialects: DIALECTS.map((x) => x.id),
+      ages: AGES.map((x) => x.id),
+      narrator: (({ voice, dialect, age, how }) => ({ voice, dialect, age, how }))(voiceFor(doc, null, brief.language, brief.video_type)),
+      characters: doc.characters.map((c) => {
+        const v = voiceFor(doc, c.name, brief.language, brief.video_type);
+        return { name: c.name, ai: c.made_with !== "cast", sheet: made(`sheet:${lookKey(c.name)}`), voice: v.voice, dialect: v.dialect, age: v.age, how: v.how };
+      }),
+      products: (doc.lock.products ?? []).map((p) => ({ name: p.name, description: p.description ?? "", photos: (p.photos ?? []).length })),
+      shots: doc.shots.map((s) => ({ n: s.n, action: s.action, dialogue: s.dialogue, cast: s.cast, keyframe: made(`keyframe:${s.n}`), clip: made(`clip:${s.n}`) })),
+      lines: [...vo.map((l) => ({ key: l.key, text: l.text })), ...lines.map((l) => ({ key: l.key, speaker: l.speaker, text: l.text }))],
+      music: made("music:main"),
+    };
+    const attached = await loadStepFiles(projectId, list);
+    // A short, structured job: a fast model answers in seconds; the step's writing model stays for writing.
+    const r = await planGenerate({ modelId: PLAN_MODEL, language: uiLocale === "ar" ? "Arabic (Saudi, plain)" : "English (plain)", request: request.trim().slice(0, 2000), files: attached, state });
+    await logAiJob({ workspaceId: me.workspace.id, projectId, userId: me.userId, task: "generate-plan", provider: textModel(r.model).provider, model: r.model, ok: true, usage: r.usage, fallbackFrom: r.fallbackFrom });
+    // Each action's price, from the same prices the buttons show. Unknown targets are dropped.
+    const imagePrice = IMAGE_MODELS.find((m) => m.id === (doc.lock.imageModel ?? DEFAULT_PICTURE_MODEL))?.priceFrom ?? 0.09;
+    const actions: PlannedAction[] = [];
+    for (const a of r.data.actions) {
+      const shot = doc.shots.find((s) => String(s.n) === a.target.replace(/\D/g, ""));
+      const line = state.lines.find((l) => l.key === a.target);
+      let price = 0;
+      if (a.type === "remakeSheet" || a.type === "remakeKeyframe") price = imagePrice;
+      if (a.type === "remakeClip") {
+        if (!shot) continue;
+        const d = lines.find((l) => l.n === shot.n);
+        const m = (d && talkModelFor(doc, d.speaker)) || DEFAULT_CLIP_MODEL;
+        price = clipPrice(m, shot.seconds);
+      }
+      if (a.type === "remakeKeyframe" && !shot) continue;
+      if (a.type === "remakeVoice") {
+        if (!line) continue;
+        price = voicePrice(line.text);
+      }
+      if (a.type === "remakeMusic") price = MUSIC_PRICE;
+      if (a.type === "productPhotos") a.files = (a.files ?? []).filter((i) => i >= 0 && i < list.length);
+      actions.push({ ...a, target: shot && ["remakeKeyframe", "remakeClip"].includes(a.type) ? String(shot.n) : a.target, price });
+    }
+    return { reply: r.data.reply, actions };
+  } catch (e) {
+    return { error: errText(e) };
+  }
 }

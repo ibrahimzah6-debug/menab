@@ -68,7 +68,8 @@ export type TextModel = {
   goodFor: { en: string; ar: string };
 };
 
-// Writing models, strongest first. All run through Kie.ai with one key.
+// Writing models, strongest first. All run through Kie.ai with one key. GPT 6 Luna was removed:
+// Kie.ai retired it (22 Nov 2026).
 export const TEXT_MODELS: TextModel[] = [
   { id: "claude-fable-5", name: "Claude Fable 5", usdPerMillionIn: 4, usdPerMillionOut: 20, provider: "kie-claude", goodFor: { en: "Strongest thinking, for the hardest briefs", ar: "أقوى تفكير، لأصعب البريفات" } },
   { id: "gpt-6-astra", name: "GPT 6 Astra", usdPerMillionIn: 2.8, usdPerMillionOut: 14, provider: "kie-gpt", goodFor: { en: "OpenAI's strongest, a second opinion on big ideas", ar: "أقوى نماذج OpenAI، رأي ثاني للأفكار الكبيرة" } },
@@ -77,7 +78,6 @@ export const TEXT_MODELS: TextModel[] = [
   { id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5", usdPerMillionIn: 0.8, usdPerMillionOut: 4, provider: "kie-claude", goodFor: { en: "Fast and strong, half the price", ar: "سريع وقوي بنص السعر" } },
   { id: "gpt-6-1-terra", name: "GPT 6.1 Terra", usdPerMillionIn: 0.11, usdPerMillionOut: 0.54, provider: "kie-gpt", goodFor: { en: "Medium: good quality at a lower price", ar: "متوسط: جودة حلوة بسعر أقل" } },
   { id: "claude-haiku-5-5", name: "Claude Haiku 5.5", usdPerMillionIn: 0.06, usdPerMillionOut: 0.3, provider: "kie-claude", goodFor: { en: "Quick drafts for very little", ar: "مسودات سريعة بسعر بسيط" } },
-  { id: "gpt-6-luna", name: "GPT 6 Luna", usdPerMillionIn: 0.034, usdPerMillionOut: 0.17, provider: "kie-gpt", goodFor: { en: "Lightest and cheapest", ar: "الأخف والأرخص" } },
 ];
 
 // GPT 6.1 Sol: strong, quick and reliable on Kie.ai (Ibrahim, 8 Nov 2026).

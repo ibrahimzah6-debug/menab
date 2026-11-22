@@ -283,7 +283,7 @@ export async function syncOutputs(admin: Admin, projectId: string) {
 export type GenRequest =
   | { kind: "sheet"; names: string[]; model?: string }
   | { kind: "outfit"; keys: string[]; model?: string }
-  | { kind: "keyframe"; shots: number[]; model?: string }
+  | { kind: "keyframe"; shots: number[]; model?: string; notes?: Record<string, string> }
   | { kind: "clip"; shots: number[]; model?: string; prompts?: Record<string, string>; auto?: boolean }
   | { kind: "voice"; keys: string[] }
   | { kind: "voicetry"; who: string | null }
@@ -372,7 +372,8 @@ export async function runGenerate(projectId: string, req: GenRequest, emit: (e: 
         if ((p.photos ?? []).length < 2) add(await sign(await assetPath("product", lookKey(p.name))), `the product, ${p.name}. Show exactly this product: same shape, colours, cap and label.`);
       }
       const productText = products.map((p) => `The product is ${p.name}${p.description ? `: ${p.description}` : ""}.`).join(" ");
-      const prompt = `Final film frame, ${aspect}. ${s.prompt}${productText ? `\n${productText}` : ""}${roles.length ? `\nReference images:\n${roles.join("\n")}` : ""}\n\n${PHOTO}`.slice(0, 5900);
+      const note = req.notes?.[String(s.n)]?.trim();
+      const prompt = `Final film frame, ${aspect}. ${s.prompt}${note ? `\nChange asked by the producer: ${note}` : ""}${productText ? `\n${productText}` : ""}${roles.length ? `\nReference images:\n${roles.join("\n")}` : ""}\n\n${PHOTO}`.slice(0, 5900);
       jobs.push(imageJob(String(s.n), fill(g.shot, { n: s.n }), prompt, refs, aspect));
     }
   } else if (req.kind === "clip") {

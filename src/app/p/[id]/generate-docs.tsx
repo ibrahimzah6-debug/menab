@@ -5,8 +5,9 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { browserClient } from "@/lib/supabase/client";
-import { approveClip, prepareUpload, saveActorToLibrary, saveReferenceLock } from "./actions";
-import { RunLine, useCreativeRun, type RunCopy } from "./creative-run";
+import { approveClip, planGenerateChange, prepareUpload, saveActorToLibrary, saveReferenceLock, type PlannedAction } from "./actions";
+import { ChangeBox, type StepBox } from "./editors";
+import { RunLine, useCreativeRun, type RunCopy, type StepFile } from "./creative-run";
 import { InlineText } from "./inline-doc";
 
 // Stage 5, Generate, in working order: the reference lock (34), voice (37), keyframes (35),
@@ -895,6 +896,119 @@ function Review({ d, g, run }: { d: GenData; g: G; run: RunCopy }) {
         })}
       </div>
       {note && <p className="small m-0" role="alert">{note}</p>}
+    </div>
+  );
+}
+
+// ---------- Stage 5 assistant ----------
+
+// The producer asks for anything in this stage (text, voice, photos); Menab answers with a list of
+// actions and their prices. Nothing runs until Apply; each action can be unticked first.
+export function GenAssistant({ d, g, run, copy, box, cost, mic }: { d: GenData; g: G; run: RunCopy; copy: { label: string; placeholder: string; apply: string; working: string }; box: StepBox; cost: string; mic: { start: string; stop: string; working: string; blocked: string } }) {
+  const { r, go } = useGen(d, run);
+  const [plan, setPlan] = useState<{ reply: string; actions: PlannedAction[]; files: StepFile[] } | null>(null);
+  const [off, setOff] = useState<Set<number>>(new Set());
+  const [note, setNote] = useState<string | undefined>();
+  const chosen = plan ? plan.actions.filter((_, i) => !off.has(i)) : [];
+  const total = chosen.reduce((n, a) => n + a.price, 0);
+
+  const apply = async () => {
+    if (!plan) return;
+    const files = plan.files;
+    // Settings first, saved in one go: voices, skips, products and the frame shape.
+    const patch: Parameters<typeof saveReferenceLock>[1] = {};
+    let skips = [...d.skip];
+    let products = d.products.map((p) => ({ name: p.name, description: p.description, photos: p.photos.map((x) => x.path) }));
+    for (const a of chosen) {
+      const k = key(a.target);
+      if (a.type === "voice") {
+        if (k === "narrator") Object.assign(patch, { ...(a.voice ? { narrator: a.voice } : {}), ...(a.dialect ? { narratorDialect: a.dialect } : {}), ...(a.age ? { narratorAge: a.age } : {}), ...(a.how ? { narratorStyle: a.how } : {}) });
+        else {
+          if (a.voice) patch.voices = { ...patch.voices, [k]: a.voice };
+          if (a.dialect) patch.dialects = { ...patch.dialects, [k]: a.dialect };
+          if (a.age) patch.ages = { ...patch.ages, [k]: a.age };
+          if (a.how) patch.styles = { ...patch.styles, [k]: a.how };
+        }
+      }
+      if (a.type === "skip") skips = [...new Set([...skips, k])];
+      if (a.type === "addBack") skips = skips.filter((x) => x !== k);
+      if (a.type === "aspect" && a.aspect) patch.aspect = a.aspect;
+      if (a.type === "product" || a.type === "productPhotos") {
+        const photos = a.type === "productPhotos" ? (a.files ?? []).map((i) => files[i]?.path).filter((x): x is string => Boolean(x)) : [];
+        const i = products.findIndex((p) => key(p.name) === k);
+        if (i < 0) products = [...products, { name: a.target, description: a.description ?? "", photos }];
+        else products = products.map((p, j) => (j === i ? { ...p, description: a.type === "product" && a.description ? a.description : p.description, photos: [...p.photos, ...photos].slice(0, 4) } : p));
+        patch.products = products;
+      }
+    }
+    if (skips.join("|") !== d.skip.join("|")) patch.skip = skips;
+    if (Object.keys(patch).length) {
+      const res = await saveReferenceLock(d.projectId, patch);
+      if (res.error) return setNote(res.error);
+    }
+    // Then the work that costs money, one kind at a time.
+    const of = (t: PlannedAction["type"]) => chosen.filter((a) => a.type === t);
+    if (of("remakeSheet").length) await go({ kind: "sheet", names: of("remakeSheet").map((a) => a.target) });
+    if (of("remakeVoice").length) await go({ kind: "voice", keys: of("remakeVoice").map((a) => a.target) });
+    if (of("remakeKeyframe").length) await go({ kind: "keyframe", shots: of("remakeKeyframe").map((a) => Number(a.target)), notes: Object.fromEntries(of("remakeKeyframe").map((a) => [a.target, a.description ?? ""])) });
+    if (of("remakeClip").length) await go({ kind: "clip", shots: of("remakeClip").map((a) => Number(a.target)), prompts: Object.fromEntries(of("remakeClip").filter((a) => a.description).map((a) => [a.target, a.description!])) });
+    if (of("remakeMusic").length) await go({ kind: "music" });
+    setPlan(null);
+    setOff(new Set());
+    setNote(g.planDone);
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <ChangeBox
+        projectId={d.projectId}
+        copy={copy}
+        cost={cost}
+        mic={mic}
+        disabled={r.busy}
+        tips={box.tips}
+        attach={box.attach}
+        onApply={async (text, files) => {
+          setNote(undefined);
+          const res = await planGenerateChange(d.projectId, text, files);
+          if (res.error) return { error: res.error };
+          setPlan({ reply: res.reply ?? "", actions: res.actions ?? [], files });
+          setOff(new Set());
+          return {};
+        }}
+      />
+      {plan && (
+        <section className="rounded-md border border-line p-3 flex flex-col gap-2" aria-label={g.planTitle}>
+          <span className="mn-label">{g.planTitle}</span>
+          {plan.reply && <p className="small m-0" dir="auto">{plan.reply}</p>}
+          {plan.actions.length === 0 ? (
+            <p className="small text-ink-muted m-0">{g.planNothing}</p>
+          ) : (
+            <ol className="m-0 p-0 list-none flex flex-col gap-1.5">
+              {plan.actions.map((a, i) => (
+                <li key={i}>
+                  <label className="flex items-start gap-2 small">
+                    <input type="checkbox" className="mt-1" checked={!off.has(i)} onChange={() => setOff((s) => { const n = new Set(s); if (n.has(i)) n.delete(i); else n.add(i); return n; })} />
+                    <span className="grow" dir="auto">{a.say}</span>
+                    <span className="data text-[12px] text-ink-muted shrink-0">{a.price ? usd(a.price) : g.free}</span>
+                  </label>
+                </li>
+              ))}
+            </ol>
+          )}
+          <div className="flex items-center gap-2">
+            {chosen.length > 0 && (
+              <button type="button" className="mn-btn mn-btn--primary mn-btn--sm grow justify-between" disabled={r.busy} onClick={() => { void apply(); }}>
+                <span>{fillIn(g.planApply, { n: chosen.length })}</span>
+                <span className="mn-btn__cost">{total ? usd(total) : g.free}</span>
+              </button>
+            )}
+            <button type="button" className="mn-btn mn-btn--ghost mn-btn--sm" disabled={r.busy} onClick={() => setPlan(null)}>{g.planClear}</button>
+          </div>
+        </section>
+      )}
+      {(r.busy || r.events.length > 0) && <RunLine events={r.events} busy={r.busy} c={run} startedAt={r.startedAt} />}
+      {(note || r.error) && <p className="small m-0" role="status">{r.error ?? note}</p>}
     </div>
   );
 }

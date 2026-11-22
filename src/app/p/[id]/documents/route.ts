@@ -1,3 +1,5 @@
+import { stepFiles } from "@/lib/ai/brain-core";
+import { loadStepFiles, stepFilesFrom, withFileNames } from "@/lib/brief-turn";
 import { revalidatePath } from "next/cache";
 import { runStageOne, type DocsEvent } from "@/lib/stage-one-run";
 
@@ -6,7 +8,8 @@ export const maxDuration = 300;
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const body = (await req.json().catch(() => null)) as { instruction?: string } | null;
+  const body = (await req.json().catch(() => null)) as { instruction?: string; files?: unknown } | null;
+  const files = stepFilesFrom(body?.files);
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
@@ -18,7 +21,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         }
       };
       try {
-        await runStageOne(id, body?.instruction, emit, req.signal);
+        const attached = await loadStepFiles(id, files);
+        const instruction = body?.instruction?.trim() || files.length ? withFileNames(body?.instruction ?? "", files) : undefined;
+        await stepFiles.run(attached, () => runStageOne(id, instruction, emit, req.signal));
         revalidatePath(`/p/${id}`);
         emit({ t: "done" });
       } catch (e) {

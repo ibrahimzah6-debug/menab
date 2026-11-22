@@ -7,7 +7,7 @@ import { findTerm, type TermKind } from "@/lib/film-terms";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { browserClient } from "@/lib/supabase/client";
 import { approveStage, prepareUpload, saveOutputEdit } from "./actions";
-import { ChangeBox } from "./editors";
+import { ChangeBox, type StepBox } from "./editors";
 import { RunLine, useCreativeRun, type RunCopy } from "./creative-run";
 import { InlineText } from "./inline-doc";
 
@@ -661,7 +661,9 @@ export function LookAssistant({
   mic,
   run,
   rewriteLabel,
+  box,
 }: {
+  box?: StepBox;
   projectId: string;
   n: number;
   copy: { label: string; placeholder: string; apply: string; working: string };
@@ -673,7 +675,7 @@ export function LookAssistant({
   const r = useCreativeRun(projectId, run);
   return (
     <div className="flex flex-col gap-2">
-      <ChangeBox projectId={projectId} copy={copy} cost={cost} mic={mic} disabled={r.busy} onApply={(text) => r.run({ kind: "look", action: { kind: "revise", n, instruction: text } })} />
+      <ChangeBox projectId={projectId} copy={copy} cost={cost} mic={mic} disabled={r.busy} tips={box?.tips} attach={box?.attach} onApply={(text, files) => r.run({ kind: "look", action: { kind: "revise", n, instruction: text, files } })} />
       <button type="button" className="mn-btn mn-btn--ghost mn-btn--sm justify-between w-full" disabled={r.busy} onClick={() => r.run({ kind: "look", action: { kind: "redo", n } })}>
         <span>{rewriteLabel}</span>
         <span className="mn-btn__cost">{cost}</span>
