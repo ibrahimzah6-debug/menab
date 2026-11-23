@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { mediaUrl } from "@/lib/media-url";
 import { notFound, redirect } from "next/navigation";
 import { IconFolder, IconLayoutBoard, IconLayoutPage } from "@/components/icons";
 import { StageBar } from "@/components/stage/stage-bar";
@@ -12,7 +13,6 @@ import { stageNumbersFor, type Path } from "@/lib/projects";
 import { isFailing } from "@/lib/ai/health";
 import { stagesFor } from "@/lib/stages";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { getMemberships } from "@/lib/workspace";
 import { BriefChat } from "./brief-chat";
 import { BoardCanvas } from "./board-canvas";
@@ -174,12 +174,7 @@ export default async function ProjectPage({
   if (lookOn && showing === 3 && open === 13) {
     const paths = ((content[13] as { characters?: { photos?: string[] }[] } | undefined)?.characters ?? []).flatMap((c) => c.photos ?? []).filter((p) => p.startsWith(`${project.workspace_id}/projects/${id}/`) && !p.includes(".."));
     if (paths.length) {
-      try {
-        const { data: signed } = await createAdminClient().storage.from("media").createSignedUrls(paths, 3600);
-        for (const s of signed ?? []) if (s.path && s.signedUrl) personPhotos[s.path] = s.signedUrl;
-      } catch {
-        // No storage access: the photos show as empty boxes.
-      }
+      for (const p of paths) personPhotos[p] = mediaUrl(p);
     }
   }
   const drawing = Object.values(images).some((x) => x.status === "generating") || Object.values(pictures).some((x) => x.status === "generating");
@@ -214,12 +209,7 @@ export default async function ProjectPage({
     const productUrls = new Map<string, string>();
     if (productPaths.length) {
       // Paths were checked to be this project's own uploads when they were saved.
-      try {
-        const { data: signed } = await createAdminClient().storage.from("media").createSignedUrls(productPaths, 3600);
-        for (const s of signed ?? []) if (s.path && s.signedUrl) productUrls.set(s.path, s.signedUrl);
-      } catch {
-        // No storage access: the photos show as empty boxes.
-      }
+      for (const p of productPaths) productUrls.set(p, mediaUrl(p));
     }
     const narrator = voiceFor(doc, null, brief.language, brief.video_type);
     genData = {
@@ -846,7 +836,7 @@ export default async function ProjectPage({
         </>
       )}
 
-      <AutoRefresh active={generating} />
+      <AutoRefresh active={generating} projectId={id} />
       {showing < stage && (
         <footer className="shrink-0 sticky bottom-0 bg-surface border-t border-line px-5 py-3 flex flex-wrap gap-3 items-center z-10">
           <span className="small text-ink-muted grow">{fill(t.stage.viewingApproved, { name: names[order.indexOf(showing)] ?? "" })}</span>

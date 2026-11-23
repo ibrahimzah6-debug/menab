@@ -57,13 +57,31 @@ export function CreativeStart({ projectId, label, cost, message, run }: { projec
 }
 
 // While Menab writes in the background, the page checks every few seconds for new pieces.
-export function AutoRefresh({ active, every = 4000 }: { active: boolean; every?: number }) {
+// While AI work runs, asks every few seconds whether anything changed, and reloads the page only
+// when it did. Reloading every time downloaded every picture again and again.
+export function AutoRefresh({ active, projectId, every = 5000 }: { active: boolean; projectId: string; every?: number }) {
   const router = useRouter();
   useEffect(() => {
     if (!active) return;
-    const id = setInterval(() => router.refresh(), every);
-    return () => clearInterval(id);
-  }, [active, every, router]);
+    let last: string | null = null;
+    let stopped = false;
+    const check = async () => {
+      try {
+        const res = await fetch(`/p/${projectId}/status`, { cache: "no-store" });
+        const { v } = (await res.json()) as { v: string | null };
+        if (!stopped && v && last !== null && v !== last) router.refresh();
+        last = v;
+      } catch {
+        // Offline for a moment: try again next time.
+      }
+    };
+    void check();
+    const id = setInterval(check, every);
+    return () => {
+      stopped = true;
+      clearInterval(id);
+    };
+  }, [active, every, projectId, router]);
   return null;
 }
 

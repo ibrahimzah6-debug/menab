@@ -1,6 +1,6 @@
 import Link from "next/link";
+import { mediaUrl } from "@/lib/media-url";
 import { getI18n } from "@/lib/i18n/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/workspace";
 import { LibraryView, type LibItem, type LibTab } from "./library-view";
@@ -24,17 +24,11 @@ export default async function LibrariesPage({ searchParams }: { searchParams: Pr
   ]);
   const items = (rows ?? []) as LibItem[];
 
-  // Every file is private; the page gets short-lived links to show them.
+  // Every file is private; only members of this workspace can open these addresses.
   const paths = items.flatMap((x) => [x.logo_path, x.path, ...(x.image_paths ?? [])]).filter((p): p is string => Boolean(p));
   const urls: Record<string, string> = {};
-  if (paths.length) {
-    try {
-      const { data } = await createAdminClient().storage.from("media").createSignedUrls(paths, 3600);
-      for (const d of data ?? []) if (d.path && d.signedUrl) urls[d.path] = d.signedUrl;
-    } catch {
-      // Without links the cards still show names.
-    }
-  }
+  // Stable addresses, so each picture downloads once (see /media).
+  for (const p of paths) urls[p] = mediaUrl(p);
 
   return (
     <div className="max-w-[1200px] flex flex-col gap-6">

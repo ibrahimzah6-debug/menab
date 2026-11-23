@@ -1,6 +1,7 @@
 import "server-only";
+import { mediaUrl } from "@/lib/media-url";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { CLIP_MODELS, clipBackup, clipModel, clipRequest, clipSeconds, DEFAULT_CLIP_MODEL, DEFAULT_NARRATOR, DEFAULT_TALKING_MODEL, defaultDialect, defaultHow, suggestNarrator, suggestVoices, dialectFor, guessAge, isAge, isDialect, isVoice, musicRequest, suggestVoice, VOICES, voiceBackupRequest, voiceRequest, voiceStyle } from "@/lib/ai/media";
+import { CLIP_MODELS, clipBackup, clipModel, clipRequest, clipSeconds, DEFAULT_CLIP_MODEL, DEFAULT_TALKING_MODEL, defaultDialect, defaultHow, suggestNarrator, suggestVoices, dialectFor, guessAge, isAge, isDialect, isVoice, musicRequest, suggestVoice, VOICES, voiceBackupRequest, voiceRequest, voiceStyle } from "@/lib/ai/media";
 import { projectAspect } from "@/lib/aspect";
 import { imageBackup, imageModel, imageRequest, type Aspect } from "@/lib/ai/images";
 import { createTask, getTask, KIE_USD_PER_CREDIT, KieError } from "@/lib/ai/kie";
@@ -117,14 +118,8 @@ export async function genAssets(supabase: SupabaseClient, projectId: string, wor
   const prefix = `${workspaceId}/projects/${projectId}/`;
   const paths = [...good.values()].map((r) => r.path!).filter((p) => p.startsWith(prefix) && !p.includes(".."));
   const urls = new Map<string, string>();
-  if (paths.length) {
-    try {
-      const { data: signed } = await createAdminClient().storage.from("media").createSignedUrls(paths, 3600);
-      for (const s of signed ?? []) if (s.path && s.signedUrl) urls.set(s.path, s.signedUrl);
-    } catch {
-      // No links: shown without media.
-    }
-  }
+  // Stable addresses, so the browser downloads each file once (see /media).
+  for (const p of paths) urls.set(p, mediaUrl(p));
   const out: Record<string, { id: string; status: string; approved: boolean; model: string; prompt: string; url: string | null; version: number; seconds: number | null; cost: number | null; error: string | null; updatedAt: string; params: Record<string, unknown> }> = {};
   for (const [k, r] of latest) {
     const g = good.get(k);

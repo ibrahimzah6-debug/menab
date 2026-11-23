@@ -1,4 +1,5 @@
 import "server-only";
+import { mediaUrl } from "@/lib/media-url";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ASPECTS, STYLE_PROMPT, imageBackup, imageModel, imageRequest, type Aspect, type Style } from "@/lib/ai/images";
 import { createTask, getTask, KIE_USD_PER_CREDIT, KieError } from "@/lib/ai/kie";
@@ -379,16 +380,9 @@ async function finish(workspaceId: string, projectId: string, accountProblem: st
 
 type ImageRow = { status: string; path: string | null; cost_usd: number | string | null; error: string | null; updated_at: string; version: number; model: string };
 
+// Stable addresses, so the browser downloads each picture once (see /media).
 async function signAll(paths: string[]) {
-  const urls = new Map<string, string>();
-  if (!paths.length) return urls;
-  try {
-    const { data: signed } = await createAdminClient().storage.from("media").createSignedUrls(paths, 3600);
-    for (const s of signed ?? []) if (s.path && s.signedUrl) urls.set(s.path, s.signedUrl);
-  } catch {
-    // No links: shown without images.
-  }
-  return urls;
+  return new Map(paths.map((p) => [p, mediaUrl(p)] as const));
 }
 
 // The newest row and the newest drawn picture of each item, with a short-lived link.
