@@ -1,4 +1,5 @@
 import "server-only";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { z } from "zod";
 import { KIE_USD_PER_CREDIT } from "./kie";
 import { textModel, type TextModel } from "./catalog";
@@ -11,6 +12,9 @@ export type Usage = { inputTokens: number; outputTokens: number; costUsd: number
 // A file attached to a message: an image or a PDF, sent to the model as-is.
 export type Attachment = { mime: string; base64: string; name: string };
 export type Msg = { role: "user" | "assistant"; content: string; files?: Attachment[] };
+
+// Photos and PDFs the producer attached in a step's assistant box, for every AI call of that run.
+export const stepFiles = new AsyncLocalStorage<Attachment[]>();
 
 export type Result<T> = { data: T; usage: Usage; model: string; fallbackFrom?: string; firstError?: string };
 
@@ -48,11 +52,10 @@ const NEAREST: Record<string, string> = {
   "claude-fable-5": "gpt-6-astra",
   "claude-opus-5-5": "gpt-6-1-sol",
   "claude-sonnet-5-5": "gpt-6-1-terra",
-  "claude-haiku-5-5": "gpt-6-luna",
+  "claude-haiku-5-5": "gpt-6-1-terra",
   "gpt-6-astra": "claude-fable-5",
   "gpt-6-1-sol": "claude-opus-5-5",
   "gpt-6-1-terra": "claude-sonnet-5-5",
-  "gpt-6-luna": "claude-haiku-5-5",
 };
 export function backupFor(m: TextModel): string {
   return NEAREST[m.id] ?? (m.provider === "kie-claude" ? "gpt-6-1-sol" : "claude-opus-5-5");
@@ -68,10 +71,14 @@ const NOT_ANSWERING = /tight|busy|overload|internal|try again|not answering|coul
 export async function structured<S extends z.ZodType>(
   modelId: string,
   system: string,
-  messages: Msg[],
+  given: Msg[],
   schema: S,
   opts: Opts,
 ): Promise<Result<z.infer<S>>> {
+  // Files attached to a step's assistant box go with the last message from the producer.
+  const extra = stepFiles.getStore();
+  const lastUser = given.map((x) => x.role).lastIndexOf("user");
+  const messages = extra?.length ? given.map((x, i) => (i === lastUser ? { ...x, files: [...(x.files ?? []), ...extra] } : x)) : given;
   const m = textModel(modelId);
   let firstError = "";
   for (let attempt = 0; attempt < 2; attempt++) {

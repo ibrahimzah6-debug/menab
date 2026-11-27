@@ -355,3 +355,18 @@ Found while testing the Moringa cream project: the character picture in stage 3 
 - The talking avatar has its own Skip and Add it back.
 - "Use a saved actor" moved to stage 3, Characters, where a character is first made. It sets the character's look and age from the saved actor; the saved sheet guides the character picture and, in stage 5, the actor sheet; the saved voice becomes the default voice. The lock asks for consent, as before.
 - Every voice menu shows up to three suggested voices as buttons under it (marked with a star in the menu too), so the suggestion is visible even after another voice was picked.
+
+## B45. Part 3: an assistant box on every step, with tips and files; the stage 5 assistant (Ibrahim, 22 Nov 2026)
+
+- Every step's assistant box (stages 1 to 5) has tips for that step and video type, the mic, and "Attach photos or PDF" (up to 5). The AI reads the attached files, the same way the brief chat does. Tips are written in full for UGC, commercial, product video, company profile and real estate; other types get the general tips of each step. A tip with a "+" opens the file picker.
+- Stage 5 has its own assistant. The producer asks for anything ("give Abu Faisal an older Najdi voice and skip the music", "the jar looks wrong in shot 3"); Menab answers with a list of actions from a fixed menu (voices, skip, products and their photos, remake a sheet, keyframe, video shot, voice line or the music, frame shape), each with its price. Every action can be unticked. Nothing runs until Apply (Ibrahim chose this).
+- The stage 5 plan uses GPT 6.1 Terra: tested at about 13 seconds and under $0.001. GPT 6.1 Sol took 76 seconds for the same plan.
+- GPT 6 Luna was removed from the writing models: Kie.ai retired it. Claude Haiku's backup is now GPT 6.1 Terra.
+
+## B46. Cut Supabase downloads (egress) (Ibrahim, 23 Nov 2026)
+
+Supabase warned that the free plan's download quota (5 GB a month) was passed. Stored files are only about 90 MB; the problem was the same pictures downloaded again and again.
+- Stable addresses: pictures, videos and audio are shown at /media/<path>, one address per file. Only members of the file's workspace get it; they are sent on to a private link for an hour, and the browser keeps the answer for 50 minutes. Before, every page refresh made new private links, so every picture downloaded again.
+- Smarter waiting: while AI work runs, the page asks /p/[id]/status every 5 seconds whether anything changed (when documents, pictures and media last changed), and reloads only when it did. Before, it reloaded the whole page every 4 seconds.
+- The private links the AI models fetch (Kie.ai) are unchanged. The profile photo keeps its own link: it is one small file outside the workspace folders.
+- Later: small preview copies of pictures for grids (speed pass), and the Supabase Pro plan before the ZAH team uses Menab daily.

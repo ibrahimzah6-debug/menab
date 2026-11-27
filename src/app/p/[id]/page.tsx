@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { mediaUrl } from "@/lib/media-url";
 import { notFound, redirect } from "next/navigation";
 import { IconFolder, IconLayoutBoard, IconLayoutPage } from "@/components/icons";
 import { StageBar } from "@/components/stage/stage-bar";
@@ -12,7 +13,6 @@ import { stageNumbersFor, type Path } from "@/lib/projects";
 import { isFailing } from "@/lib/ai/health";
 import { stagesFor } from "@/lib/stages";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { getMemberships } from "@/lib/workspace";
 import { BriefChat } from "./brief-chat";
 import { BoardCanvas } from "./board-canvas";
@@ -28,11 +28,12 @@ import { PanelTabs } from "./panel-tabs";
 import { BoardCursor, TypeIn } from "./board-live";
 import { VideoTypePicker } from "./video-type-picker";
 import { hiddenOutputs } from "@/lib/video-types";
+import { tipsFor } from "@/lib/step-tips";
 import { DEFAULT_PICTURE_MODEL, PICTURE_MODELS, clipPromptFor, dialogueLines, genAssets, scriptLines, settlePending, stageFive, talkModelFor, voiceFor } from "@/lib/generate";
 import { AGES, CLIP_MODELS, DIALECTS, MUSIC_PRICE, VOICES, voicePrice } from "@/lib/ai/media";
 import { aspectFromBrief, projectAspect } from "@/lib/aspect";
 import { lookKey } from "@/lib/frames";
-import { ClipsView, KeyframesView, ReferenceLockView, ReviewView, SoundView, type GenData } from "./generate-docs";
+import { ClipsView, GenAssistant, KeyframesView, ReferenceLockView, ReviewView, SoundView, type GenData } from "./generate-docs";
 import { BudgetView, CallSheetsView, CrewView, EquipmentView, MeetingView as PpmMeetingView, PermitsView, PpmView, PreprodAssistant, PreprodFooter, PreprodTryAgain, ScheduleView, type CrewRow } from "./preprod-docs";
 import { ArtView, CharactersView, LocationsView, LookAssistant, LookFooter, LookTryAgain, ShotListView, StoryboardView, WardrobeView, type FrameImage } from "./look-docs";
 
@@ -42,7 +43,7 @@ export const maxDuration = 300;
 const iso = (x: string) => String.fromCharCode(0x2066) + x + String.fromCharCode(0x2069);
 const money = (n: number) => iso(`$${n < 0.01 && n > 0 ? n.toFixed(3) : n.toFixed(2)}`);
 // An estimate shown before an action, kept in reading order in Arabic.
-const approx = (n: number) => iso(`~$${n.toFixed(2)}`);
+const approx = (n: number) => iso(n > 0 && n < 0.005 ? "<$0.01" : `~$${n.toFixed(2)}`);
 const MILESTONE: Record<number, string> = { 2: "M3", 3: "M4", 4: "M6", 5: "M5", 6: "v2", 7: "M7" };
 
 type Output = { id: string; number: number; stage: number; status: OutputStatus | "failed"; current_version: number; stale_from: number | null };
@@ -173,12 +174,7 @@ export default async function ProjectPage({
   if (lookOn && showing === 3 && open === 13) {
     const paths = ((content[13] as { characters?: { photos?: string[] }[] } | undefined)?.characters ?? []).flatMap((c) => c.photos ?? []).filter((p) => p.startsWith(`${project.workspace_id}/projects/${id}/`) && !p.includes(".."));
     if (paths.length) {
-      try {
-        const { data: signed } = await createAdminClient().storage.from("media").createSignedUrls(paths, 3600);
-        for (const s of signed ?? []) if (s.path && s.signedUrl) personPhotos[s.path] = s.signedUrl;
-      } catch {
-        // No storage access: the photos show as empty boxes.
-      }
+      for (const p of paths) personPhotos[p] = mediaUrl(p);
     }
   }
   const drawing = Object.values(images).some((x) => x.status === "generating") || Object.values(pictures).some((x) => x.status === "generating");
@@ -213,12 +209,7 @@ export default async function ProjectPage({
     const productUrls = new Map<string, string>();
     if (productPaths.length) {
       // Paths were checked to be this project's own uploads when they were saved.
-      try {
-        const { data: signed } = await createAdminClient().storage.from("media").createSignedUrls(productPaths, 3600);
-        for (const s of signed ?? []) if (s.path && s.signedUrl) productUrls.set(s.path, s.signedUrl);
-      } catch {
-        // No storage access: the photos show as empty boxes.
-      }
+      for (const p of productPaths) productUrls.set(p, mediaUrl(p));
     }
     const narrator = voiceFor(doc, null, brief.language, brief.video_type);
     genData = {
@@ -260,6 +251,7 @@ export default async function ProjectPage({
       prices: { image: IMAGE_MODELS.find((m) => m.id === (doc.lock.imageModel ?? DEFAULT_PICTURE_MODEL))?.priceFrom ?? 0.09, voiceLine: lines.map((l) => voicePrice(l.text)), dialogueLine: talkLines.map((l) => voicePrice(l.text)), voiceTry: 0.002, music: MUSIC_PRICE },
     };
   }
+  const stepBox = { tips: tipsFor(open, brief.video_type, lang), attach: { add: p.change.attach, remove: p.change.removeFile, tips: p.change.tips } };
   const missingFrames = shotFrames.filter((f) => !(images[f.n]?.version) && images[f.n]?.status !== "generating").map((f) => f.n);
 
   // Every version of the open output, to restore an earlier one.
@@ -487,7 +479,7 @@ export default async function ProjectPage({
                         <span className="mn-label">{p.model}</span>
                         <StepModelPicker projectId={id} label={p.model} options={modelOptions} value={model} defaultLabel={model === workspaceDefault ? p.defaultTag : ""} disabled={!canEdit} />
                       </div>
-                      {stage === 1 && docsReady && editableHere && <DocsAssistant projectId={id} copy={p.change} cost={approx(estimateUsd(model, "stageOne"))} mic={t.mic} run={runCopy} rewriteLabel={p.rewrite} />}
+                      {stage === 1 && docsReady && editableHere && <DocsAssistant box={stepBox} projectId={id} copy={p.change} cost={approx(estimateUsd(model, "stageOne"))} mic={t.mic} run={runCopy} rewriteLabel={p.rewrite} />}
                     </section>
                   ),
                 },
@@ -747,6 +739,7 @@ export default async function ProjectPage({
           )}
 
           {/* Right panel: Brief and Assistant as two tabs; the brief first while talking. */}
+          {/* Every step's assistant box: tips for this step and video type, and photos or PDFs to attach. */}
           <aside className="stage-side relative w-full md:w-[320px] lg:w-[340px] shrink-0 md:min-h-0 flex flex-col">
             <PanelTabs
               storageKey={`menab-panel-${id}-${showing}-${open === 1 ? "chat" : "doc"}`}
@@ -801,6 +794,7 @@ export default async function ProjectPage({
                       </div>
                       {showing === 2 && editableHere && [7, 9, 10, 11].includes(open) && Boolean(content[open]) && (
                         <CreativeAssistant
+                          box={stepBox}
                           key={open}
                           projectId={id}
                           n={open}
@@ -811,10 +805,11 @@ export default async function ProjectPage({
                         />
                       )}
                       {showing === 4 && editableHere && [20, 22, 25, 26, 31, 32].includes(open) && Boolean(content[open]) && (
-                        <PreprodAssistant key={open} projectId={id} n={open} copy={p.change} cost={approx(estimateUsd(model, "preprodPart"))} mic={t.mic} run={runCopy} rewriteLabel={t.preprod.rewrite} />
+                        <PreprodAssistant box={stepBox} key={open} projectId={id} n={open} copy={p.change} cost={approx(estimateUsd(model, "preprodPart"))} mic={t.mic} run={runCopy} rewriteLabel={t.preprod.rewrite} />
                       )}
                       {showing === 3 && editableHere && open >= 13 && open <= 18 && Boolean(content[open]) && (
                         <LookAssistant
+                          box={stepBox}
                           key={open}
                           projectId={id}
                           n={open}
@@ -825,8 +820,11 @@ export default async function ProjectPage({
                           rewriteLabel={t.look.rewrite}
                         />
                       )}
+                      {showing === 5 && genData && genData.editable && (
+                        <GenAssistant key={open} d={genData} g={t.generate} run={runCopy} copy={{ ...p.change, apply: t.generate.planAsk, working: t.generate.planThinking }} box={stepBox} cost={approx(estimateUsd("gpt-6-1-terra", "revise"))} mic={t.mic} />
+                      )}
                       {showing === 1 && open !== 1 && docsReady && editableHere && (
-                        <DocsAssistant projectId={id} copy={p.change} cost={approx(estimateUsd(model, "stageOne"))} mic={t.mic} run={runCopy} rewriteLabel={p.rewrite} />
+                        <DocsAssistant box={stepBox} projectId={id} copy={p.change} cost={approx(estimateUsd(model, "stageOne"))} mic={t.mic} run={runCopy} rewriteLabel={p.rewrite} />
                       )}
                     </section>
                   ),
@@ -838,7 +836,7 @@ export default async function ProjectPage({
         </>
       )}
 
-      <AutoRefresh active={generating} />
+      <AutoRefresh active={generating} projectId={id} />
       {showing < stage && (
         <footer className="shrink-0 sticky bottom-0 bg-surface border-t border-line px-5 py-3 flex flex-wrap gap-3 items-center z-10">
           <span className="small text-ink-muted grow">{fill(t.stage.viewingApproved, { name: names[order.indexOf(showing)] ?? "" })}</span>

@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { MicButton } from "@/components/mic-button";
-import { saveBriefIdea, saveOutputEdit, writeBriefDocuments } from "./actions";
+import { browserClient } from "@/lib/supabase/client";
+import type { Tip } from "@/lib/step-tips";
+import { prepareUpload, saveBriefIdea, saveOutputEdit, writeBriefDocuments } from "./actions";
+import type { StepFile } from "./creative-run";
 
 type Json = string | number | boolean | null | Json[] | { [k: string]: Json };
 
@@ -224,12 +227,19 @@ export function BriefIdeaEditor({
 }
 
 // "Tell Menab what to change": revises the documents from one instruction, cost shown first.
+// Tips and the attach labels for a step's assistant box.
+export type StepBox = { tips: Tip[]; attach: { add: string; remove: string; tips: string } };
+
+// The assistant box of a step: tips for this step and video type, a text box with the mic, photos
+// or PDFs to attach, and one button that shows the price before the AI changes the step.
 export function ChangeBox({
   projectId,
   copy,
   cost,
   disabled,
   mic,
+  tips = [],
+  attach,
   onApply,
 }: {
   projectId: string;
@@ -237,19 +247,64 @@ export function ChangeBox({
   cost: string;
   disabled?: boolean;
   mic?: { start: string; stop: string; working: string; blocked: string };
+  tips?: Tip[];
+  attach?: { add: string; remove: string; tips: string };
   // Another way to apply the change (the Creative stage streams its steps); default: stage 1 documents.
-  onApply?: (text: string) => Promise<{ error?: string }>;
+  onApply?: (text: string, files: StepFile[]) => Promise<{ error?: string }> | void;
 }) {
   const router = useRouter();
   const [text, setText] = useState("");
+  const [files, setFiles] = useState<StepFile[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | undefined>();
+  const picker = useRef<HTMLInputElement>(null);
+  const addText = (x: string) => setText((v) => (v.trim() ? `${v.trim()} ${x}` : x));
+  const upload = async (list: FileList | null) => {
+    if (!list?.length) return;
+    setUploading(true);
+    const added: StepFile[] = [];
+    for (const file of Array.from(list).slice(0, 5 - files.length)) {
+      const prep = await prepareUpload(projectId, "file", file.name, file.type, file.size);
+      if (!prep.path || !prep.token) {
+        setError(prep.error);
+        continue;
+      }
+      const { error: e } = await browserClient().storage.from("media").uploadToSignedUrl(prep.path, prep.token, file, { contentType: file.type });
+      if (e) {
+        setError(e.message);
+        continue;
+      }
+      added.push({ path: prep.path, name: file.name, mime: file.type });
+    }
+    setFiles((f) => [...f, ...added]);
+    setUploading(false);
+  };
+  const ready = Boolean(text.trim() || files.length);
   return (
     <div className="flex flex-col gap-2 border-t border-line pt-3">
       <div className="flex items-center justify-between gap-2">
         <label htmlFor="change-box" className="mn-label">{copy.label}</label>
-        {mic && <MicButton projectId={projectId} labels={mic} size={28} onText={(t) => setText((x) => (x.trim() ? `${x.trim()} ${t}` : t))} />}
+        {mic && <MicButton projectId={projectId} labels={mic} size={28} onText={addText} />}
       </div>
+      {tips.length > 0 && attach && (
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label={attach.tips}>
+          {tips.map((x) => (
+            <button
+              key={x.label}
+              type="button"
+              className="mn-btn mn-btn--secondary mn-btn--sm"
+              disabled={disabled || pending}
+              onClick={() => {
+                addText(x.text);
+                if (x.file) picker.current?.click();
+              }}
+            >
+              {x.file && <span aria-hidden="true">+ </span>}{x.label}
+            </button>
+          ))}
+        </div>
+      )}
       <textarea
         id="change-box"
         dir="auto"
@@ -260,18 +315,37 @@ export function ChangeBox({
         disabled={disabled || pending}
         onChange={(e) => setText(e.target.value)}
       />
+      {attach && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {files.map((f) => (
+            <span key={f.path} className="mn-chip max-w-full">
+              <span className="truncate max-w-[180px]" dir="auto">{f.name}</span>
+              <button type="button" aria-label={`${attach.remove}: ${f.name}`} title={attach.remove} onClick={() => setFiles((l) => l.filter((y) => y.path !== f.path))}>✕</button>
+            </span>
+          ))}
+          {files.length < 5 && (
+            <label className={`mn-btn mn-btn--ghost mn-btn--sm ${uploading || disabled || pending ? "opacity-60 pointer-events-none" : "cursor-pointer"}`}>
+              <span aria-hidden="true">+ </span>{uploading ? copy.working : attach.add}
+              <input ref={picker} type="file" accept="image/png,image/jpeg,image/webp,application/pdf" multiple className="sr-only" onChange={(e) => { upload(e.target.files); e.target.value = ""; }} />
+            </label>
+          )}
+        </div>
+      )}
       {error && <p role="alert" className="small m-0">{error}</p>}
       <button
         type="button"
         className="mn-btn mn-btn--secondary mn-btn--sm justify-between w-full"
-        disabled={disabled || pending || !text.trim()}
+        disabled={disabled || pending || uploading || !ready}
         onClick={() => {
-          setTimeout(() => router.refresh(), 1500);
+          const sent = files;
           start(async () => {
-            const res = onApply ? await onApply(text) : await writeBriefDocuments(projectId, text);
-            setError(res.error);
-            if (!res.error) setText("");
-            router.refresh();
+            const res = onApply ? await onApply(text, sent) : await writeBriefDocuments(projectId, text);
+            setError(res?.error);
+            if (!res?.error) {
+              setText("");
+              setFiles([]);
+            }
+            if (!onApply) router.refresh();
           });
         }}
       >

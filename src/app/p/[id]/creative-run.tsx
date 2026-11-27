@@ -33,17 +33,19 @@ export type RunCopy = {
   };
 };
 type Ev = { t: string; at?: number; [k: string]: unknown };
+// A photo or PDF attached in a step's assistant box, already uploaded to the project.
+export type StepFile = { path: string; name: string; mime: string };
 type Action =
   | { kind: "directions" }
   | { kind: "build" }
-  | { kind: "revise"; n: number; instruction: string }
+  | { kind: "revise"; n: number; instruction: string; files?: StepFile[] }
   | { kind: "redo"; n: number }
-  | { kind: "docs"; instruction?: string }
-  | { kind: "look"; action: { kind: "write" } | { kind: "redo"; n: number } | { kind: "revise"; n: number; instruction: string } }
+  | { kind: "docs"; instruction?: string; files?: StepFile[] }
+  | { kind: "look"; action: { kind: "write" } | { kind: "redo"; n: number } | { kind: "revise"; n: number; instruction: string; files?: StepFile[] } }
   | { kind: "frames"; frames: number[]; style: "sketch" | "photo"; model: string; aspect: string }
   | { kind: "refs"; refs: "character" | "location"; names: string[]; model: string }
   | { kind: "gen"; body: Record<string, unknown> }
-  | { kind: "preprod"; action: { kind: "write" } | { kind: "redo"; n: number } | { kind: "revise"; n: number; instruction: string } };
+  | { kind: "preprod"; action: { kind: "write" } | { kind: "redo"; n: number } | { kind: "revise"; n: number; instruction: string; files?: StepFile[] } };
 
 const fillIn = (s: string, v: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? ""));
 
@@ -112,7 +114,7 @@ export function useCreativeRun(projectId: string, c: RunCopy) {
     let finished = false;
     try {
       const endpoint = action.kind === "docs" ? "documents" : action.kind === "look" ? "look" : action.kind === "frames" || action.kind === "refs" ? "frames" : action.kind === "gen" ? "generate" : action.kind === "preprod" ? "preprod" : "creative";
-      const payload = action.kind === "docs" ? { instruction: action.instruction } : action.kind === "look" || action.kind === "preprod" ? action.action : action.kind === "refs" ? { refs: action.refs, names: action.names, model: action.model } : action.kind === "gen" ? action.body : action;
+      const payload = action.kind === "docs" ? { instruction: action.instruction, files: action.files } : action.kind === "look" || action.kind === "preprod" ? action.action : action.kind === "refs" ? { refs: action.refs, names: action.names, model: action.model } : action.kind === "gen" ? action.body : action;
       const res = await fetch(`/p/${projectId}/${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { mediaUrl } from "@/lib/media-url";
 import { notFound } from "next/navigation";
 import { IconFolder } from "@/components/icons";
 import { loadDeck } from "@/lib/deck";
@@ -33,7 +34,8 @@ export default async function FilesPage({ params }: { params: Promise<{ id: stri
   try {
     const admin = createAdminClient();
     const [{ data: view }] = await Promise.all([admin.storage.from("media").createSignedUrls(items.map((x) => x.path), 3600)]);
-    for (const v of view ?? []) if (v.path && v.signedUrl) links.set(v.path, { view: v.signedUrl, download: `${v.signedUrl}&download=` });
+    // Shown at a stable address so it downloads once; the download link is only used on a click.
+    for (const v of view ?? []) if (v.path && v.signedUrl) links.set(v.path, { view: mediaUrl(v.path), download: `${v.signedUrl}&download=` });
   } catch {
     // No links: the pictures list shows without images.
   }

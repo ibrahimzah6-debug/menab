@@ -226,3 +226,32 @@ export async function runBriefMessage(projectId: string, payload: BriefPayload, 
     await saveVersion(supabase, o, c, "ai", me.userId, used);
   }
 }
+
+// The files attached to a step's assistant box: only this project's own uploads, as the AI reads them.
+export type StepFile = { path: string; name: string; mime: string };
+export function stepFilesFrom(x: unknown): StepFile[] {
+  if (!Array.isArray(x)) return [];
+  return x
+    .map((f) => ({ path: String(f?.path ?? ""), name: String(f?.name ?? "file").slice(0, 200), mime: String(f?.mime ?? "") }))
+    .filter((f) => f.path && FILE_TYPES.includes(f.mime))
+    .slice(0, 5);
+}
+export async function loadStepFiles(projectId: string, list: StepFile[]): Promise<Attachment[]> {
+  if (!list.length) return [];
+  const { me } = await loadProject(projectId);
+  const admin = createAdminClient();
+  const out: Attachment[] = [];
+  for (const f of list) {
+    if (!ownPath(f.path, me.workspace.id, projectId)) throw new Error("File not found.");
+    const { data } = await admin.storage.from("media").download(f.path);
+    if (!data) throw new Error("File not found.");
+    out.push({ mime: f.mime, base64: Buffer.from(await data.arrayBuffer()).toString("base64"), name: f.name });
+  }
+  return out;
+}
+// The instruction with the attached file names, so the AI knows what they are.
+export const withFileNames = (instruction: string, list: StepFile[]) => {
+  const names = list.map((f) => f.name).join(", ");
+  const text = instruction.trim() || "Use the attached files.";
+  return (names ? `${text}\n\nAttached files: ${names}` : text).slice(0, 2400);
+};

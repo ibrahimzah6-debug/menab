@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ChangeBox } from "./editors";
+import { ChangeBox, type StepBox } from "./editors";
 import { RunLine, useCreativeRun, type RunCopy } from "./creative-run";
 
 // Asks Menab to change the open Creative document; the steps show on one line.
@@ -13,7 +13,9 @@ export function CreativeAssistant({
   cost,
   mic,
   run,
+  box,
 }: {
+  box?: StepBox;
   projectId: string;
   n: number;
   copy: { label: string; placeholder: string; apply: string; working: string };
@@ -24,7 +26,7 @@ export function CreativeAssistant({
   const r = useCreativeRun(projectId, run);
   return (
     <div className="flex flex-col gap-2">
-      <ChangeBox projectId={projectId} copy={copy} cost={cost} mic={mic} onApply={(text) => r.run({ kind: "revise", n, instruction: text })} />
+      <ChangeBox projectId={projectId} copy={copy} cost={cost} mic={mic} tips={box?.tips} attach={box?.attach} onApply={(text, files) => r.run({ kind: "revise", n, instruction: text, files })} />
       <div className="flex items-center gap-3">
         <RunLine events={r.events} busy={r.busy} c={run} startedAt={r.startedAt} />
         {r.busy && <button type="button" className="mn-btn mn-btn--ghost mn-btn--sm" onClick={r.stop}>{run.steps.stop}</button>}
@@ -55,13 +57,31 @@ export function CreativeStart({ projectId, label, cost, message, run }: { projec
 }
 
 // While Menab writes in the background, the page checks every few seconds for new pieces.
-export function AutoRefresh({ active, every = 4000 }: { active: boolean; every?: number }) {
+// While AI work runs, asks every few seconds whether anything changed, and reloads the page only
+// when it did. Reloading every time downloaded every picture again and again.
+export function AutoRefresh({ active, projectId, every = 5000 }: { active: boolean; projectId: string; every?: number }) {
   const router = useRouter();
   useEffect(() => {
     if (!active) return;
-    const id = setInterval(() => router.refresh(), every);
-    return () => clearInterval(id);
-  }, [active, every, router]);
+    let last: string | null = null;
+    let stopped = false;
+    const check = async () => {
+      try {
+        const res = await fetch(`/p/${projectId}/status`, { cache: "no-store" });
+        const { v } = (await res.json()) as { v: string | null };
+        if (!stopped && v && last !== null && v !== last) router.refresh();
+        last = v;
+      } catch {
+        // Offline for a moment: try again next time.
+      }
+    };
+    void check();
+    const id = setInterval(check, every);
+    return () => {
+      stopped = true;
+      clearInterval(id);
+    };
+  }, [active, every, projectId, router]);
   return null;
 }
 
@@ -116,7 +136,9 @@ export function DocsAssistant({
   mic,
   run,
   rewriteLabel,
+  box,
 }: {
+  box?: StepBox;
   projectId: string;
   copy: { label: string; placeholder: string; apply: string; working: string };
   cost: string;
@@ -127,7 +149,7 @@ export function DocsAssistant({
   const r = useCreativeRun(projectId, run);
   return (
     <div className="flex flex-col gap-2">
-      <ChangeBox projectId={projectId} copy={copy} cost={cost} mic={mic} disabled={r.busy} onApply={(text) => r.run({ kind: "docs", instruction: text })} />
+      <ChangeBox projectId={projectId} copy={copy} cost={cost} mic={mic} disabled={r.busy} tips={box?.tips} attach={box?.attach} onApply={(text, files) => r.run({ kind: "docs", instruction: text, files })} />
       <button type="button" className="mn-btn mn-btn--ghost mn-btn--sm justify-between w-full" disabled={r.busy} onClick={() => r.run({ kind: "docs" })}>
         <span>{rewriteLabel}</span>
         <span className="mn-btn__cost">{cost}</span>
